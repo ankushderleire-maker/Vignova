@@ -21,9 +21,7 @@ app.add_middleware(
 )
 
 # ── Trusted Hosts: Only accept requests for known hostnames ──
-trusted_hosts = os.getenv("TRUSTED_HOSTS", "localhost,127.0.0.1").split(",")
-trusted_hosts = [h.strip() for h in trusted_hosts if h.strip()]
-app.add_middleware(TrustedHostMiddleware, allowed_hosts=trusted_hosts)
+trusted_hosts = os.getenv("TRUSTED_HOSTS", "*").split(",")
 
 # ── Request Body Size Limit Middleware (10 MB max) ──
 MAX_BODY_SIZE = 10 * 1024 * 1024  # 10 MB
