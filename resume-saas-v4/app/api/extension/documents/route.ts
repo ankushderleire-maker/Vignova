@@ -37,7 +37,7 @@ export async function GET(req: Request) {
         const jobsWithLetters = await db.jobApplication.findMany({
             where: {
                 userId,
-                coverLetter: { not: null, not: "" }
+                coverLetter: { not: "" }
             },
             orderBy: { createdAt: "desc" },
             take: 20,
