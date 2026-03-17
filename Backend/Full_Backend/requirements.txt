@@ -1,0 +1,17 @@
+fastapi
+uvicorn
+python-dotenv
+pydantic
+pypdf
+google-generativeai
+sentence-transformers
+torch
+spacy
+keybert
+PyMuPDF
+nltk
+python-multipart
+sarvamai
+psycopg2-binary
+requests
+aiohttp
