@@ -1,6 +1,7 @@
 import os
 import json
 import logging
+import requests
 from fastapi import APIRouter, UploadFile, File, HTTPException
 from app.config import model
 from app.models.schemas import ResumeSchema, TailorRequest
@@ -13,6 +14,9 @@ logger = logging.getLogger("resume")
 
 # Max upload size: 5 MB
 MAX_FILE_SIZE = 5 * 1024 * 1024
+
+OLLAMA_BASE_URL = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434")
+OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "deepseek-r1:1.5b")
 
 
 @router.post("/api/parse-resume")
@@ -54,8 +58,34 @@ async def parse_resume(file: UploadFile = File(...)):
     """
 
     try:
-        response = model.generate_content(prompt)
-        parsed_json = extract_json_from_response(response.text)
+        logger.info(f"Sending resume text to local Ollama ({OLLAMA_MODEL})")
+        ollama_response = requests.post(
+            f"{OLLAMA_BASE_URL}/api/generate",
+            json={
+                "model": OLLAMA_MODEL,
+                "prompt": prompt,
+                "stream": False,
+                "options": {
+                    "temperature": 0.1,
+                    "num_predict": 2048,
+                },
+                "format": "json"
+            },
+            timeout=120,
+        )
+
+        if ollama_response.status_code != 200:
+            logger.error(f"Ollama HTTP error: {ollama_response.status_code}")
+            return {"data": ResumeSchema().model_dump()}
+
+        ollama_data = ollama_response.json()
+        response_text = ollama_data.get("response", "")
+        
+        # DeepSeek outputs <think> tags. Clean them out if present before passing to json parser
+        import re
+        response_text = re.sub(r'<think>.*?</think>', '', response_text, flags=re.DOTALL).strip()
+
+        parsed_json = extract_json_from_response(response_text)
         
         if not parsed_json:
             return {"data": ResumeSchema().model_dump()}
