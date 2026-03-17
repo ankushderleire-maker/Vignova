@@ -6,7 +6,7 @@ sleep 5
 
 echo "Pushing database schema..."
 # Automatically create the tables in the database if they don't exist
-npx prisma db push --accept-data-loss
+npx prisma@6 db push --accept-data-loss
 
 echo "Starting Next.js server..."
 # Start the production server
