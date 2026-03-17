@@ -1,0 +1,31 @@
+name: Deploy to VPS
+
+on:
+  push:
+    branches:
+      - deploy
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VIGNOVA_VPS }}
+          script: |
+            cd /www/wwwroot/Vignova
+
+            echo "Pulling latest code..."
+            git pull origin deploy
+
+            echo "Rebuilding containers..."
+            docker-compose down
+            docker-compose build --no-cache
+            docker-compose up -d
+
+            echo "Cleaning old images..."
+            docker system prune -f
