@@ -1,0 +1,1 @@
+call npx eslint "components/resume-html-templates/LuxeTemplate.tsx" "components/resume-html-templates/MinimalTemplate.tsx" "components/resume-html-templates/NordicTemplate.tsx" "components/resume-html-templates/DiamondTemplate.tsx" "components/resume-html-templates/ExecutiveTemplate.tsx" > lint_results.txt 2>&1

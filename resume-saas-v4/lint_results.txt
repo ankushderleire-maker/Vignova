@@ -1,0 +1,33 @@
+
+H:\Ankush\RESUME PRO\resume-saas-v4\components\resume-html-templates\DiamondTemplate.tsx
+   86:55  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  356:43  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  356:65  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  357:38  error  A `require()` style import is forbidden   @typescript-eslint/no-require-imports
+
+H:\Ankush\RESUME PRO\resume-saas-v4\components\resume-html-templates\ExecutiveTemplate.tsx
+   83:55  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  350:45  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  350:67  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  351:38  error  A `require()` style import is forbidden   @typescript-eslint/no-require-imports
+
+H:\Ankush\RESUME PRO\resume-saas-v4\components\resume-html-templates\LuxeTemplate.tsx
+   87:47  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  349:40  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  349:62  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  350:38  error  A `require()` style import is forbidden   @typescript-eslint/no-require-imports
+
+H:\Ankush\RESUME PRO\resume-saas-v4\components\resume-html-templates\MinimalTemplate.tsx
+   88:47  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  303:43  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  303:65  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  304:38  error  A `require()` style import is forbidden   @typescript-eslint/no-require-imports
+
+H:\Ankush\RESUME PRO\resume-saas-v4\components\resume-html-templates\NordicTemplate.tsx
+   78:47  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  294:42  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  294:64  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  295:38  error  A `require()` style import is forbidden   @typescript-eslint/no-require-imports
+
+✖ 20 problems (20 errors, 0 warnings)
+

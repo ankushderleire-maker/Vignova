@@ -1,0 +1,192 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model users {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email         String   @unique
+  password_hash String
+  full_name     String?
+  role          String   @default("USER") // USER | ADMIN
+  created_at    DateTime @default(now())
+
+  // Relations
+  subscriptions   subscriptions[]
+  master_profiles master_profiles[]
+
+  // Add this line so Prisma knows about the relationship
+  job_applications  JobApplication[]
+  generated_resumes GeneratedResume[]
+  payments          Payment[]
+
+  // Extension Settings
+  extensionSettings Json?    @default("{}") // Stores template preferences: { mode: "specific"|"random" | "curated", templateId: string, templateIds: string[] }
+}
+
+model Payment {
+  id              String   @id @default(cuid())
+  userId          String   @db.Uuid
+  amount          Float
+  currency        String   @default("USD")
+  status          String   // COMPLETED, PENDING, FAILED
+  paymentMethod   String   @default("PAYPAL")
+  transactionId   String   // PayPal Order ID
+  planType        String
+  billingCycle    String
+  createdAt       DateTime @default(now())
+
+  user users @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([userId])
+}
+
+model master_profiles {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id     String   @db.Uuid
+  name        String   @default("Primary Profile")
+  parsed_data Json?    @default("{}")
+  is_default  Boolean  @default(false)
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+
+  user users @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, name])
+  @@index([user_id])
+}
+
+model subscriptions {
+  id                   String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id              String    @unique @db.Uuid // One subscription per user
+  
+  // Plan Details
+  plan_type            String    @default("FREE") // FREE | PRO | PREMIUM
+  billing_cycle        String    @default("MONTHLY") // MONTHLY | SEMI_ANNUAL | ANNUAL
+  
+  // Credits
+  credits_remaining    Int       @default(3)
+  credits_total        Int       @default(3) // Total credits per cycle
+  
+  // Feature Flags
+  has_extension_access Boolean   @default(false)
+  has_multi_profile    Boolean   @default(false)
+  has_unlimited_resumes Boolean  @default(false)
+  
+  // Billing Dates
+  starts_at            DateTime  @default(now())
+  expires_at           DateTime?
+  
+  // Timestamps
+  created_at           DateTime  @default(now())
+  updated_at           DateTime  @updatedAt
+
+  user users @relation(fields: [user_id], references: [id], onDelete: Cascade)
+}
+
+// --- NEW CORRECTED MODEL ---
+model JobApplication {
+  id String @id @default(cuid())
+
+  // FIXED: Must be @db.Uuid to match the 'users' table ID type
+  userId String @db.Uuid
+
+  company     String
+  jobTitle    String
+  location    String?
+  jobUrl      String?
+  salary      String?
+  description String?  @db.Text
+  coverLetter String?  @db.Text
+  status      String   @default("SAVED")
+  matchScore  Int?     @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Chrome Extension Support
+  source      String   @default("manual") // "manual" | "extension"
+  sourceUrl   String?  // Original job posting URL from extension
+
+  // FIXED: Changed 'User' to 'users' to match your model name
+  user users @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Relation to generated resumes for this job
+  generatedResumes GeneratedResume[]
+
+  @@index([userId])
+  @@index([source])
+}
+
+model GeneratedResume {
+  id        String   @id @default(cuid())
+  userId    String   @db.Uuid
+  jobId     String
+  content   Json // Stores the full resume content
+  name      String // E.g., "Resume 1", "Draft 2026-02-07"
+  createdAt DateTime @default(now())
+
+  // Chrome Extension Support & Analytics
+  source          String   @default("manual") // "manual" | "extension"
+  sourceUrl       String?  // Original job posting URL
+  extensionData   Json?    // Additional metadata from extension
+
+  user users          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  job  JobApplication @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([jobId])
+  @@index([createdAt]) // For analytics time-series queries
+  @@index([source])    // Filter by source
+}
+
+model plan_configs {
+  id                   String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  plan_type            String   @unique // FREE | PRO | PREMIUM
+  name                 String   // Display name: "Free", "Pro", "Premium"
+  description          String   // Tagline: "Get started with basic features"
+
+  // Pricing
+  monthly_price        Float    @default(0)
+  
+  // Credits
+  credits              Int      @default(3)
+
+  // Feature Flags
+  has_extension_access Boolean  @default(false)
+  has_multi_profile    Boolean  @default(false)
+  has_unlimited_resumes Boolean @default(false)
+
+  // Feature Display Strings
+  resume_creation_label String  @default("3 resumes/month")
+  ai_optimization_label String  @default("Basic")
+  templates_label       String  @default("5 templates")
+  support_label         String  @default("Community")
+
+  // UI
+  is_popular           Boolean  @default(false)
+
+  // Timestamps
+  created_at           DateTime @default(now())
+  updated_at           DateTime @updatedAt
+}
+
+// --- PUBLIC JOB LISTINGS (populated by Python cron worker) ---
+model jobs {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  title       String
+  company     String
+  location    String?
+  description String?   @db.Text
+  apply_url   String?
+  source      String?
+  date_posted DateTime?
+  created_at  DateTime  @default(now())
+
+  @@unique([title, company, location])
+  @@index([title])
+  @@index([location])
+  @@index([company])
+}

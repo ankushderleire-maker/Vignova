@@ -1,0 +1,1003 @@
+/* ═══════════════════════════════════════════
+   Vignova Extension — Popup Styles v2
+   ═══════════════════════════════════════════ */
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+html {
+    height: 100%;
+}
+
+body {
+    width: 380px;
+    height: 100%;
+    font-family: 'Geist', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: #ffffff;
+    color: #0f172a;
+    display: flex;
+    flex-direction: column;
+}
+
+.vignova-popup {
+    padding: 0;
+    position: relative;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+/* ─── Header ─── */
+.vignova-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    background: #000000;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+}
+
+.vignova-logo {
+    display: flex;
+    align-items: flex-end;
+    gap: 0;
+}
+
+.vignova-logo-icon {
+    font-size: 16px;
+    background: linear-gradient(135deg, #f97316, #ea580c);
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 7px;
+}
+
+.vignova-logo-text {
+    font-size: 17px;
+    font-weight: 800;
+    letter-spacing: -0.3px;
+    color: #ffffff;
+    margin-left: -6px;
+    margin-bottom: 1px;
+}
+
+.vignova-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.vignova-icon-btn {
+    background: none;
+    border: none;
+    color: #ffffff;
+    font-size: 16px;
+    cursor: pointer;
+    padding: 6px;
+    border-radius: 6px;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.vignova-icon-btn:hover {
+    color: #00ff9c;
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.vignova-icon-btn-sm {
+    background: none;
+    border: none;
+    color: #9CA3AF;
+    font-size: 12px;
+    cursor: pointer;
+    padding: 2px 4px;
+    border-radius: 4px;
+    transition: all 0.15s;
+}
+
+.vignova-icon-btn-sm:hover {
+    color: #f97316;
+}
+
+/* ─── Views ─── */
+.vignova-view {
+    padding: 0;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+#dashboardView {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+/* ─── Login ─── */
+#loginView {
+    padding: 20px;
+}
+
+.vignova-welcome h2 {
+    font-size: 20px;
+    font-weight: 700;
+    margin-bottom: 4px;
+}
+
+.vignova-welcome p {
+    font-size: 13px;
+    color: #475569;
+    margin-bottom: 20px;
+}
+
+.vignova-field {
+    margin-bottom: 14px;
+}
+
+.vignova-field label {
+    display: block;
+    font-size: 11px;
+    font-weight: 600;
+    color: #475569;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 6px;
+}
+
+.vignova-field input {
+    width: 100%;
+    padding: 10px 14px;
+    background: #f8fafc;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    color: #0f172a;
+    font-size: 14px;
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+.vignova-field input:focus {
+    border-color: #059669;
+}
+
+.vignova-field input::placeholder {
+    color: #9CA3AF;
+}
+
+/* ─── Buttons ─── */
+.vignova-btn-primary {
+    width: 100%;
+    padding: 11px;
+    background: rgba(5, 150, 105, 0.1);
+    border: 1.5px solid rgba(5, 150, 105, 0.4);
+    border-radius: 8px;
+    color: #059669;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s, transform 0.1s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    text-decoration: none;
+    text-align: center;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.vignova-btn-primary:hover {
+    background: rgba(5, 150, 105, 0.2);
+    box-shadow: 0 4px 6px rgba(5, 150, 105, 0.15);
+    border-color: rgba(5, 150, 105, 0.6);
+}
+
+.vignova-btn-primary:active {
+    transform: scale(0.98);
+}
+
+.vignova-btn-primary:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.vignova-btn-secondary {
+    width: 100%;
+    padding: 9px;
+    background: #f1f5f9;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    color: #475569;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.vignova-btn-secondary:hover {
+    background: #e2e8f0;
+    color: #0f172a;
+}
+
+.vignova-btn-autofill {
+    width: 100%;
+    padding: 8px 12px;
+    background: rgba(5, 150, 105, 0.1);
+    border: 1.5px solid rgba(5, 150, 105, 0.4);
+    border-radius: 8px;
+    color: #059669;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin-bottom: 12px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.vignova-btn-autofill:hover {
+    transform: scale(0.99);
+    background: rgba(5, 150, 105, 0.2);
+    box-shadow: 0 4px 6px rgba(5, 150, 105, 0.15);
+    border-color: rgba(5, 150, 105, 0.6);
+}
+
+.vignova-btn-autofill:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.vignova-btn-autofill-active {
+    background: rgba(239, 68, 68, 0.1);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    color: #ef4444;
+}
+
+.vignova-btn-tailor {
+    width: 100%;
+    padding: 11px;
+    background: rgba(5, 150, 105, 0.1);
+    border: 1.5px solid rgba(5, 150, 105, 0.4);
+    border-radius: 8px;
+    color: #059669;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s;
+    margin-top: 8px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.vignova-btn-tailor:hover {
+    background: rgba(5, 150, 105, 0.2);
+    box-shadow: 0 4px 6px rgba(5, 150, 105, 0.15);
+    border-color: rgba(5, 150, 105, 0.6);
+}
+
+/* Spinner */
+.vignova-spinner {
+    width: 16px;
+    height: 16px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-top-color: #111827;
+    border-radius: 50%;
+    animation: vignova-spin 0.6s linear infinite;
+    display: inline-block;
+}
+
+@keyframes vignova-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* Error */
+.vignova-error {
+    background: rgba(239, 68, 68, 0.1);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 12px;
+    color: #f87171;
+    margin-bottom: 14px;
+}
+
+/* ═══ TAB BAR ═══ */
+.vignova-tabs {
+    display: flex;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+    background: rgba(0, 0, 0, 0.02);
+    padding: 0 4px;
+    backdrop-filter: blur(8px);
+}
+
+.vignova-tab {
+    flex: 1;
+    padding: 10px 8px;
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: #475569;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    transition: all 0.2s;
+}
+
+.vignova-tab:hover {
+    color: #0f172a;
+}
+
+.vignova-tab.active {
+    color: #059669;
+    border-bottom-color: #059669;
+}
+
+.vignova-tab-icon {
+    font-size: 13px;
+}
+
+/* ═══ TAB CONTENT ═══ */
+.vignova-tab-content {
+    display: none;
+    padding: 14px 16px;
+    animation: tabFadeIn 0.2s ease;
+    flex: 1;
+    flex-direction: column;
+    overflow-y: auto;
+}
+
+.vignova-tab-content.active {
+    display: flex;
+}
+
+@keyframes tabFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(4px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* ═══ AUTOFILL TAB ═══ */
+
+/* Job Banner */
+.vignova-job-banner {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    background: rgba(5, 150, 105, 0.08);
+    border: 1px solid rgba(5, 150, 105, 0.2);
+    border-radius: 10px;
+    margin-bottom: 12px;
+}
+
+.vignova-job-banner-icon {
+    font-size: 24px;
+    flex-shrink: 0;
+}
+
+.vignova-job-banner-text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.vignova-job-banner-text strong {
+    font-size: 12px;
+    color: #0f172a;
+}
+
+.vignova-job-banner-text span {
+    font-size: 11px;
+    color: #475569;
+}
+
+/* Active Profile */
+.vignova-active-profile {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 10px;
+    background: #f8fafc;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    margin-bottom: 12px;
+    font-size: 12px;
+}
+
+.vignova-active-profile-label {
+    color: #475569;
+}
+
+.vignova-active-profile strong {
+    color: #059669;
+    flex: 1;
+}
+
+/* Quick Actions */
+.vignova-quick-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.vignova-quick-action {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 10px 6px;
+    background: #ffffff;
+    border: 1px solid #cbd5e1;
+    border-radius: 10px;
+    cursor: pointer;
+    color: #475569;
+    transition: all 0.2s;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
+}
+
+.vignova-quick-action:hover {
+    background: #f8fafc;
+    border-color: #94a3b8;
+    color: #0f172a;
+    transform: translateY(-1px);
+}
+
+.vignova-qa-icon {
+    font-size: 18px;
+}
+
+.vignova-qa-label {
+    font-size: 10px;
+    font-weight: 600;
+}
+
+/* Link Row */
+.vignova-link-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 12px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    color: #475569;
+    font-size: 12px;
+    text-decoration: none;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.vignova-link-row:hover {
+    background: #e2e8f0;
+    color: #0f172a;
+}
+
+.vignova-arrow {
+    color: #9CA3AF;
+}
+
+/* ═══ KEYWORDS TAB ═══ */
+
+/* ═══ KEYWORDS TAB (MATCH BREAKDOWN) ═══ */
+.vignova-match-breakdown {
+    background-color: #FFFFFF;
+    background-image: linear-gradient(rgba(34, 197, 94, 0.08) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(34, 197, 94, 0.08) 1px, transparent 1px);
+    background-size: 20px 20px;
+    border: 1px solid rgba(34, 197, 94, 0.3);
+    border-radius: 8px;
+    padding: 12px;
+    margin-bottom: 12px;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+}
+
+.vignova-mb-header {
+    font-size: 14px;
+    font-weight: 700;
+    color: #111827;
+    margin-bottom: 12px;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+    padding-bottom: 8px;
+}
+
+.vignova-mb-row {
+    display: flex;
+    align-items: center;
+    margin-bottom: 8px;
+    font-size: 11px;
+}
+
+.vignova-mb-label {
+    width: 90px;
+    color: #6B7280;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+}
+
+.vignova-mb-bar-bg {
+    flex: 1;
+    height: 6px;
+    background: rgba(0, 0, 0, 0.1);
+    border-radius: 4px;
+    margin: 0 10px;
+    overflow: hidden;
+}
+
+.vignova-mb-bar-fill {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.6s ease;
+}
+
+.vignova-mb-val {
+    width: 35px;
+    text-align: right;
+    color: #111827;
+    font-weight: 600;
+}
+
+.vignova-keyword-tier {
+    margin-bottom: 12px;
+}
+
+.vignova-keyword-tier-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 12px;
+    background: #f8fafc;
+    border: 1px solid #f1f5f9;
+    border-radius: 6px;
+    margin-bottom: 8px;
+}
+
+.vignova-keyword-tier-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: #0f172a;
+}
+
+.vignova-keyword-tier-badge {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    background: white;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 600;
+    color: #059669;
+    border: 1px solid #e0f2fe;
+}
+
+.vignova-badge-low {
+    color: #94a3b8;
+    border-color: #f1f5f9;
+}
+
+.vignova-keyword-list {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    padding: 0 4px;
+}
+
+.vignova-keyword-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: #334155;
+}
+
+.vignova-keyword-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    color: white;
+}
+
+.vignova-keyword-icon.matched {
+    background: #2dd4bf;
+    /* Teal/Cyan for matched */
+}
+
+.vignova-keyword-icon.missing {
+    background: #64748b;
+    /* Slate grey for missing */
+}
+
+.vignova-keyword-empty-skeleton {
+    position: relative;
+    padding-top: 4px;
+}
+
+.vignova-skeleton-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+    background: rgba(255, 255, 255, 0.6);
+    backdrop-filter: blur(2px);
+    border-radius: 8px;
+    color: #64748b;
+}
+
+.vignova-skeleton-icon {
+    margin-bottom: 12px;
+    color: #94a3b8;
+    background: #ffffff;
+    padding: 12px;
+    border-radius: 50%;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.vignova-skeleton-bg {
+    opacity: 0.6;
+    pointer-events: none;
+    user-select: none;
+    box-shadow: none;
+}
+
+.vignova-skeleton-chip {
+    height: 20px;
+    background: #f1f5f9;
+    border-radius: 12px;
+}
+
+.vignova-score-status {
+    font-size: 12px;
+    color: #6B7280;
+    text-align: center;
+}
+
+.vignova-score-status.good {
+    color: #22c55e;
+}
+
+.vignova-score-status.ok {
+    color: #f59e0b;
+}
+
+.vignova-score-status.bad {
+    color: #ef4444;
+}
+
+/* ═══ PROFILE TAB ═══ */
+
+.vignova-profile-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px;
+    background: rgba(0, 0, 0, 0.03);
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    border-radius: 12px;
+    margin-bottom: 12px;
+}
+
+.vignova-profile-avatar {
+    width: 42px;
+    height: 42px;
+    background: linear-gradient(135deg, #34d399, #059669);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 800;
+    font-size: 16px;
+    flex-shrink: 0;
+}
+
+.vignova-profile-meta {
+    flex: 1;
+}
+
+.vignova-profile-meta .vignova-profile-name {
+    font-size: 15px;
+    font-weight: 700;
+}
+
+.vignova-profile-location {
+    font-size: 12px;
+    color: #6B7280;
+}
+
+.vignova-edit-link {
+    font-size: 12px;
+    color: #059669;
+    text-decoration: none;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.vignova-edit-link:hover {
+    text-decoration: underline;
+}
+
+/* Copy Rows */
+.vignova-copy-rows {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-bottom: 12px;
+}
+
+.vignova-copy-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    background: rgba(0, 0, 0, 0.02);
+    border: 1px solid rgba(0, 0, 0, 0.06);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.15s;
+    font-size: 12px;
+    color: #4B5563;
+}
+
+.vignova-copy-row:hover {
+    background: rgba(14, 165, 233, 0.05);
+    border-color: rgba(14, 165, 233, 0.2);
+}
+
+.vignova-copy-row:active {
+    transform: scale(0.98);
+}
+
+.vignova-copy-row-icon {
+    font-size: 14px;
+    flex-shrink: 0;
+}
+
+.vignova-copy-row-text {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.vignova-copy-row-hint {
+    font-size: 10px;
+    color: #9CA3AF;
+}
+
+/* Copyable Blocks */
+.vignova-copyable-block {
+    font-size: 11px;
+    line-height: 1.5;
+    color: #4B5563;
+    padding: 10px 12px;
+    background: rgba(0, 0, 0, 0.02);
+    border: 1px solid rgba(0, 0, 0, 0.05);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.vignova-copyable-block:hover {
+    background: rgba(14, 165, 233, 0.05);
+    border-color: rgba(14, 165, 233, 0.2);
+    color: #374151;
+}
+
+.vignova-copyable-block:active {
+    transform: scale(0.98);
+}
+
+/* Profile Sections */
+.vignova-profile-section {
+    padding: 10px 12px;
+    background: rgba(0, 0, 0, 0.02);
+    border: 1px solid rgba(0, 0, 0, 0.06);
+    border-radius: 10px;
+    margin-bottom: 8px;
+}
+
+.vignova-profile-section-title {
+    font-size: 11px;
+    font-weight: 700;
+    color: #6B7280;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 8px;
+}
+
+/* Experience/Education Items */
+.vignova-exp-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.vignova-exp-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    cursor: pointer;
+}
+
+.vignova-exp-item:hover .vignova-exp-title {
+    color: #0ea5e9;
+}
+
+.vignova-exp-icon {
+    width: 32px;
+    height: 32px;
+    background: rgba(14, 165, 233, 0.1);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    flex-shrink: 0;
+}
+
+.vignova-exp-title {
+    font-size: 12px;
+    font-weight: 600;
+    color: #374151;
+    transition: color 0.15s;
+}
+
+.vignova-exp-sub {
+    font-size: 11px;
+    color: #6B7280;
+}
+
+.vignova-exp-dates {
+    font-size: 10px;
+    color: #9CA3AF;
+}
+
+.vignova-empty {
+    font-size: 12px;
+    color: #9CA3AF;
+    text-align: center;
+    padding: 8px;
+}
+
+/* Plan Row */
+.vignova-plan-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    background: rgba(0, 0, 0, 0.02);
+    border: 1px solid rgba(0, 0, 0, 0.06);
+    border-radius: 8px;
+    margin-top: 12px;
+}
+
+.vignova-plan-badge {
+    font-size: 9px;
+    font-weight: 800;
+    padding: 3px 8px;
+    border-radius: 5px;
+    background: rgba(249, 115, 22, 0.12);
+    color: #f97316;
+    border: 1px solid rgba(249, 115, 22, 0.2);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.vignova-credits-inline {
+    font-size: 11px;
+    color: #6B7280;
+}
+
+.vignova-credits-inline span:first-child {
+    color: #111827;
+    font-weight: 700;
+}
+
+/* Copy Toast */
+.vignova-copy-toast {
+    position: fixed;
+    bottom: -40px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(34, 197, 94, 0.9);
+    color: #111827;
+    padding: 6px 16px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    transition: bottom 0.3s ease;
+    z-index: 999;
+}
+
+.vignova-copy-toast.show {
+    bottom: 16px;
+}
+
+/* ─── Upgrade ─── */
+.vignova-upgrade-content {
+    text-align: center;
+    padding: 20px;
+}
+
+.vignova-upgrade-icon {
+    font-size: 40px;
+    display: block;
+    margin-bottom: 12px;
+}
+
+.vignova-upgrade-content h3 {
+    font-size: 18px;
+    font-weight: 700;
+    margin-bottom: 8px;
+}
+
+.vignova-upgrade-content p {
+    font-size: 13px;
+    color: #6B7280;
+    margin-bottom: 20px;
+    line-height: 1.5;
+}
+
+/* ─── Scrollbars ─── */
+body {
+    overflow-x: hidden;
+}
+
+.vignova-tab-content {
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+/* Chrome/Edge Custom Thin Scrollbar */
+::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.15);
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.3);
+}

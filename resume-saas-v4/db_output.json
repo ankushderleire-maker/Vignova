@@ -1,0 +1,112 @@
+{
+  "users": [
+    {
+      "id": "91de1775-d185-4cfa-8a9c-b207cd2c3c1d",
+      "email": "ankush@gmail.com",
+      "full_name": "Ankush"
+    },
+    {
+      "id": "1a6fa6f0-faaa-420c-a14d-08883cb9132a",
+      "email": "test@example.com",
+      "full_name": "Test User"
+    },
+    {
+      "id": "926cc115-f7a9-4934-aa1c-14dde1c2705a",
+      "email": "testuser_12345@example.com",
+      "full_name": "Test User"
+    },
+    {
+      "id": "132aaee4-f9b7-45b7-ac6b-226727207386",
+      "email": "smruti.po1106@gmail.com",
+      "full_name": "Smruti Pote"
+    },
+    {
+      "id": "ced0f78f-710b-4141-8a13-de5f9adca65d",
+      "email": "ankush1@gmail.com",
+      "full_name": "ankush"
+    }
+  ],
+  "jobs": [
+    {
+      "id": "cmmid9wg30009icxgfuud2ea8",
+      "userId": "926cc115-f7a9-4934-aa1c-14dde1c2705a",
+      "jobTitle": "Select which cookies you accept. This is an extremely long job title that is meant to test the truncation logic in the List View of the Job Tracker to ensure it does not break the layout.",
+      "company": "Cookie Monster",
+      "source": "manual",
+      "createdAt": "2026-03-08T23:11:49.529Z"
+    },
+    {
+      "id": "cmmgoaneq0005ica8ppfy1zx0",
+      "userId": "91de1775-d185-4cfa-8a9c-b207cd2c3c1d",
+      "jobTitle": "data analyst jobs in Dublin, County Dublin",
+      "company": "Optum\nDUBLIN 8, County Dublin",
+      "source": "extension",
+      "createdAt": "2026-03-07T18:44:47.998Z"
+    },
+    {
+      "id": "cmmgfb9bh0001ica80n48xzk7",
+      "userId": "91de1775-d185-4cfa-8a9c-b207cd2c3c1d",
+      "jobTitle": "Senior Workday Integration Engineer - Talent Systems (BizTech)",
+      "company": "Careers at Airbnb",
+      "source": "extension",
+      "createdAt": "2026-03-07T14:33:19.849Z"
+    },
+    {
+      "id": "cmmges2of0003icg0wayd58r1",
+      "userId": "91de1775-d185-4cfa-8a9c-b207cd2c3c1d",
+      "jobTitle": "Data Analyst\n- job post",
+      "company": "Paysafe Group",
+      "source": "extension",
+      "createdAt": "2026-03-07T14:18:24.783Z"
+    },
+    {
+      "id": "cmmgeo7s20001icg0skalnvh7",
+      "userId": "91de1775-d185-4cfa-8a9c-b207cd2c3c1d",
+      "jobTitle": "Senior Workday Integration Engineer - Talent Systems (BizTech)",
+      "company": "Careers at Airbnb",
+      "source": "extension",
+      "createdAt": "2026-03-07T14:15:24.765Z"
+    },
+    {
+      "id": "cmmf7zac8000bic9k476rczv9",
+      "userId": "91de1775-d185-4cfa-8a9c-b207cd2c3c1d",
+      "jobTitle": "AI and Automation Engineer\n- job post",
+      "company": "DAA",
+      "source": "extension",
+      "createdAt": "2026-03-06T18:20:17.816Z"
+    },
+    {
+      "id": "cmmf7yz1h0009ic9kjghpaogv",
+      "userId": "91de1775-d185-4cfa-8a9c-b207cd2c3c1d",
+      "jobTitle": "AI and Automation Engineer\n- job post",
+      "company": "DAA",
+      "source": "INDEED",
+      "createdAt": "2026-03-06T18:20:03.174Z"
+    },
+    {
+      "id": "cmme94mgv0005ic9kn8trejmb",
+      "userId": "91de1775-d185-4cfa-8a9c-b207cd2c3c1d",
+      "jobTitle": "Manager, Dev GTM, APAC",
+      "company": "Cloudflare",
+      "source": "manual",
+      "createdAt": "2026-03-06T02:04:40.255Z"
+    },
+    {
+      "id": "cmme9460j0003ic9ktvm6796m",
+      "userId": "91de1775-d185-4cfa-8a9c-b207cd2c3c1d",
+      "jobTitle": "Manager, Dev GTM, APAC",
+      "company": "Cloudflare",
+      "source": "manual",
+      "createdAt": "2026-03-06T02:04:18.931Z"
+    },
+    {
+      "id": "cmme92sv70001ic9kru4sqha8",
+      "userId": "926cc115-f7a9-4934-aa1c-14dde1c2705a",
+      "jobTitle": "Manager, Dev GTM, APAC",
+      "company": "Cloudflare",
+      "source": "manual",
+      "createdAt": "2026-03-06T02:03:15.227Z"
+    }
+  ],
+  "jobsCount": 38
+}
