@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React from 'react';
 import { PageLayout } from '@/components/landing/PageLayout';
@@ -449,7 +449,7 @@ export default function ExtensionPage() {
                             Install Extension
                         </Link>
                         <button
-                            onClick={() => window.dispatchEvent(new Event('openWaitlist'))}
+                            onClick={() => window.location.href = 'https://app.vignova.io/login'}
                             className="inline-flex items-center justify-center px-8 py-3 bg-white/5 border border-white/10 text-white font-bold rounded-xl hover:bg-white/10 transition-all cursor-pointer"
                         >
                             Start Free

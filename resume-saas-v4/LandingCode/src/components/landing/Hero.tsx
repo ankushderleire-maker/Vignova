@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
@@ -119,7 +119,7 @@ export const Hero = () => {
 
                         <div className="flex flex-col sm:flex-row gap-4 pt-2">
                             <button
-                                onClick={() => window.dispatchEvent(new Event('openWaitlist'))}
+                                onClick={() => window.location.href = 'https://app.vignova.io/login'}
                                 className="inline-flex items-center justify-center px-8 py-3.5 text-base font-bold text-black transition-all duration-300 bg-[#00ff9c] rounded-xl hover:bg-[#33ffb0] hover:scale-105 hover:shadow-[0_0_30px_rgba(0,255,156,0.4)] cursor-pointer"
                             >
                                 Start Free

@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
@@ -91,7 +91,7 @@ export const Hero = () => {
 
                     {/* TEXT ANIMATION FIX */}
                     <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold tracking-tight text-white leading-[1.1]">
-                        Vignova —
+                        Vignova â€”
 
                         {/* Container with slightly larger height to allow for descenders, but hidden vertically */}
                         <span className="block h-[1.25em] overflow-hidden relative my-2">

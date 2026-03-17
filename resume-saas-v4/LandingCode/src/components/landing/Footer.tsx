@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React from 'react';
 import Link from 'next/link';
@@ -85,7 +85,7 @@ export const Footer = () => {
 
                 <div className="border-t border-white/10 pt-8 flex flex-col md:flex-row justify-between items-center">
                     <p className="text-gray-500 text-sm">
-                        © {new Date().getFullYear()} Vignova. All rights reserved.
+                        Â© {new Date().getFullYear()} Vignova. All rights reserved.
                     </p>
                     <p className="text-gray-600 text-xs mt-2 md:mt-0">
                         Built with AI. Designed for job seekers.

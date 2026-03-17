@@ -1,8 +1,8 @@
-import React from 'react';
+﻿import React from 'react';
 import { PageLayout } from '@/components/landing/PageLayout';
 
 export const metadata = {
-    title: 'Terms of Service — Vignova',
+    title: 'Terms of Service â€” Vignova',
     description: 'Vignova terms of service. Understand the rules and guidelines for using our platform.',
 };
 

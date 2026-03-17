@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React from 'react';
 import { PageLayout } from '@/components/landing/PageLayout';
@@ -114,7 +114,7 @@ export default function AboutPage() {
                             </p>
 
                             <p>
-                                And then there were the application forms—the ones so painfully long that I'd just quit halfway through. On top of that, keeping track of all the relevant jobs for my skill set was a nightmare.
+                                And then there were the application formsâ€”the ones so painfully long that I'd just quit halfway through. On top of that, keeping track of all the relevant jobs for my skill set was a nightmare.
                             </p>
 
                             <p>
@@ -122,7 +122,7 @@ export default function AboutPage() {
                             </p>
 
                             <p className="border-l-2 border-[#00ff9c] pl-4 italic text-gray-300">
-                                "I wanted to create a single platform that strips away the tedious work, automates the formatting and keyword matching, and gives job seekers their time back so they can focus on what actually matters—preparing for interviews and landing the job."
+                                "I wanted to create a single platform that strips away the tedious work, automates the formatting and keyword matching, and gives job seekers their time back so they can focus on what actually mattersâ€”preparing for interviews and landing the job."
                             </p>
                             
                             <p className="font-medium text-white pt-4">

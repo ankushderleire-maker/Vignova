@@ -1,8 +1,8 @@
-import React from 'react';
+﻿import React from 'react';
 import { PageLayout } from '@/components/landing/PageLayout';
 
 export const metadata = {
-    title: 'Privacy Policy — Vignova',
+    title: 'Privacy Policy â€” Vignova',
     description: 'Vignova privacy policy. Learn how we handle your data securely and responsibly.',
 };
 

@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React from 'react';
 import { PageLayout } from '@/components/landing/PageLayout';
@@ -20,7 +20,7 @@ const steps = [
     {
         image: "/hiw_img/2_master_profile.png?v=2",
         title: "Create Your Master Profile",
-        description: "Start by building a comprehensive career profile with all your work experience, skills, education, certifications, and project history. This master profile serves as Vignova's knowledge base about you — it's the foundation for generating unlimited tailored resumes.",
+        description: "Start by building a comprehensive career profile with all your work experience, skills, education, certifications, and project history. This master profile serves as Vignova's knowledge base about you â€” it's the foundation for generating unlimited tailored resumes.",
     },
     {
         image: "/hiw_img/3_resume_generator.png?v=2",
@@ -35,7 +35,7 @@ const steps = [
     {
         image: "/hiw_img/4_job_tracker.png?v=2",
         title: "Track Your Applications",
-        description: "Organize your entire job search with the visual Job Tracker. Move applications through stages — saved, applied, interviewing, and offers — using a Kanban-style board. Filter, search, and never lose track of where you stand.",
+        description: "Organize your entire job search with the visual Job Tracker. Move applications through stages â€” saved, applied, interviewing, and offers â€” using a Kanban-style board. Filter, search, and never lose track of where you stand.",
     },
     {
         image: "/hiw_img/7_ai_resume_editor.png?v=2",
@@ -66,7 +66,7 @@ export default function HowItWorksPage() {
                         Your AI-powered job search workflow
                     </h1>
                     <p className="text-gray-400 text-lg max-w-2xl mx-auto">
-                        From building your career profile to landing interviews — here&apos;s how Vignova streamlines every step of your job search.
+                        From building your career profile to landing interviews â€” here&apos;s how Vignova streamlines every step of your job search.
                     </p>
                 </motion.div>
 
@@ -124,7 +124,7 @@ export default function HowItWorksPage() {
                     <h2 className="text-2xl md:text-3xl font-bold text-white mb-3">Ready to get started?</h2>
                     <p className="text-gray-400 mb-6">Create your master profile and generate your first tailored resume in minutes.</p>
                     <button
-                        onClick={() => window.dispatchEvent(new Event('openWaitlist'))}
+                        onClick={() => window.location.href = 'https://app.vignova.io/login'}
                         className="inline-flex items-center px-8 py-3 bg-[#00ff9c] text-black font-bold rounded-xl hover:bg-[#33ffb0] transition-all cursor-pointer"
                     >
                         Start Free

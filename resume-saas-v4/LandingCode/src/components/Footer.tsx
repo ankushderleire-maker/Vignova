@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React from 'react';
 import Link from 'next/link';
@@ -38,7 +38,7 @@ export const Footer = () => {
 
                 <div className="border-t border-white/10 pt-8 flex flex-col md:flex-row justify-between items-center bg-black">
                     <p className="text-gray-500 text-sm">
-                        © {new Date().getFullYear()} Vignova. All rights reserved.
+                        Â© {new Date().getFullYear()} Vignova. All rights reserved.
                     </p>
                     <div className="flex gap-4 mt-4 md:mt-0">
                         <Link href="#" className="text-gray-400 hover:text-white"><Twitter className="w-5 h-5" /></Link>

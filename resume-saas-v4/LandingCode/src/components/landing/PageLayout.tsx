@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { useState } from 'react';
 import Link from 'next/link';
@@ -29,7 +29,7 @@ export const PageLayout = ({ children }: { children: React.ReactNode }) => {
                                 <Chrome className="w-4 h-4 mr-1.5" />
                                 Extension
                             </Link>
-                            <button onClick={() => window.dispatchEvent(new Event('openWaitlist'))} className="px-4 py-2 bg-[#00ff9c] text-black text-sm font-bold rounded-lg hover:bg-[#33ffb0] hover:shadow-[0_0_20px_rgba(0,255,156,0.3)] transition-all cursor-pointer">
+                            <button onClick={() => window.location.href = 'https://app.vignova.io/login'} className="px-4 py-2 bg-[#00ff9c] text-black text-sm font-bold rounded-lg hover:bg-[#33ffb0] hover:shadow-[0_0_20px_rgba(0,255,156,0.3)] transition-all cursor-pointer">
                                 Start Free
                             </button>
                         </div>
@@ -62,7 +62,7 @@ export const PageLayout = ({ children }: { children: React.ReactNode }) => {
                             <button 
                                 onClick={() => {
                                     setIsMobileMenuOpen(false);
-                                    window.dispatchEvent(new Event('openWaitlist'));
+                                    window.location.href = 'https://app.vignova.io/login';
                                 }} 
                                 className="w-full py-3 bg-[#00ff9c] text-black font-bold rounded-xl hover:bg-[#33ffb0] transition-all cursor-pointer"
                             >

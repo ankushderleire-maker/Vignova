@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React from 'react';
 import { PageLayout } from '@/components/landing/PageLayout';
@@ -37,13 +37,13 @@ const features = [
     },
     {
         title: "Visual Job Tracker",
-        description: "Track every application through a Kanban-style pipeline. Move jobs between stages — saved, applied, interviewing, and offers. Get a bird's eye view of your entire job search with analytics.",
+        description: "Track every application through a Kanban-style pipeline. Move jobs between stages â€” saved, applied, interviewing, and offers. Get a bird's eye view of your entire job search with analytics.",
         image: "/hiw_img/4_job_tracker.png?v=2",
         highlights: ["Kanban board view", "Application stages", "Status tracking", "Search & filter"],
     },
     {
         title: "AI Resume Editor",
-        description: "Fine-tune generated resumes with an intelligent editor. Get AI suggestions for improving bullet points, language impact, and content relevance — with a live preview side panel.",
+        description: "Fine-tune generated resumes with an intelligent editor. Get AI suggestions for improving bullet points, language impact, and content relevance â€” with a live preview side panel.",
         image: "/hiw_img/7_ai_resume_editor.png?v=2",
         highlights: ["Live preview", "AI suggestions", "Content refinement", "Format control"],
     },
@@ -55,13 +55,13 @@ const features = [
     },
     {
         title: "Chrome Extension",
-        description: "Browse LinkedIn, Indeed, or any job board and use Vignova directly in your browser. One-click resume tailoring, autofill job applications, upload resumes, and match keywords — all without leaving the page.",
+        description: "Browse LinkedIn, Indeed, or any job board and use Vignova directly in your browser. One-click resume tailoring, autofill job applications, upload resumes, and match keywords â€” all without leaving the page.",
         image: "/hiw_img/ext_1_linkedin_panel.png?v=2",
         highlights: ["LinkedIn integration", "Auto-fill forms", "Keyword matching", "Resume upload"],
     },
     {
         title: "Smart Job Discovery",
-        description: "Find relevant job opportunities faster with Vignova's aggregated job feed. Filter by role, location, remote options, and more — then save and apply directly from the platform.",
+        description: "Find relevant job opportunities faster with Vignova's aggregated job feed. Filter by role, location, remote options, and more â€” then save and apply directly from the platform.",
         image: "/hiw_img/6_job_finder.png?v=2",
         highlights: ["Aggregated listings", "Advanced filters", "Save & apply", "Remote options"],
     },
@@ -82,10 +82,10 @@ export default function ProductPage() {
                     </h1>
                     <p className="text-gray-400 text-lg mb-8 max-w-2xl">
                         Vignova combines AI resume generation, ATS optimization, job tracking, and browser automation
-                        into one seamless platform — so you spend less time applying and more time interviewing.
+                        into one seamless platform â€” so you spend less time applying and more time interviewing.
                     </p>
                     <button
-                        onClick={() => window.dispatchEvent(new Event('openWaitlist'))}
+                        onClick={() => window.location.href = 'https://app.vignova.io/login'}
                         className="inline-flex items-center px-8 py-3 bg-[#00ff9c] text-black font-bold rounded-xl hover:bg-[#33ffb0] hover:shadow-[0_0_30px_rgba(0,255,156,0.2)] transition-all cursor-pointer"
                     >
                         Get Started Free
@@ -173,7 +173,7 @@ export default function ProductPage() {
                     <h2 className="text-2xl md:text-3xl font-bold text-white mb-3">Ready to upgrade your job search?</h2>
                     <p className="text-gray-400 mb-6">Start generating tailored resumes and landing more interviews today.</p>
                     <button
-                        onClick={() => window.dispatchEvent(new Event('openWaitlist'))}
+                        onClick={() => window.location.href = 'https://app.vignova.io/login'}
                         className="inline-flex items-center px-8 py-3 bg-[#00ff9c] text-black font-bold rounded-xl hover:bg-[#33ffb0] transition-all cursor-pointer"
                     >
                         Start Free
