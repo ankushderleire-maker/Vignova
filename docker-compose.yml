@@ -9,7 +9,7 @@ services:
     container_name: vignova-proxy
     ports:
       - "8080:80"
-      - "443:443"
+      - "8443:443"
     volumes:
       - ./nginx.conf:/etc/nginx/nginx.conf:ro
     depends_on:
