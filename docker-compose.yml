@@ -25,7 +25,7 @@ services:
   # ----------------------------------------
   landing:
     build:
-      context: ./resume-saas-v4/LandingCode
+      context: ./LandingCode
       dockerfile: Dockerfile
     container_name: vignova-landing
     expose:
