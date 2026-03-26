@@ -11,7 +11,7 @@ import os
 import json
 import logging
 import requests
-from fastapi import APIRouter
+from fastapi import APIRouter, Header, HTTPException
 from pydantic import BaseModel
 from typing import Optional
 
@@ -21,6 +21,7 @@ logger = logging.getLogger("agent_planner")
 # Ollama config from .env
 OLLAMA_BASE_URL = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434")
 OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "llama3")
+INTERNAL_API_KEY = os.environ.get("INTERNAL_API_KEY", "vignova_internal_secret_key_123")
 
 
 # ── Request Models ────────────────────────────────────────────────────
@@ -187,7 +188,9 @@ def parse_action(text):
 # ── Routes ────────────────────────────────────────────────────────────
 
 @router.post("/api/agent/plan")
-async def plan_action(req: PlanRequest):
+async def plan_action(req: PlanRequest, x_api_key: str = Header(None)):
+    if x_api_key != INTERNAL_API_KEY:
+        raise HTTPException(status_code=401, detail="Unauthorized")
     """Get a single next action from the AI."""
     try:
         prompt = build_prompt(req.fields, req.buttons, req.profile, req.url, batch=False)
@@ -209,7 +212,9 @@ async def plan_action(req: PlanRequest):
 
 
 @router.post("/api/agent/plan-batch")
-async def plan_batch(req: PlanRequest):
+async def plan_batch(req: PlanRequest, x_api_key: str = Header(None)):
+    if x_api_key != INTERNAL_API_KEY:
+        raise HTTPException(status_code=401, detail="Unauthorized")
     """Get multiple actions at once from the AI."""
     try:
         prompt = build_prompt(req.fields, req.buttons, req.profile, req.url, batch=True)

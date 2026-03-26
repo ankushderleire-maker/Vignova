@@ -116,6 +116,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     // ═══════════════════════════════════════════
     //  LOAD DASHBOARD
     // ═══════════════════════════════════════════
+    let isPremium = false;
+
     async function loadDashboard() {
         showView(dashboardView);
 
@@ -131,7 +133,9 @@ document.addEventListener("DOMContentLoaded", async () => {
             // Credits
             document.getElementById("creditsRemaining").textContent = data.credits_remaining ?? 0;
             document.getElementById("creditsTotal").textContent = data.credits_total ?? 0;
-            document.getElementById("planBadge").textContent = (data.plan_type || data.plan || "free").toUpperCase();
+            const planType = (data.plan_type || data.plan || "free").toUpperCase();
+            isPremium = planType === "PRO" || planType === "PREMIUM";
+            document.getElementById("planBadge").textContent = planType;
 
             // Run tab logic independent of each other so one failure doesn't freeze the whole UI
             loadProfileTab(data).catch(console.error);

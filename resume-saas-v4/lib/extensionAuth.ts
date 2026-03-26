@@ -100,9 +100,8 @@ export async function getExtensionUser(req: Request) {
         }
     }
 
-    if (!hasAccess) {
-        return { error: "Extension access not available on your plan. Please upgrade.", status: 403 };
-    }
+    // All users get extension access.
+    // Premium feature gating is handled in the extension popup UI itself.
 
     return {
         user,

@@ -222,11 +222,15 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
     // ─── API Proxy: Agent Plan (Single Action) ───
     if (message.type === "API_AGENT_PLAN") {
-        (async () => {
+        chrome.storage.local.get(["vignova_token"], async (result) => {
+            if (!result.vignova_token) {
+                sendResponse({ success: false, error: "Not authenticated" });
+                return;
+            }
             try {
-                const response = await fetch("https://api.vignova.io/api/agent/plan", {
+                const response = await fetch(`${Vignova_API_BASE}/api/extension/plan`, {
                     method: "POST",
-                    headers: { "Content-Type": "application/json" },
+                    headers: { "Content-Type": "application/json", "Authorization": `Bearer ${result.vignova_token}` },
                     body: JSON.stringify(message.data),
                 });
                 const data = await response.json();
@@ -234,17 +238,21 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             } catch (err) {
                 sendResponse({ success: false, error: "Cannot connect to backend. Is it running?" });
             }
-        })();
+        });
         return true;
     }
 
     // ─── API Proxy: Agent Plan Batch (Multiple Actions) ───
     if (message.type === "API_AGENT_PLAN_BATCH") {
-        (async () => {
+        chrome.storage.local.get(["vignova_token"], async (result) => {
+            if (!result.vignova_token) {
+                sendResponse({ success: false, error: "Not authenticated" });
+                return;
+            }
             try {
-                const response = await fetch("https://api.vignova.io/api/agent/plan-batch", {
+                const response = await fetch(`${Vignova_API_BASE}/api/extension/plan-batch`, {
                     method: "POST",
-                    headers: { "Content-Type": "application/json" },
+                    headers: { "Content-Type": "application/json", "Authorization": `Bearer ${result.vignova_token}` },
                     body: JSON.stringify(message.data),
                 });
                 const data = await response.json();
@@ -252,7 +260,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             } catch (err) {
                 sendResponse({ success: false, error: "Cannot connect to backend." });
             }
-        })();
+        });
         return true;
     }
 
@@ -439,26 +447,34 @@ chrome.runtime.onInstalled.addListener((details) => {
 
 // Broadcast TOGGLE_DASHBOARD to the active tab when the extension icon is clicked
 chrome.action.onClicked.addListener((tab) => {
-    if (tab.id) {
-        chrome.tabs.sendMessage(tab.id, { type: "TOGGLE_DASHBOARD" }).catch(() => {
-            console.log("[Vignova] Content script missing (likely due to extension reload). Auto-injecting...");
-            chrome.scripting.executeScript({
-                target: { tabId: tab.id },
-                files: [
-                    "agent/observer.js",
-                    "agent/ruleEngine.js",
-                    "agent/atsDetector.js",
-                    "agent/planner.js",
-                    "agent/executor.js",
-                    "agent/agentLoop.js",
-                    "content/autoapply.js"
-                ]
-            }).then(() => {
-                // Small delay to let scripts initialize, then send the toggle command again
-                setTimeout(() => {
-                    chrome.tabs.sendMessage(tab.id, { type: "TOGGLE_DASHBOARD" }).catch(() => { });
-                }, 300);
-            }).catch(err => console.error("[Vignova] Could not inject dashboard:", err));
-        });
+    if (!tab.id) return;
+
+    // Prevent injection attempts on restricted browser URLs
+    const restrictedPrefixes = ["chrome://", "edge://", "about:", "chrome-extension://"];
+    if (tab.url && restrictedPrefixes.some(prefix => tab.url.startsWith(prefix))) {
+        // Fallback: Instead of failing to inject, open the Vignova web dashboard
+        chrome.tabs.create({ url: "https://app.vignova.io/dashboard" });
+        return;
     }
+
+    chrome.tabs.sendMessage(tab.id, { type: "TOGGLE_DASHBOARD" }).catch(() => {
+        console.log("[Vignova] Content script missing (likely due to extension reload). Auto-injecting...");
+        chrome.scripting.executeScript({
+            target: { tabId: tab.id },
+            files: [
+                "agent/observer.js",
+                "agent/ruleEngine.js",
+                "agent/atsDetector.js",
+                "agent/planner.js",
+                "agent/executor.js",
+                "agent/agentLoop.js",
+                "content/autoapply.js"
+            ]
+        }).then(() => {
+            // Small delay to let scripts initialize, then send the toggle command again
+            setTimeout(() => {
+                chrome.tabs.sendMessage(tab.id, { type: "TOGGLE_DASHBOARD" }).catch(() => { });
+            }, 300);
+        }).catch(err => console.error("[Vignova] Could not inject dashboard:", err));
+    });
 });
