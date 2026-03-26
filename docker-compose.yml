@@ -1,92 +1,58 @@
-version: '3.8'
-
 services:
   # ----------------------------------------
-  # Proxy Layer (NGINX)
-  # ----------------------------------------
-  nginx:
-    image: nginx:alpine
-    container_name: vignova-proxy
-    ports:
-      - "8080:80"
-      - "8443:443"
-    volumes:
-      - ./nginx.conf:/etc/nginx/nginx.conf:ro
-    depends_on:
-      - landing
-      - dashboard
-      - backend
-    networks:
-      - vignova-net
-    restart: unless-stopped
-
-  # ----------------------------------------
-  # Main Domain (vignova.io)
+  # Landing (vignova.io)
   # ----------------------------------------
   landing:
     build:
       context: ./LandingCode
-      dockerfile: Dockerfile
     container_name: vignova-landing
-    expose:
-      - "80"
-    networks:
-      - vignova-net
+    ports:
+      - "3001:80"
     restart: unless-stopped
 
   # ----------------------------------------
-  # Subdomain (app.vignova.io)
+  # Dashboard (app.vignova.io)
   # ----------------------------------------
   dashboard:
     build:
       context: ./resume-saas-v4
-      dockerfile: Dockerfile
     container_name: vignova-dashboard
-    environment:
-      - NODE_ENV=production
-      # Pull env vars from a .env file on the host at the root of the project
+    ports:
+      - "3000:3000"
     env_file:
       - .env
-    expose:
-      - "3000"
     depends_on:
       - db
       - backend
-    networks:
-      - vignova-net
     restart: unless-stopped
 
   # ----------------------------------------
-  # API Backend (api.vignova.io)
+  # Backend (api.vignova.io)
   # ----------------------------------------
   backend:
     build:
       context: ./Backend/Full_Backend
-      dockerfile: Dockerfile
     container_name: vignova-backend
+    ports:
+      - "8000:8000"
     environment:
       - ENVIRONMENT=production
       - OLLAMA_BASE_URL=http://ollama:11434
     env_file:
       - .env
-    expose:
-      - "8000"
     volumes:
       - backend_uploads:/app/uploads
     depends_on:
       - db
       - ollama
-    networks:
-      - vignova-net
     restart: unless-stopped
 
   # ----------------------------------------
-  # Local AI Model Engine
+  # Ollama
   # ----------------------------------------
   ollama:
     image: ollama/ollama:latest
     container_name: vignova-ollama
-    # Auto-pull the DeepSeek model on startup (blocks until downloaded)
     entrypoint: >
       /bin/sh -c "
       /bin/ollama serve &
@@ -96,10 +62,8 @@ services:
       "
     volumes:
       - ollama_models:/root/.ollama
-    expose:
-      - "11434"
-    networks:
-      - vignova-net
+    ports:
+      - "11434:11434"
     restart: unless-stopped
 
   # ----------------------------------------
@@ -114,20 +78,11 @@ services:
       POSTGRES_DB: ${DB_NAME:-resume_ai_saas}
     volumes:
       - postgres_data:/var/lib/postgresql/data
-    expose:
-      - "5432"
-    networks:
-      - vignova-net
+    ports:
+      - "5432:5432"
     restart: unless-stopped
 
-# ----------------------------------------
-# Volumes and Networks
-# ----------------------------------------
 volumes:
   postgres_data:
   backend_uploads:
   ollama_models:
-
-networks:
-  vignova-net:
-    driver: bridge
