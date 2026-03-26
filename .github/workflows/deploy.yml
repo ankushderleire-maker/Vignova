@@ -19,13 +19,15 @@ jobs:
           script: |
             cd /www/wwwroot/Vignova
 
+            echo "Resetting local changes..."
+            git reset --hard
+
             echo "Pulling latest code..."
-            git pull origin deploy
+            git pull origin Deploy
 
             echo "Rebuilding containers..."
-            docker-compose down
-            docker-compose build --no-cache
-            docker-compose up -d
+            docker compose down
+            docker compose up -d --build
 
             echo "Cleaning old images..."
             docker system prune -f
