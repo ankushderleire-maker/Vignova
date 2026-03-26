@@ -52,7 +52,19 @@ export default function PrivacyPage() {
                     </section>
 
                     <section>
-                        <h2 className="text-xl font-bold text-slate-900 mb-4">4. Data Security</h2>
+                        <h2 className="text-xl font-bold text-slate-900 mb-4">4. Browser Extension & URL Tracking</h2>
+                        <p className="mb-4">
+                            Our browser extension requests access to your browsing context (the &lt;all_urls&gt; permission) to function effectively across the web.
+                        </p>
+                        <ul className="list-disc list-inside space-y-2 pl-4 text-slate-500 mb-4">
+                            <li><span className="text-slate-900 font-medium">Why we need it:</span> Job applications are hosted on thousands of different domains (e.g., Workday, Greenhouse, LinkedIn). The extension must activate universally to detect form fields on any job board you visit.</li>
+                            <li><span className="text-slate-900 font-medium">What we collect:</span> We only scan the Document Object Model (DOM) of active job application forms to extract field labels (e.g., &quot;First Name&quot;, &quot;Resume&quot;).</li>
+                            <li><span className="text-slate-900 font-medium">Privacy guarantee:</span> We <strong>do not</strong> read, track, or scrape your web browsing history outside of an active job application. This data is only transmitted to generate your tailored applications and is never sold to third parties.</li>
+                        </ul>
+                    </section>
+
+                    <section>
+                        <h2 className="text-xl font-bold text-slate-900 mb-4">5. Data Security</h2>
                         <p>
                             We implement industry-standard security measures including encryption at rest and in transit,
                             secure cloud infrastructure (Google Cloud), and regular security audits. Your career data is
@@ -61,7 +73,7 @@ export default function PrivacyPage() {
                     </section>
 
                     <section>
-                        <h2 className="text-xl font-bold text-slate-900 mb-4">5. AI Processing</h2>
+                        <h2 className="text-xl font-bold text-slate-900 mb-4">6. AI Processing</h2>
                         <p>
                             Vignova uses Google Gemini AI to process your career information and generate tailored resumes.
                             Your data is processed securely and is not used to train external AI models.
@@ -70,7 +82,7 @@ export default function PrivacyPage() {
                     </section>
 
                     <section>
-                        <h2 className="text-xl font-bold text-slate-900 mb-4">6. Data Retention</h2>
+                        <h2 className="text-xl font-bold text-slate-900 mb-4">7. Data Retention</h2>
                         <p>
                             We retain your personal data for as long as your account is active. You can request deletion
                             of your account and all associated data at any time by contacting us at{' '}
@@ -79,7 +91,7 @@ export default function PrivacyPage() {
                     </section>
 
                     <section>
-                        <h2 className="text-xl font-bold text-slate-900 mb-4">7. Your Rights</h2>
+                        <h2 className="text-xl font-bold text-slate-900 mb-4">8. Your Rights</h2>
                         <p className="mb-4">You have the right to:</p>
                         <ul className="list-disc list-inside space-y-2 pl-4 text-slate-500">
                             <li>Access and download your personal data.</li>
@@ -91,7 +103,7 @@ export default function PrivacyPage() {
                     </section>
 
                     <section>
-                        <h2 className="text-xl font-bold text-slate-900 mb-4">8. Contact Us</h2>
+                        <h2 className="text-xl font-bold text-slate-900 mb-4">9. Contact Us</h2>
                         <p>
                             For privacy-related questions or requests, contact us at{' '}
                             <a href="mailto:hello@vignova.io" className="text-blue-600 hover:underline">hello@vignova.io</a>.
