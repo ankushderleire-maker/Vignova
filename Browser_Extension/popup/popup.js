@@ -104,13 +104,13 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     // ─── Settings ───
     document.getElementById("settingsBtn")?.addEventListener("click", () => {
-        chrome.tabs.create({ url: "http://localhost:3000/dashboard/settings" });
+        chrome.tabs.create({ url: "https://app.vignova.io/dashboard/settings" });
     });
 
     // ─── Register ───
     document.getElementById("registerLink")?.addEventListener("click", (e) => {
         e.preventDefault();
-        chrome.tabs.create({ url: "http://localhost:3000/register" });
+        chrome.tabs.create({ url: "https://app.vignova.io/register" });
     });
 
     // ═══════════════════════════════════════════
@@ -135,7 +135,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
             // Run tab logic independent of each other so one failure doesn't freeze the whole UI
             loadProfileTab(data).catch(console.error);
-            loadAutofillTab().catch(console.error);
+            loadAutofillTab(data).catch(console.error);
 
         } catch (err) {
             console.error("[Vignova] Dashboard load error:", err);
@@ -288,6 +288,10 @@ document.addEventListener("DOMContentLoaded", async () => {
 
         // Start/Stop Agent
         startAgentBtn.addEventListener("click", async () => {
+            if (!agentRunning && !isPremium) {
+                alert("Upgrade plan to use this feature");
+                return;
+            }
             if (agentRunning) {
                 const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
                 if (tab?.id) {
@@ -357,6 +361,10 @@ document.addEventListener("DOMContentLoaded", async () => {
 
         // Tailor Resume
         document.getElementById("tailorResumeBtn")?.addEventListener("click", async () => {
+            if (!isPremium) {
+                alert("Upgrade plan to use this feature");
+                return;
+            }
             const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
             if (!tab?.id) return;
 
@@ -407,6 +415,10 @@ document.addEventListener("DOMContentLoaded", async () => {
 
         // Cover Letter
         document.getElementById("coverLetterBtn")?.addEventListener("click", async () => {
+            if (!isPremium) {
+                alert("Upgrade plan to use this feature");
+                return;
+            }
             const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
             if (!tab?.id) return;
 
@@ -426,7 +438,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
                 if (res?.success) {
                     showToast("Cover letter saved! ✓");
-                    chrome.tabs.create({ url: `http://localhost:3000/dashboard/jobs` });
+                    chrome.tabs.create({ url: `https://app.vignova.io/dashboard/jobs` });
                 } else {
                     showToast(res?.error || "Failed to generate");
                 }
@@ -438,7 +450,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         // Job Tracker Link
         document.getElementById("jobTrackerLink")?.addEventListener("click", (e) => {
             e.preventDefault();
-            chrome.tabs.create({ url: "http://localhost:3000/dashboard/jobs" });
+            chrome.tabs.create({ url: "https://app.vignova.io/dashboard/jobs" });
         });
 
         // Fetch Recent Jobs
@@ -455,7 +467,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                                     <span style="display: flex; align-items: center;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2" width="16" height="20" rx="2" ry="2"></rect><path d="M9 22v-4h6v4"></path><path d="M8 6h.01"></path><path d="M16 6h.01"></path><path d="M12 6h.01"></path><path d="M12 10h.01"></path><path d="M12 14h.01"></path><path d="M16 10h.01"></path><path d="M16 14h.01"></path><path d="M8 10h.01"></path><path d="M8 14h.01"></path></svg></span> ${job.company}
                                 </div>
                             </div>
-                            <a href="http://localhost:3000/dashboard/jobs" target="_blank" style="color: #475569; font-size: 16px; text-decoration: none; padding: 4px; border-radius: 4px; transition: background 0.2s;" onmouseover="this.style.background='rgba(0,0,0,0.05)'; this.style.color='#0f172a';" onmouseout="this.style.background='transparent'; this.style.color='#475569';" title="Open Job Tracker">›</a>
+                            <a href="https://app.vignova.io/dashboard/jobs" target="_blank" style="color: #475569; font-size: 16px; text-decoration: none; padding: 4px; border-radius: 4px; transition: background 0.2s;" onmouseover="this.style.background='rgba(0,0,0,0.05)'; this.style.color='#0f172a';" onmouseout="this.style.background='transparent'; this.style.color='#475569';" title="Open Job Tracker">›</a>
                         </div>
                     `).join('');
                 } else {
@@ -794,7 +806,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             // Edit link
             document.getElementById("editProfileLink")?.addEventListener("click", (e) => {
                 e.preventDefault();
-                chrome.tabs.create({ url: "http://localhost:3000/dashboard/profile" });
+                chrome.tabs.create({ url: "https://app.vignova.io/dashboard/profile" });
             });
 
         } catch (err) {

@@ -4,7 +4,7 @@
  * Content scripts send messages here; we make the actual fetch and return results.
  */
 
-const Vignova_API_BASE = "http://localhost:3000";
+const Vignova_API_BASE = "https://app.vignova.io";
 
 // ─── Message Router ───
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -224,7 +224,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message.type === "API_AGENT_PLAN") {
         (async () => {
             try {
-                const response = await fetch("http://localhost:8000/api/agent/plan", {
+                const response = await fetch("https://api.vignova.io/api/agent/plan", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify(message.data),
@@ -242,7 +242,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message.type === "API_AGENT_PLAN_BATCH") {
         (async () => {
             try {
-                const response = await fetch("http://localhost:8000/api/agent/plan-batch", {
+                const response = await fetch("https://api.vignova.io/api/agent/plan-batch", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify(message.data),

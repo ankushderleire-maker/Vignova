@@ -74,8 +74,8 @@
         "scripting"
     ],
     "host_permissions": [
-        "http://localhost:3000/*",
-        "http://localhost:8000/*",
+        "https://app.vignova.io/*",
+        "https://api.vignova.io/*",
         "<all_urls>"
     ],
     "web_accessible_resources": [

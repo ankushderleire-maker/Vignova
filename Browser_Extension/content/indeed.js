@@ -393,7 +393,7 @@
                 btn.classList.add("success");
                 btn.disabled = false;
                 btn.onclick = () => {
-                    window.open("http://localhost:3000/dashboard", "_blank");
+                    window.open("https://app.vignova.io/dashboard", "_blank");
                 };
             } else {
                 btn.innerHTML = "❌ Failed";

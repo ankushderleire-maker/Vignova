@@ -96,16 +96,7 @@ export async function POST(req: Request) {
             }
         }
 
-        if (!hasAccess) {
-            return withCors(NextResponse.json(
-                {
-                    error: "Extension access is not available on your current plan",
-                    upgrade_required: true,
-                    plan: subscription.plan_type || "FREE",
-                },
-                { status: 403 }
-            ));
-        }
+        // Block removed so free tier users can proceed and get their token
 
         // ─── Generate Extension Token ───
         const token = generateExtensionToken(user.id, user.email);

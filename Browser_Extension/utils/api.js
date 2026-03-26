@@ -3,7 +3,7 @@
  * All API calls go through this helper to attach the auth token.
  */
 
-const Vignova_API_BASE = "http://localhost:3000";
+const Vignova_API_BASE = "https://app.vignova.io";
 
 const Vignova_API = {
     /**

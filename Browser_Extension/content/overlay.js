@@ -67,11 +67,11 @@ const Vignova_Overlay = {
                     📥 Download PDF
                 </button>
             ` : `
-                <a href="http://localhost:3000/dashboard" target="_blank" class="vignova-overlay-download-btn">
+                <a href="https://app.vignova.io/dashboard" target="_blank" class="vignova-overlay-download-btn">
                     Open Dashboard
                 </a>
             `}
-            <a href="http://localhost:3000/dashboard" target="_blank" class="vignova-overlay-view-btn">
+            <a href="https://app.vignova.io/dashboard" target="_blank" class="vignova-overlay-view-btn">
                 View in Vignova Dashboard →
             </a>
             <div class="vignova-overlay-credits">

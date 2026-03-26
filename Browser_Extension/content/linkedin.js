@@ -404,7 +404,7 @@
                 btn.disabled = false;
                 btn.onclick = () => {
                     // Redirect to dashboard (maybe specific job page later?)
-                    window.open("http://localhost:3000/dashboard", "_blank");
+                    window.open("https://app.vignova.io/dashboard", "_blank");
                 };
             } else {
                 btn.innerHTML = "❌ Failed";
