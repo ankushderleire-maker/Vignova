@@ -200,7 +200,7 @@ function ResumeStudioPageContent() {
                 hasAtsReport: !!atsReport
             });
 
-            const response = await fetch("http://localhost:8000/api/generate-tailored-resume", {
+            const response = await fetch("/api/python/generate-tailored-resume", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({

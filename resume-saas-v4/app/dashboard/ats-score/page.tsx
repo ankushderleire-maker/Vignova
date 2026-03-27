@@ -352,7 +352,7 @@ function AtsScoreContent() {
             setLastResumeText(usedResumeText);
             setLastJdText(selectedJob.description);
 
-            const response = await fetch("http://localhost:8000/api/calculate-ats", { method: "POST", body: formData });
+            const response = await fetch("/api/python/calculate-ats", { method: "POST", body: formData });
             if (!response.ok) throw new Error(await response.text());
             const data = await response.json();
             setResult(data);
@@ -381,7 +381,7 @@ function AtsScoreContent() {
             formData.append("resume_text", lastResumeText);
             formData.append("ats_scores", JSON.stringify(atsResult));
 
-            const res = await fetch("http://localhost:8000/api/enhance-ats-report", { method: "POST", body: formData });
+            const res = await fetch("/api/python/enhance-ats-report", { method: "POST", body: formData });
             if (!res.ok) throw new Error(await res.text());
             setAiReport(await res.json());
             fetchSubscription();
