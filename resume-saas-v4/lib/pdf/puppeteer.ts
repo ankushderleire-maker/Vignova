@@ -14,7 +14,21 @@ export async function getBrowser(): Promise<Browser> {
 
     const isProduction = process.env.NODE_ENV === "production";
 
-    if (isProduction) {
+    if (process.env.PUPPETEER_EXECUTABLE_PATH) {
+        // PRODUCTION (Docker VPS): Use system installed chromium
+        const puppeteerCore = require("puppeteer-core");
+        browserInstance = await puppeteerCore.launch({
+            executablePath: process.env.PUPPETEER_EXECUTABLE_PATH,
+            headless: true,
+            args: [
+                "--no-sandbox",
+                "--disable-setuid-sandbox",
+                "--disable-dev-shm-usage",
+                "--disable-gpu"
+            ],
+            ignoreHTTPSErrors: true,
+        });
+    } else if (isProduction) {
         // PRODUCTION: Use @sparticuz/chromium
         const chromium = require("@sparticuz/chromium");
         const puppeteerCore = require("puppeteer-core");
