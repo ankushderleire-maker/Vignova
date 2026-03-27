@@ -41,15 +41,6 @@ const nextConfig: NextConfig = {
   
   /* Optimize Docker builds */
   output: "standalone",
-
-  async rewrites() {
-    return [
-      {
-        source: "/api/python/:path*",
-        destination: `${process.env.AI_BACKEND_URL || "http://localhost:8000"}/api/:path*`,
-      },
-    ];
-  },
 };
 
 export default nextConfig;
