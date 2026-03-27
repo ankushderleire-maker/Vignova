@@ -38,7 +38,7 @@ services:
     environment:
       - ENVIRONMENT=production
       - OLLAMA_BASE_URL=http://ollama:11434
-      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - GOOGLE_API_KEY=${GEMINI_API_KEY}
     env_file:
       - .env
     volumes:
