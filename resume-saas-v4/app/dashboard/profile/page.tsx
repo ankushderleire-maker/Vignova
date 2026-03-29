@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, createContext, useContext } from "react";
+import React, { useState, useEffect, createContext, useContext, useRef } from "react";
 import {
   User, Briefcase, GraduationCap, Code2,
   Plus, Trash2, Save, Loader2, Link as LinkIcon,
@@ -45,7 +45,7 @@ type ProfileContextType = {
   activeSection: string;
   setActiveSection: (sec: string) => void;
   isSaving: boolean;
-  handleSave: () => void;
+  handleSave: (options?: { silentSuccess?: boolean }) => void;
   isLoading: boolean;
   profiles: any[];
   selectedProfileId: string | null;
@@ -54,7 +54,13 @@ type ProfileContextType = {
   deleteProfile: (id: string) => Promise<void>;
   loadFromPdf: (file: File) => Promise<void>;
   subscription: any;
-  showFeedback: (type: "confirm" | "success" | "error" | "loading" | "analyzing", title: string, message: string, onConfirm?: () => void) => void;
+  showFeedback: (
+    type: "confirm" | "success" | "error" | "loading" | "analyzing",
+    title: string,
+    message: string,
+    onConfirm?: () => void,
+    options?: { confirmLabel?: string; cancelLabel?: string; iconType?: "confirm" | "success" | "error" | "loading" | "analyzing" }
+  ) => void;
   hideFeedback: () => void;
 };
 
@@ -75,6 +81,8 @@ function ProfileProvider({ children }: { children: React.ReactNode }) {
   const [profiles, setProfiles] = useState<any[]>([]);
   const [selectedProfileId, setSelectedProfileId] = useState<string | null>(null);
   const [subscription, setSubscription] = useState<any>(null);
+  const dataRef = useRef<ResumeData>(INITIAL_STATE);
+  const selectedProfileIdRef = useRef<string | null>(null);
 
   // --- FEEDBACK MODAL STATE ---
   const [feedback, setFeedback] = useState<{
@@ -83,12 +91,38 @@ function ProfileProvider({ children }: { children: React.ReactNode }) {
     title: string;
     message: string;
     onConfirm?: () => void;
+    confirmLabel?: string;
+    cancelLabel?: string;
+    iconType?: "confirm" | "success" | "error" | "loading" | "analyzing";
   }>({ isOpen: false, type: "loading", title: "", message: "" });
 
-  const showFeedback = (type: "confirm" | "success" | "error" | "loading" | "analyzing", title: string, message: string, onConfirm?: () => void) => {
-    setFeedback({ isOpen: true, type, title, message, onConfirm });
+  const showFeedback = (
+    type: "confirm" | "success" | "error" | "loading" | "analyzing",
+    title: string,
+    message: string,
+    onConfirm?: () => void,
+    options?: { confirmLabel?: string; cancelLabel?: string; iconType?: "confirm" | "success" | "error" | "loading" | "analyzing" }
+  ) => {
+    setFeedback({
+      isOpen: true,
+      type,
+      title,
+      message,
+      onConfirm,
+      confirmLabel: options?.confirmLabel,
+      cancelLabel: options?.cancelLabel,
+      iconType: options?.iconType,
+    });
   };
   const hideFeedback = () => setFeedback(prev => ({ ...prev, isOpen: false }));
+
+  useEffect(() => {
+    dataRef.current = data;
+  }, [data]);
+
+  useEffect(() => {
+    selectedProfileIdRef.current = selectedProfileId;
+  }, [selectedProfileId]);
 
   const createNewProfile = async (name?: string, parsed_data?: any) => {
     try {
@@ -212,19 +246,28 @@ function ProfileProvider({ children }: { children: React.ReactNode }) {
       .catch(() => setIsLoading(false));
   }, [selectedProfileId]);
 
-  const handleSave = async () => {
-    if (!selectedProfileId) return;
+  const handleSave = async (options?: { silentSuccess?: boolean }) => {
+    const profileId = selectedProfileIdRef.current;
+    if (!profileId) return;
+
+    setIsSaving(true);
     showFeedback("loading", "Saving Profile", "Updating your master dataset...");
     try {
-      const res = await fetch(`/api/profiles/${selectedProfileId}`, {
+      const res = await fetch(`/api/profiles/${profileId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ parsed_data: data }),
+        body: JSON.stringify({ parsed_data: dataRef.current }),
       });
       if (!res.ok) throw new Error("Save failed");
-      showFeedback("success", "Profile Saved", "Your master dataset has been updated successfully.");
+      if (options?.silentSuccess) {
+        hideFeedback();
+      } else {
+        showFeedback("success", "Profile Saved", "Your master dataset has been updated successfully.");
+      }
     } catch (error) {
       showFeedback("error", "Save Failed", "There was an error saving your profile. Please try again.");
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -272,9 +315,14 @@ function ProfileProvider({ children }: { children: React.ReactNode }) {
                   <AlertCircle className="w-8 h-8" />
                 </div>
               )}
-              {feedback.type === "confirm" && (
+              {(feedback.iconType || feedback.type) === "confirm" && (
                 <div className="bg-yellow-500/10 text-yellow-500 w-full h-full rounded-full flex items-center justify-center">
                   <AlertTriangle className="w-8 h-8" />
+                </div>
+              )}
+              {(feedback.iconType || feedback.type) === "success" && (
+                <div className="bg-green-500/10 text-green-500 w-full h-full rounded-full flex items-center justify-center">
+                  <CheckCircle2 className="w-8 h-8" />
                 </div>
               )}
             </div>
@@ -285,7 +333,7 @@ function ProfileProvider({ children }: { children: React.ReactNode }) {
             {feedback.type === "confirm" && (
               <div className="flex gap-4 w-full">
                 <button onClick={hideFeedback} className="flex-1 py-3.5 bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 border border-[var(--border-color)] rounded-xl text-[var(--foreground)] text-xs tracking-wider uppercase font-bold transition-all">
-                  Cancel
+                  {feedback.cancelLabel || "Cancel"}
                 </button>
                 <button
                   onClick={() => {
@@ -294,7 +342,7 @@ function ProfileProvider({ children }: { children: React.ReactNode }) {
                   }}
                   className="flex-1 py-3.5 bg-[var(--primary)] text-[var(--background)] rounded-xl text-xs tracking-wider uppercase font-bold hover:bg-[var(--primary)]/90 transition-all shadow-[0_0_20px_rgba(var(--primary),0.3)]"
                 >
-                  Confirm
+                  {feedback.confirmLabel || "Confirm"}
                 </button>
               </div>
             )}
@@ -753,7 +801,7 @@ function InternalSidebar() {
 
       <div className="mt-6 pt-6 border-t border-[var(--border-color)] hidden md:block">
         <button
-          onClick={handleSave}
+          onClick={() => handleSave()}
           disabled={isSaving || isLoading}
           className="w-full flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-bold uppercase tracking-wide text-xs transition-all disabled:opacity-50 text-[var(--background)] bg-[var(--primary)] hover:bg-[var(--primary)]/90 shadow-[0_0_15px_rgba(var(--primary),0.3)] hover:shadow-[0_0_20px_rgba(var(--primary),0.5)]"
         >
@@ -916,6 +964,7 @@ function ProfileCreationModal({ isOpen, onClose }: { isOpen: boolean; onClose: (
                     accept=".pdf"
                     className="hidden"
                     disabled={isUploading || !name.trim()}
+                    suppressHydrationWarning
                     onChange={handleFileUpload}
                   />
                 </label>
@@ -933,7 +982,7 @@ function ProfileCreationModal({ isOpen, onClose }: { isOpen: boolean; onClose: (
 }
 
 function MainContent() {
-  const { activeSection, isLoading, profiles, selectedProfileId, setSelectedProfileId, deleteProfile, loadFromPdf, showFeedback } = useProfile();
+  const { activeSection, isLoading, profiles, selectedProfileId, setSelectedProfileId, deleteProfile, loadFromPdf, showFeedback, handleSave } = useProfile();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -988,7 +1037,15 @@ function MainContent() {
       showFeedback("analyzing", "Extracting PDF...", "Please wait while AI analyzes the document...");
       try {
         await loadFromPdf(file);
-        showFeedback("success", "Extraction Complete", "Profile data successfully extracted! Please review the form and click 'Save Profile' to apply changes permanently.");
+        showFeedback(
+          "confirm",
+          "Extraction Complete",
+          "Profile data was extracted successfully. Review the form and save these changes if everything looks correct.",
+          () => {
+            handleSave({ silentSuccess: true });
+          },
+          { confirmLabel: "Save", cancelLabel: "Cancel", iconType: "success" }
+        );
       } catch (err: any) {
         showFeedback("error", "Extraction Failed", err.message || "Failed to extract from PDF");
       } finally {
@@ -1046,7 +1103,7 @@ function MainContent() {
             <label className={`flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-bold text-[var(--text-secondary)] bg-transparent hover:bg-black/5 dark:hover:bg-white/10 border border-[var(--border-color)] rounded-lg transition-colors hover:border-gray-500 shrink-0 ${isUploading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}>
               {isUploading ? <Loader2 className="w-4 h-4 animate-spin text-[var(--primary)]" /> : <Upload className="w-4 h-4" />}
               <span className="hidden lg:inline">{isUploading ? "Extracting..." : "Overwrite from PDF"}</span>
-              <input type="file" id="pdf-upload-input" accept=".pdf" className="hidden" disabled={isUploading} onChange={handlePdfUpload} />
+              <input type="file" id="pdf-upload-input" accept=".pdf" className="hidden" disabled={isUploading} suppressHydrationWarning onChange={handlePdfUpload} />
             </label>
           </div>
 

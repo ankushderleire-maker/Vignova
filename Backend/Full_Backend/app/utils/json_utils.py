@@ -1,57 +1,110 @@
-import re
 import json
+import re
 
 
-def _repair_json_string(raw: str) -> str:
-    """Attempt to fix the most common AI JSON formatting errors."""
-    # 1. Remove markdown fences
-    raw = re.sub(r"```json|```", "", raw).strip()
-    
-    # 2. Replace smart/curly quotes with straight quotes
-    raw = raw.replace("\u2018", "'").replace("\u2019", "'")
-    raw = raw.replace("\u201c", "'").replace("\u201d", "'")
-    
-    # 3. Strip null bytes / control chars that break parsers
-    raw = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f]", "", raw)
-    
-    # 4. Fix unescaped double-quotes inside JSON string values.
-    #    E.g.  "soft": "..., "AI-first" thinking, ..."
-    #    Strategy: scan character-by-character inside string values and escape
-    #    stray quotes. This is intentionally conservative.
-    def fix_inner_quotes(m: re.Match) -> str:
-        inner = m.group(1)
-        # Replace any " that is not preceded by a backslash with an escaped version
-        # but only if it's not at the start/end of the captured group
-        inner = re.sub(r'(?<!\\)"', "'", inner)
-        return '"' + inner + '"'
+def _strip_fences(raw: str) -> str:
+    return re.sub(r"```json|```", "", raw or "").strip()
 
-    # Only apply to string values that are longer than 30 chars (skill lists etc.)
-    raw = re.sub(r'"([^"\\\\\\n]{30,})"', fix_inner_quotes, raw)
 
-    return raw
+def _normalize_quotes(raw: str) -> str:
+    return (
+        raw.replace("\u2018", "'")
+        .replace("\u2019", "'")
+        .replace("\u201c", '"')
+        .replace("\u201d", '"')
+        .replace("\u2013", "-")
+        .replace("\u2014", "-")
+    )
+
+
+def _remove_control_chars(raw: str) -> str:
+    return re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f]", "", raw)
+
+
+def _extract_json_candidate(text: str) -> str:
+    start = text.find("{")
+    if start == -1:
+        return ""
+
+    depth = 0
+    in_string = False
+    escape = False
+
+    for idx in range(start, len(text)):
+        ch = text[idx]
+        if in_string:
+            if escape:
+                escape = False
+            elif ch == "\\":
+                escape = True
+            elif ch == '"':
+                in_string = False
+            continue
+
+        if ch == '"':
+            in_string = True
+        elif ch == "{":
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+            if depth == 0:
+                return text[start : idx + 1]
+
+    return text[start:].strip()
+
+
+def _trim_to_last_complete_field(raw: str) -> str:
+    raw = raw.rstrip().rstrip(",")
+    if raw.endswith("}"):
+        return raw
+
+    last_comma = raw.rfind(',"')
+    if last_comma == -1:
+        last_comma = raw.rfind(",\n")
+    if last_comma == -1:
+        return raw
+
+    trimmed = raw[:last_comma].rstrip(", \n\r\t")
+    open_braces = trimmed.count("{")
+    close_braces = trimmed.count("}")
+    if open_braces > close_braces:
+        trimmed += "}" * (open_braces - close_braces)
+    return trimmed
+
+
+def _repair_common_json_issues(raw: str) -> str:
+    raw = _strip_fences(raw)
+    raw = _normalize_quotes(raw)
+    raw = _remove_control_chars(raw)
+    raw = re.sub(r",(\s*[}\]])", r"\1", raw)
+    return raw.strip()
 
 
 def extract_json_from_response(text: str):
-    """Extract and parse a JSON object from an AI response, with multi-stage repair."""
-    stages = [
-        lambda t: t,                         # Stage 0: raw (maybe already clean)
-        _repair_json_string,                  # Stage 1: apply all repairs
-        lambda t: _repair_json_string(t),     # Stage 2: second pass after strip
+    """Extract and parse a JSON object from an AI response, with recovery for truncation."""
+    prepared = _repair_common_json_issues(text)
+    candidate = _extract_json_candidate(prepared)
+    if not candidate:
+        return {}
+
+    attempts = [
+        candidate,
+        re.sub(r",(\s*[}\]])", r"\1", candidate),
+        _trim_to_last_complete_field(candidate),
     ]
 
-    for i, prepare in enumerate(stages):
+    for idx, attempt in enumerate(attempts):
+        if not attempt:
+            continue
         try:
-            cleaned = prepare(text)
-            match = re.search(r"\{.*\}", cleaned, re.DOTALL)
-            if match:
-                return json.loads(match.group())
-        except json.JSONDecodeError as e:
-            if i == len(stages) - 1:
-                print("JSON Extraction Error (all stages failed):", e)
+            return json.loads(attempt)
+        except json.JSONDecodeError as exc:
+            if idx == len(attempts) - 1:
+                print("JSON Extraction Error (all stages failed):", exc)
                 print("--- RAW TEXT THAT FAILED TO PARSE ---")
-                print(text[:2000])  # limit log size
+                print((text or "")[:4000])
                 print("-------------------------------------")
-        except Exception as e:
-            print(f"JSON Extraction Error (stage {i}):", e)
+        except Exception as exc:
+            print(f"JSON Extraction Error (stage {idx}):", exc)
 
     return {}

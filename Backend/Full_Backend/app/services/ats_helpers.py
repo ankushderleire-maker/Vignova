@@ -2,12 +2,18 @@ import os
 import re
 import json
 import datetime
+import logging
+import hashlib
+from pathlib import Path
 import nltk
 from nltk.stem import WordNetLemmatizer
 from sentence_transformers import util
 import google.generativeai as genai
 
 from app.services.ml_models import semantic_model
+
+logger = logging.getLogger("ats_helpers")
+CACHE_PATH = Path(__file__).resolve().parents[2] / "data" / "ats_keyword_cache.json"
 
 
 # ───────────── ATS HELPER FUNCTIONS ─────────────
@@ -25,6 +31,77 @@ def chunk_text(text: str, max_words: int = 200, overlap: int = 50) -> list:
         chunks.append(chunk)
         start += max_words - overlap
     return chunks
+
+
+def _normalize_jd_for_cache(jd_text: str) -> str:
+    return re.sub(r"\s+", " ", (jd_text or "").strip().lower())
+
+
+def _cache_key_for_jd(jd_text: str) -> str:
+    return hashlib.sha256(_normalize_jd_for_cache(jd_text).encode("utf-8")).hexdigest()
+
+
+def _load_keyword_cache() -> dict:
+    try:
+        if CACHE_PATH.exists():
+            return json.loads(CACHE_PATH.read_text(encoding="utf-8"))
+    except Exception as exc:
+        logger.warning("Could not read ATS keyword cache: %s", exc)
+    return {}
+
+
+def _save_keyword_cache(cache: dict) -> None:
+    try:
+        CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)
+        CACHE_PATH.write_text(json.dumps(cache, ensure_ascii=True, indent=2), encoding="utf-8")
+    except Exception as exc:
+        logger.warning("Could not write ATS keyword cache: %s", exc)
+
+
+def _extract_keywords_locally(jd_text: str) -> list[str]:
+    common_multi_word_terms = [
+        "machine learning", "deep learning", "natural language processing", "project management",
+        "data analysis", "data science", "generative ai", "agentic ai", "vector database",
+        "knowledge graph", "prompt engineering", "ci/cd", "github actions", "rest api",
+        "fast api", "software engineering", "agile", "scrum", "aws", "docker", "langchain",
+        "langgraph", "rag", "llmops", "mlops", "sql", "mongodb", "milvus", "python",
+        "flask", "pandas", "numpy", "scikit-learn", "nltk", "word2vec", "tf-idf",
+        "pos tagging", "agent design patterns", "multi-agent systems", "workflow orchestration",
+        "event-driven systems", "cloud platforms", "production operations", "regression testing",
+        "ai evaluation", "release gates", "tool use", "planning", "react",
+    ]
+
+    jd_lower = _normalize_jd_for_cache(jd_text)
+    found = []
+    seen = set()
+
+    for term in common_multi_word_terms:
+        pattern = r"\b" + re.escape(term) + r"\b"
+        if re.search(pattern, jd_lower) and term not in seen:
+            seen.add(term)
+            found.append(term)
+
+    single_terms = re.findall(r"[A-Za-z][A-Za-z0-9+/#.-]{2,}", jd_lower)
+    stop_terms = {
+        "experience", "years", "year", "team", "teams", "role", "company", "client", "clients",
+        "opportunity", "exciting", "working", "work", "business", "environment", "candidate",
+        "including", "preferred", "required", "ability", "strong", "excellent", "using",
+        "build", "develop", "design", "support", "knowledge", "understanding",
+    }
+
+    for term in single_terms:
+        if term in stop_terms:
+            continue
+        if term in seen:
+            continue
+        if len(term) < 3:
+            continue
+        seen.add(term)
+        found.append(term)
+        if len(found) >= 20:
+            break
+
+    return found[:20]
 
 
 def calculate_semantic_score(jd_text: str, resume_text: str) -> float:
@@ -77,60 +154,97 @@ def calculate_keyword_score(jd_text: str, resume_text: str) -> dict:
     """
     
     extracted_keywords = []
+    cache = _load_keyword_cache()
+    cache_key = _cache_key_for_jd(jd_text)
+
+    def normalize_keyword_list(items) -> list[str]:
+        normalized = []
+        seen = set()
+        for item in items or []:
+            keyword = str(item).strip().lower()
+            if not keyword:
+                continue
+            if len(keyword) < 3:
+                continue
+            if keyword in {
+                "opportunity", "role", "team", "business", "company", "client",
+                "work", "working", "environment", "candidate", "exciting",
+            }:
+                continue
+            if keyword in seen:
+                continue
+            seen.add(keyword)
+            normalized.append(keyword)
+        return normalized
     
-    try:
-        ats_score_model = os.getenv("ATS_SCORE_MODEL", "GEMINI").upper()
-        sarvam_api_key = os.getenv("SARVAM_API_KEY")
-        
-        if ats_score_model == "SARVAM" and sarvam_api_key:
-            # --- SARVAM AI IMPLEMENTATION ---
-            print("Using Sarvam AI for ATS Keyword Extraction...")
-            from sarvamai import SarvamAI
-            client = SarvamAI(api_subscription_key=sarvam_api_key)
-            
-            response = client.chat.completions(
-                messages=[{"content": prompt, "role": "user"}]
-            )
-            
-            # Extract text (handling both object and dict return types from the SDK)
-            if hasattr(response, 'choices'):
-                text_response = response.choices[0].message.content.strip()
+    cached_keywords = cache.get(cache_key)
+    if isinstance(cached_keywords, list) and cached_keywords:
+        extracted_keywords = normalize_keyword_list(cached_keywords)
+    else:
+        try:
+            ats_score_model = os.getenv("ATS_SCORE_MODEL", "GEMINI").upper()
+            sarvam_api_key = os.getenv("SARVAM_API_KEY")
+
+            if ats_score_model == "SARVAM" and sarvam_api_key:
+                logger.info("Using Sarvam AI for ATS keyword extraction")
+                from sarvamai import SarvamAI
+                client = SarvamAI(api_subscription_key=sarvam_api_key)
+
+                response = client.chat.completions(
+                    messages=[{"content": prompt, "role": "user"}],
+                    temperature=0,
+                )
+
+                if hasattr(response, 'choices'):
+                    text_response = response.choices[0].message.content.strip()
+                else:
+                    text_response = response['choices'][0]['message']['content'].strip()
             else:
-                text_response = response['choices'][0]['message']['content'].strip()
-            
-        else:
-            # --- GEMINI IMPLEMENTATION (Fallback/Default) ---
-            print("Using Gemini for keyword extraction...")
-            model = genai.GenerativeModel('gemini-2.5-flash')
-            response = model.generate_content(prompt)
-            text_response = response.text.strip()
-            
-        # Clean markdown if present
-        if text_response.startswith('```json'):
-            text_response = text_response[7:]
-        if text_response.startswith('```'):
-            text_response = text_response[3:]
-        if text_response.endswith('```'):
-            text_response = text_response[:-3]
-            
-        extracted_keywords = json.loads(text_response.strip())
-        
-        # Format into expected list of dicts with calculated relevance
-        jd_keywords = []
-        for i, kw in enumerate(extracted_keywords):
-            # Degrading relevance based on order (most important first)
-            relevance = max(0.4, 1.0 - (i * 0.03)) 
-            jd_keywords.append({
-                "keyword": str(kw).lower().strip(),
-                "relevance": round(relevance, 3),
-                "type": "skill"
-            })
-            
-    except Exception as e:
-        print(f"Error extracting keywords with AI: {e}")
-        # Fallback to a very basic extraction if API fails
-        jd_keywords = [{"keyword": w.lower(), "relevance": 0.5, "type": "term"} 
-                       for w in jd_text.split() if len(w) > 5][:10]
+                logger.info("Using Gemini for ATS keyword extraction")
+                model = genai.GenerativeModel('gemini-2.5-flash')
+                response = model.generate_content(
+                    prompt,
+                    generation_config=genai.GenerationConfig(
+                        temperature=0,
+                        response_mime_type="application/json",
+                    ),
+                )
+                text_response = response.text.strip()
+
+            cleaned_response = text_response.strip()
+            if cleaned_response.startswith('```json'):
+                cleaned_response = cleaned_response[7:]
+            if cleaned_response.startswith('```'):
+                cleaned_response = cleaned_response[3:]
+            if cleaned_response.endswith('```'):
+                cleaned_response = cleaned_response[:-3]
+            cleaned_response = cleaned_response.strip()
+
+            if not cleaned_response.startswith("["):
+                array_match = re.search(r"\[[\s\S]*\]", cleaned_response)
+                if array_match:
+                    cleaned_response = array_match.group(0)
+
+            extracted_keywords = normalize_keyword_list(json.loads(cleaned_response))
+        except Exception:
+            logger.warning("ATS keyword extraction returned invalid AI output. Falling back to local extraction.")
+            extracted_keywords = _extract_keywords_locally(jd_text)
+
+        if not extracted_keywords:
+            extracted_keywords = _extract_keywords_locally(jd_text)
+
+        cache[cache_key] = extracted_keywords
+        _save_keyword_cache(cache)
+
+    # Format into expected list of dicts with calculated relevance
+    jd_keywords = []
+    for i, kw in enumerate(extracted_keywords[:20]):
+        relevance = max(0.4, 1.0 - (i * 0.03))
+        jd_keywords.append({
+            "keyword": kw,
+            "relevance": round(relevance, 3),
+            "type": "skill"
+        })
 
     # Limit to top 20 just in case
     jd_keywords = jd_keywords[:20]
@@ -180,6 +294,18 @@ def calculate_keyword_score(jd_text: str, resume_text: str) -> dict:
                 continue
 
         missing.append(item)
+
+    def dedupe_items(items: list[dict]) -> list[dict]:
+        deduped = {}
+        for item in items:
+            keyword = item["keyword"]
+            current = deduped.get(keyword)
+            if current is None or item["relevance"] > current["relevance"]:
+                deduped[keyword] = item
+        return list(deduped.values())
+
+    found = dedupe_items(found)
+    missing = [item for item in dedupe_items(missing) if item["keyword"] not in {f["keyword"] for f in found}]
 
     total = len(jd_keywords) if jd_keywords else 1
     score = (len(found) / total * 100)

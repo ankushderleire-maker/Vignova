@@ -1,7 +1,7 @@
 "use client";
 
-import React from 'react';
-import { X, AlertTriangle, Info, CheckCircle2 } from 'lucide-react';
+import React, { useEffect } from "react";
+import { AlertTriangle, CheckCircle2, Info, Loader2, Trash2, X } from "lucide-react";
 
 interface DialogProps {
     isOpen: boolean;
@@ -9,12 +9,34 @@ interface DialogProps {
     onConfirm?: () => void;
     title: string;
     description: string | React.ReactNode;
-    type?: 'alert' | 'confirm';
-    variant?: 'default' | 'destructive' | 'success';
+    type?: "alert" | "confirm";
+    variant?: "default" | "destructive" | "success";
     confirmText?: string;
     cancelText?: string;
     loading?: boolean;
+    autoCloseMs?: number;
 }
+
+const variantMap = {
+    default: {
+        icon: Info,
+        iconClass: "text-amber-500",
+        iconWrap: "bg-amber-50 ring-1 ring-amber-100",
+        confirmClass: "bg-amber-500 text-white hover:bg-amber-600 shadow-[inset_0_1px_0_rgba(255,255,255,0.25)]",
+    },
+    destructive: {
+        icon: Trash2,
+        iconClass: "text-rose-500",
+        iconWrap: "bg-rose-50 ring-1 ring-rose-100",
+        confirmClass: "bg-rose-500 text-white hover:bg-rose-600 shadow-[inset_0_1px_0_rgba(255,255,255,0.2)]",
+    },
+    success: {
+        icon: CheckCircle2,
+        iconClass: "text-emerald-500",
+        iconWrap: "bg-emerald-50 ring-1 ring-emerald-100",
+        confirmClass: "bg-emerald-500 text-white hover:bg-emerald-600 shadow-[inset_0_1px_0_rgba(255,255,255,0.25)]",
+    },
+} as const;
 
 export function CustomDialog({
     isOpen,
@@ -22,71 +44,104 @@ export function CustomDialog({
     onConfirm,
     title,
     description,
-    type = 'alert',
-    variant = 'default',
-    confirmText = 'OK',
-    cancelText = 'Cancel',
-    loading = false
+    type = "alert",
+    variant = "default",
+    confirmText = "Confirm",
+    cancelText = "Cancel",
+    loading = false,
+    autoCloseMs,
 }: DialogProps) {
+    useEffect(() => {
+        if (!isOpen) return;
+
+        const onKeyDown = (event: KeyboardEvent) => {
+            if (event.key === "Escape" && !loading) onClose();
+        };
+
+        const originalOverflow = document.body.style.overflow;
+        document.body.style.overflow = "hidden";
+        window.addEventListener("keydown", onKeyDown);
+
+        return () => {
+            document.body.style.overflow = originalOverflow;
+            window.removeEventListener("keydown", onKeyDown);
+        };
+    }, [isOpen, loading, onClose]);
+
+    useEffect(() => {
+        if (!isOpen || loading || type !== "alert") return;
+        const dismissAfter = autoCloseMs ?? (variant === "success" ? 1800 : undefined);
+        if (!dismissAfter) return;
+
+        const timer = window.setTimeout(() => onClose(), dismissAfter);
+        return () => window.clearTimeout(timer);
+    }, [autoCloseMs, isOpen, loading, onClose, type, variant]);
+
     if (!isOpen) return null;
+
+    const current = variantMap[variant];
+    const Icon = current.icon;
 
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-            {/* Backdrop */}
-            <div
-                className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity"
-                onClick={type === 'alert' ? onClose : undefined}
+            <button
+                type="button"
+                aria-label="Close dialog"
+                className="absolute inset-0 bg-slate-950/35 backdrop-blur-[2px]"
+                onClick={!loading ? onClose : undefined}
             />
 
-            {/* Dialog Panel */}
-            <div className="relative bg-[var(--sidebar-bg)] border border-[var(--border-color)] w-full max-w-sm rounded-[24px] shadow-2xl overflow-hidden animate-in zoom-in-95 fade-in duration-200">
-                <div className="p-6">
-                    <div className="flex gap-4">
-                        <div className={`shrink-0 w-10 h-10 flex items-center justify-center rounded-full mt-1 ${variant === 'destructive' ? 'bg-red-500/10 text-red-500' :
-                                variant === 'success' ? 'bg-green-500/10 text-green-500' :
-                                    'bg-[var(--primary)]/10 text-[var(--primary)]'
-                            }`}>
-                            {variant === 'destructive' ? <AlertTriangle className="w-5 h-5" /> :
-                                variant === 'success' ? <CheckCircle2 className="w-5 h-5" /> :
-                                    <Info className="w-5 h-5" />}
-                        </div>
-                        <div className="space-y-1.5 flex-1 pt-1">
-                            <h3 className="text-lg font-bold text-[var(--foreground)] tracking-tight leading-tight">
-                                {title}
-                            </h3>
-                            <div className="text-sm text-[var(--text-secondary)] leading-relaxed">
-                                {description}
-                            </div>
-                        </div>
-                    </div>
+            <div className="relative w-full max-w-[370px] rounded-2xl border border-black/8 bg-white px-7 pb-7 pt-8 text-center shadow-[0_18px_45px_-20px_rgba(15,23,42,0.25)] dark:border-white/10 dark:bg-[#111418] dark:shadow-[0_20px_50px_-22px_rgba(0,0,0,0.6)]">
+                <button
+                    type="button"
+                    onClick={onClose}
+                    disabled={loading}
+                    className="absolute right-3 top-3 inline-flex h-6 w-6 items-center justify-center rounded-full border border-black/12 bg-white text-slate-500 transition hover:text-slate-800 disabled:opacity-50 dark:border-white/12 dark:bg-[#1a1f26] dark:text-slate-400 dark:hover:text-slate-200"
+                >
+                    <X className="h-3.5 w-3.5" />
+                </button>
+
+                <div className={`mx-auto flex h-14 w-14 items-center justify-center rounded-2xl ${current.iconWrap} dark:bg-white/5 dark:ring-white/10`}>
+                    <Icon className={`h-7 w-7 ${current.iconClass}`} />
                 </div>
-                <div className="bg-black/20 dark:bg-white/5 px-6 py-4 flex items-center justify-end gap-3 rounded-b-[24px]">
-                    {type === 'confirm' && (
+
+                <h3 className="mt-6 text-[2rem] font-semibold leading-none tracking-[-0.03em] text-slate-900 dark:text-white">
+                    {title}
+                </h3>
+
+                <div className="mx-auto mt-3 max-w-[250px] text-sm leading-6 text-slate-600 dark:text-slate-300">
+                    {description}
+                </div>
+
+                <div className={`mt-8 grid gap-3 ${type === "confirm" ? "grid-cols-2" : "grid-cols-1"}`}>
+                    {type === "confirm" && (
                         <button
+                            type="button"
                             onClick={onClose}
                             disabled={loading}
-                            className="px-5 py-2.5 rounded-xl text-sm font-bold text-[var(--text-secondary)] hover:text-[var(--foreground)] hover:bg-black/5 dark:hover:bg-white/10 transition-colors disabled:opacity-50"
+                            className="inline-flex h-11 items-center justify-center rounded-xl bg-slate-100 px-4 text-sm font-medium text-slate-900 transition hover:bg-slate-200 disabled:opacity-50 dark:bg-white/8 dark:text-white dark:hover:bg-white/12"
                         >
                             {cancelText}
                         </button>
                     )}
+
                     <button
+                        type="button"
                         onClick={() => {
                             if (onConfirm) onConfirm();
-                            if (type === 'alert' && !loading) onClose();
+                            if (type === "alert" && !loading) onClose();
                         }}
                         disabled={loading}
-                        className={`min-w-[100px] px-5 py-2.5 rounded-xl text-sm font-bold text-white transition-all shadow-lg flex items-center justify-center ${variant === 'destructive' ? 'bg-red-500 hover:bg-red-600 shadow-red-500/20' :
-                                variant === 'success' ? 'bg-green-500 hover:bg-green-600 shadow-green-500/20' :
-                                    'bg-[var(--primary)] hover:bg-[var(--primary)]/90 shadow-[var(--primary)]/20'
-                            } disabled:opacity-50`}
+                        className={`inline-flex h-11 items-center justify-center rounded-xl px-4 text-sm font-medium transition ${current.confirmClass} disabled:opacity-60`}
                     >
                         {loading ? (
-                            <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
-                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                            </svg>
-                        ) : confirmText}
+                            <>
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                Working
+                            </>
+                        ) : (
+                            confirmText
+                        )}
                     </button>
                 </div>
             </div>

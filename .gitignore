@@ -7,3 +7,13 @@ node_modules/
 **/.next/
 .env
 **/.env
+# Python cache
+__pycache__/
+*.py[cod]
+*.class
+
+# App Data
+Backend/Full_Backend/data/*.json
+
+# Excluded from version control
+Browser_Extension/
