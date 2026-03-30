@@ -35,7 +35,7 @@ export async function POST(req: Request) {
             },
         });
 
-        // Initialize Nodemailer transporter
+        // Initialize Nodemailer transporter ok
         const transporter = nodemailer.createTransport({
             host: process.env.SMTP_HOST || "smtp.example.com",
             port: Number(process.env.SMTP_PORT) || 587,
