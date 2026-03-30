@@ -29,14 +29,6 @@ export function StatCard({ title, count, icon: Icon, trend, color = "var(--prima
                 <div className="flex items-start justify-between mb-4">
                     <div className="relative">
                         <div
-                            className="absolute inset-0 rounded-xl"
-                            style={{
-                                background: color,
-                                opacity: 0.2,
-                                filter: "blur(8px)"
-                            }}
-                        />
-                        <div
                             className="relative p-3 rounded-xl"
                             style={{ backgroundColor: `${color}15` }}
                         >

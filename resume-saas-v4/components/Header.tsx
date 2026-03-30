@@ -18,6 +18,9 @@ import {
   ChevronDown,
   Moon,
   Sun,
+  ScanLine,
+  Search,
+  Chrome,
   type LucideIcon
 } from "lucide-react";
 import { useTheme } from "@/components/providers/ThemeContext";
@@ -54,6 +57,26 @@ const pageInfo: Record<string, { title: string; description: string; icon: Lucid
     description: "Customize your preferences and account settings",
     icon: Settings,
   },
+  "/dashboard/cover-letter": {
+    title: "Cover Letter",
+    description: "Generate tailored cover letters for your job applications",
+    icon: FileText,
+  },
+  "/dashboard/ats-score": {
+    title: "ATS Score",
+    description: "Analyze your resume against job descriptions for ATS compatibility",
+    icon: ScanLine,
+  },
+  "/dashboard/find-jobs": {
+    title: "Find Jobs",
+    description: "Search for new opportunities matching your profile",
+    icon: Search,
+  },
+  "/dashboard/extension": {
+    title: "Extension",
+    description: "Manage your Vignova browser extension settings",
+    icon: Chrome,
+  },
 };
 
 export function Header() {
@@ -80,9 +103,9 @@ export function Header() {
   const planColor = sub?.plan_type === "PREMIUM" ? "text-amber-600 dark:text-amber-400 bg-amber-500/10 border-amber-500/30" : sub?.plan_type === "PRO" ? "text-blue-600 dark:text-blue-400 bg-blue-500/10 border-blue-500/30" : "text-gray-600 dark:text-gray-400 bg-gray-500/10 border-gray-500/30";
   const credits = sub?.credits_remaining ?? 3;
   const isUnlimited = sub?.has_unlimited_resumes || false;
-  const badgeBg = sub?.plan_type === "PREMIUM" ? "bg-amber-500/10 border-amber-500/30" : sub?.plan_type === "PRO" ? "bg-blue-500/10 border-blue-500/30" : "bg-gray-500/10 border-gray-500/30";
-  const badgeText = sub?.plan_type === "PREMIUM" ? "text-amber-600 dark:text-amber-400" : sub?.plan_type === "PRO" ? "text-blue-600 dark:text-blue-400" : "text-gray-600 dark:text-gray-400";
-  const planLabelColor = sub?.plan_type === "PREMIUM" ? "text-amber-600 dark:text-amber-400" : sub?.plan_type === "PRO" ? "text-blue-600 dark:text-blue-400" : "text-gray-600 dark:text-gray-400";
+  const badgeBg = sub?.plan_type === "PREMIUM" ? "bg-amber-500/10 border-amber-500/30" : sub?.plan_type === "PRO" ? "bg-blue-500/10 border-blue-500/30" : "bg-white/10 border-white/20";
+  const badgeText = sub?.plan_type === "PREMIUM" ? "text-amber-400" : sub?.plan_type === "PRO" ? "text-blue-400" : "text-gray-300";
+  const planLabelColor = badgeText;
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -114,15 +137,15 @@ export function Header() {
   const Icon = currentPage.icon;
 
   return (
-    <header className="flex h-16 items-center justify-between border-b border-[var(--border-color)] bg-[var(--sidebar-bg)]/80 px-8 backdrop-blur-md relative z-20">
+    <header className="flex h-16 items-center justify-between border-b border-white/10 bg-[#000000] px-8 relative z-20">
       {/* Left side: Icon + Page Title + Description */}
-      <div className="flex items-center gap-3 min-w-0 pr-4">
-        <div className="p-2 bg-[var(--primary)]/10 rounded-lg shrink-0">
-          <Icon className="h-4 w-4 text-[var(--primary)]" />
+      <div className="flex items-center gap-4 min-w-0 pr-4">
+        <div className="p-2.5 bg-blue-500/10 rounded-xl shrink-0 border border-blue-500/20">
+          <Icon className="h-6 w-6 text-blue-400" />
         </div>
-        <div className="min-w-0 flex items-center gap-3">
-          <h1 className="text-xl font-bold text-[var(--foreground)] leading-tight tracking-tight truncate shrink-0">{currentPage.title}</h1>
-          <p className="text-xs text-[var(--text-secondary)] hidden md:block truncate mt-0.5">
+        <div className="min-w-0 flex flex-col justify-center">
+          <h1 className="text-xl font-bold text-white leading-tight tracking-tight truncate">{currentPage.title}</h1>
+          <p className="text-xs text-gray-400 hidden md:block truncate mt-0.5">
             {currentPage.description.includes("1 Credit") ? (
               <>
                 {currentPage.description.split("1 Credit")[0]}
@@ -151,10 +174,10 @@ export function Header() {
         <div className="relative" ref={dropdownRef}>
           <button
             onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-            className="flex items-center gap-3 pl-6 border-l border-[var(--border-color)] outline-none group"
+            className="flex items-center gap-3 pl-6 border-l border-white/10 outline-none group"
           >
             <div className="text-right hidden sm:block group-hover:opacity-80 transition-opacity">
-              <p className="text-sm font-medium text-[var(--foreground)]">
+              <p className="text-sm font-medium text-white">
                 {session?.user?.name || "User"}
               </p>
               <p className={`text-xs font-medium ${planLabelColor}`}>{planName} Plan</p>

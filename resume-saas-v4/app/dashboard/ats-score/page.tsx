@@ -468,16 +468,7 @@ function AtsScoreContent() {
         <div className="w-full max-w-7xl mx-auto min-h-[calc(100vh-120px)] flex flex-col space-y-6 animate-slide-down">
 
             {/* Page Header */}
-            <div className="flex items-center justify-between shrink-0">
-                <div className="flex items-center gap-3">
-                    <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-blue-500/10 border border-blue-500/20">
-                        <ScanLine className="w-5 h-5 text-blue-500" />
-                    </div>
-                    <div>
-                        <h1 className="text-xl font-bold text-[var(--foreground)] tracking-tight">ATS Score Analysis</h1>
-                        <p className="text-xs text-[var(--text-secondary)]">Deep resume analysis powered by local AI models</p>
-                    </div>
-                </div>
+            <div className="flex items-center justify-end shrink-0">
 
                 <div className="flex items-center gap-3">
                     {step === "result" && (

@@ -114,9 +114,7 @@ export default function SavedResumesPage() {
             {/* Page Header */}
             <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
                 <div>
-                    <h1 className="text-3xl font-bold text-[var(--foreground)] mb-1">
-                        Saved Resumes
-                    </h1>
+
                     <p className="text-[var(--text-secondary)] text-sm">
                         {resumes.length} resume{resumes.length !== 1 ? "s" : ""} generated
                     </p>

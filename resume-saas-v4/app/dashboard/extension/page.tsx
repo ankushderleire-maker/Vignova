@@ -111,14 +111,7 @@ export default function ExtensionPage() {
 
     return (
         <div className="max-w-5xl mx-auto p-6 space-y-8 animate-fade-in">
-            <header>
-                <h1 className="text-3xl font-bold mb-2 flex items-center gap-3">
-                    <Chrome className="text-[var(--primary)]" /> Browser Extension
-                </h1>
-                <p className="text-[var(--foreground)]/70">
-                    Manage your extension settings and resume generation preferences.
-                </p>
-            </header>
+
 
             {/* Download Section */}
             <section className="bg-[var(--sidebar-bg)] border border-[var(--border-color)] rounded-xl p-6 flex flex-col md:flex-row items-center justify-between gap-6">

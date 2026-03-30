@@ -59,10 +59,10 @@ export function Sidebar() {
       <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-[var(--primary)]/10 to-transparent pointer-events-none" />
 
       {/* Logo Area */}
-      <div className="flex h-16 items-center px-6 bg-[var(--sidebar-bg)]/50 backdrop-blur-md z-10">
+      <div className="flex h-16 items-center px-6 bg-[#000000] border-b border-white/10 z-10">
         <div className="flex items-end">
           <img src="/logo.png" alt="Vignova Logo" width={40} height={40} className="w-10 h-10 object-contain" />
-          <span className="text-lg font-bold text-[var(--foreground)] tracking-tight -ml-1.5 mb-0.5">VIGNOVA</span>
+          <span className="text-lg font-bold text-white tracking-tight -ml-1.5 mb-0.5">VIGNOVA</span>
         </div>
       </div>
 

@@ -185,10 +185,7 @@ export default function FindJobsPage() {
             {/* Header */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
-                    <h1 className="text-xl font-bold text-[var(--foreground)] flex items-center gap-2">
-                        <Briefcase className="w-5 h-5 text-[var(--primary)]" />
-                        Find Jobs
-                    </h1>
+
                     <p className="text-sm text-[var(--text-secondary)] mt-0.5">
                         {total > 0 ? `${total.toLocaleString()} jobs available` : "Browse open positions"}
                     </p>
