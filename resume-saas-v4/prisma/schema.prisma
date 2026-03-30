@@ -15,6 +15,10 @@ model users {
   role          String   @default("USER") // USER | ADMIN
   created_at    DateTime @default(now())
 
+  // Password Reset
+  resetToken       String?
+  resetTokenExpiry DateTime?
+
   // Relations
   subscriptions   subscriptions[]
   master_profiles master_profiles[]
