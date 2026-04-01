@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Lock, Loader2, CheckCircle2 } from "lucide-react";
 
@@ -163,5 +163,13 @@ function ResetPasswordForm() {
 }
 
 export default function ResetPasswordPage() {
-    return <ResetPasswordForm />;
+    return (
+        <Suspense fallback={
+            <div className="flex min-h-screen w-full items-center justify-center bg-black">
+                <Loader2 className="w-8 h-8 animate-spin text-white" />
+            </div>
+        }>
+            <ResetPasswordForm />
+        </Suspense>
+    );
 }
