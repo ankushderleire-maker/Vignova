@@ -119,7 +119,7 @@ export default function ExtensionPage() {
                             <div className="w-16 h-16 bg-[var(--primary)]/10 rounded-full flex items-center justify-center mx-auto mb-4">
                                 <Chrome className="w-8 h-8 text-[var(--primary)]" />
                             </div>
-                            <h2 className="text-xl font-bold mb-3">Premium Feature</h2>
+                            <h2 className="text-xl font-bold mb-3">Upgrade Plan to Unlock More</h2>
                             <p className="text-[var(--foreground)]/70 mb-6 text-sm">
                                 Auto-tailoring resumes directly from LinkedIn and Indeed requires a Pro or Premium plan.
                             </p>

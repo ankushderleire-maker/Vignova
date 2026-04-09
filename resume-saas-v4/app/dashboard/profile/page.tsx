@@ -836,7 +836,7 @@ function ProfileCreationModal({ isOpen, onClose }: { isOpen: boolean; onClose: (
             <div className="w-16 h-16 rounded-full bg-yellow-500/10 flex items-center justify-center">
               <Crown className="w-8 h-8 text-yellow-500" />
             </div>
-            <h3 className="text-xl font-bold text-[var(--foreground)] font-heading">Multiple Profiles is a Premium Feature</h3>
+            <h3 className="text-xl font-bold text-[var(--foreground)] font-heading">Upgrade to Unlock More</h3>
             <p className="text-[var(--text-secondary)] text-sm leading-relaxed">
               Free users are limited to 1 Master Profile dataset. Upgrade to Pro or Premium to create unlimited tailored profiles for different job types.
             </p>
