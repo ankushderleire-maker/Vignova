@@ -799,7 +799,7 @@ function InternalSidebar() {
         })}
       </nav>
 
-      <div className="mt-6 pt-6 border-t border-[var(--border-color)] hidden md:block">
+      <div id="tour-save-profile" className="mt-6 pt-6 border-t border-[var(--border-color)] hidden md:block">
         <button
           onClick={() => handleSave()}
           disabled={isSaving || isLoading}
@@ -1059,7 +1059,7 @@ function MainContent() {
   const activeProfile = profiles.find(p => p.id === selectedProfileId);
 
   return (
-    <div className="flex-1 flex flex-col font-ui w-full min-w-0">
+    <div id="tour-profile" className="flex-1 flex flex-col font-ui w-full min-w-0">
       <ProfileCreationModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
 
       {/* HEADER BAR: SECTION TITLE & PROFILE SELECTOR */}

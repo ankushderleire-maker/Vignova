@@ -163,7 +163,7 @@ export function Header() {
       <div className="flex items-center gap-4 sm:gap-6 shrink-0">
 
         {/* Credits Counter (Monetization Visibility) */}
-        <div className={`flex items-center gap-2 rounded-full px-4 py-1.5 border ${badgeBg}`}>
+        <div id="tour-credits" className={`flex items-center gap-2 rounded-full px-4 py-1.5 border ${badgeBg}`}>
           <Zap className={`h-4 w-4 ${badgeText} fill-current`} />
           <span className={`text-sm font-semibold ${badgeText}`}>
             {isUnlimited ? "∞" : credits} Credits

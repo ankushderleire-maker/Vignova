@@ -492,7 +492,7 @@ function AtsScoreContent() {
             {/* ─── SETUP STEP ─── */}
             {
                 step === "setup" && (
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div id="tour-ats-setup" className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                         {/* LEFT: JD Selection */}
                         <div className="bg-[var(--sidebar-bg)]/50 border border-[var(--border-color)] rounded-xl p-6 shadow-xl space-y-5">
                             <div>
@@ -579,7 +579,7 @@ function AtsScoreContent() {
                             )}
 
                             <div className="mt-auto pt-4">
-                                <button onClick={handleRunAnalysis} disabled={!selectedJobId || (resumeSource === "saved" && !selectedResumeId) || (resumeSource === "upload" && !uploadFile)} className="w-full flex items-center justify-center gap-2 bg-[var(--primary)] hover:bg-[var(--primary)]/90 text-white px-5 py-3 rounded-xl transition shadow-lg shadow-[var(--primary)]/20 font-medium text-sm disabled:opacity-40 disabled:cursor-not-allowed">
+                                <button id="tour-run-ats" onClick={handleRunAnalysis} disabled={!selectedJobId || (resumeSource === "saved" && !selectedResumeId) || (resumeSource === "upload" && !uploadFile)} className="w-full flex items-center justify-center gap-2 bg-[var(--primary)] hover:bg-[var(--primary)]/90 text-white px-5 py-3 rounded-xl transition shadow-lg shadow-[var(--primary)]/20 font-medium text-sm disabled:opacity-40 disabled:cursor-not-allowed">
                                     <ScanLine className="h-4 w-4" /> Run ATS Analysis
                                 </button>
                             </div>

@@ -4,6 +4,7 @@ import React from "react";
 import { usePathname } from "next/navigation";
 import { Sidebar } from "@/components/Sidebar";
 import { Header } from "@/components/Header";
+import { OnboardingTour } from "@/components/OnboardingTour";
 
 export default function DashboardLayoutContent({
     children,
@@ -57,6 +58,9 @@ export default function DashboardLayoutContent({
                     </div>
                 </main>
             </div>
+
+            {/* Onboarding Tour (first-time users only) */}
+            <OnboardingTour />
         </div>
     );
 }

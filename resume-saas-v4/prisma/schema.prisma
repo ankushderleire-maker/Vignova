@@ -30,6 +30,9 @@ model users {
 
   // Extension Settings
   extensionSettings Json?    @default("{}") // Stores template preferences: { mode: "specific"|"random" | "curated", templateId: string, templateIds: string[] }
+
+  // Onboarding
+  onboarding_done Boolean @default(false)
 }
 
 model Payment {

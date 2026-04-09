@@ -129,7 +129,7 @@ export default function GeneratorPage() {
       <div className="mt-2">
 
         {/* Table Header */}
-        <div className="grid grid-cols-12 gap-4 px-4 py-3 border-b border-[var(--border-color)] bg-transparent text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider">
+        <div id="tour-generator" className="grid grid-cols-12 gap-4 px-4 py-3 border-b border-[var(--border-color)] bg-transparent text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider">
           <div className="col-span-5">Job Details</div>
           <div className="col-span-3">Status</div>
           <div className="col-span-2">Date Added</div>
@@ -187,6 +187,7 @@ export default function GeneratorPage() {
                   ) : (
                     <button
                       onClick={() => handleGenerate(job.id)}
+                      data-tour="ai-studio"
                       className="flex items-center gap-1.5 bg-[var(--primary)] text-[var(--background)] hover:bg-[var(--foreground)] hover:text-[var(--background)] px-3 py-1.5 rounded-md text-xs font-bold transition-all shadow-md hover:shadow-lg"
                     >
                       <Zap className="h-3 w-3 fill-current" />
