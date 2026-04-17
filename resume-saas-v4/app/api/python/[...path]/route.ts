@@ -1,8 +1,15 @@
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 
 export const maxDuration = 300; // 5 minutes just in case
 
 export async function POST(req: NextRequest, context: any) {
+    const session = await getServerSession(authOptions);
+    if (!(session?.user as any)?.id) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     try {
         // App router params might be passed in context.params
         const params = await context.params;

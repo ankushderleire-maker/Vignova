@@ -112,8 +112,7 @@ export const authOptions: NextAuthOptions = {
       if (session.user) {
         // @ts-ignore
         session.user.id = token.id as string;
-        // @ts-ignore
-        session.user.role = token.role as string;
+        // role intentionally omitted — admin checks query the DB server-side
       }
       return session;
     },
