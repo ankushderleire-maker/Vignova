@@ -1,8 +1,25 @@
+"""
+Resume Routes
+=============
+POST /api/parse-resume            — PDF → structured JSON via Gemini
+POST /api/generate-tailored-resume — master profile + JD → tailored resume + ATS report
+
+Production fixes applied:
+  - All synchronous LLM calls (Gemini / Sarvam) run in run_in_executor so
+    the event loop is never blocked (each call can take 3–15 seconds).
+  - _TAILORING_SEMAPHORE(3) caps concurrent tailoring requests so at most 3
+    × 4 Gemini calls run simultaneously — prevents CPU saturation and
+    Gemini rate-limit errors under concurrent load.
+  - parse-resume also runs its Gemini call in a thread.
+"""
+
+import asyncio
 import json
 import logging
 import os
+from functools import partial
 
-from fastapi import APIRouter, File, HTTPException, UploadFile
+from fastapi import APIRouter, File, HTTPException, Request, UploadFile
 
 from app.config import model
 from app.models.schemas import ResumeSchema, TailorRequest
@@ -26,6 +43,13 @@ logger = logging.getLogger("resume")
 
 MAX_FILE_SIZE = 5 * 1024 * 1024
 
+# Prevents the most expensive endpoint from spawning unlimited concurrent
+# Gemini calls.  3 concurrent tailoring flows = up to 12 Gemini calls in
+# flight — a safe ceiling for a 2-worker deployment.
+_TAILORING_SEMAPHORE = asyncio.Semaphore(3)
+
+
+# ── Pure helpers (no async needed) ────────────────────────────────────
 
 def _to_skill_list(value) -> list[str]:
     if not value:
@@ -36,39 +60,35 @@ def _to_skill_list(value) -> list[str]:
 
 
 def merge_skills(master_profile: dict, resume_data: dict) -> dict:
-    master_skills = master_profile.get("skills") or {}
+    master_skills    = master_profile.get("skills") or {}
     generated_skills = resume_data.get("skills") or {}
 
-    master_technical = []
-    master_soft = []
     if isinstance(master_skills, dict):
         master_technical = _to_skill_list(master_skills.get("technical"))
-        master_soft = _to_skill_list(master_skills.get("soft"))
+        master_soft      = _to_skill_list(master_skills.get("soft"))
     else:
         master_technical = _to_skill_list(master_skills)
+        master_soft      = []
 
-    generated_technical = []
-    generated_soft = []
     if isinstance(generated_skills, dict):
         generated_technical = _to_skill_list(generated_skills.get("technical"))
-        generated_soft = _to_skill_list(generated_skills.get("soft"))
+        generated_soft      = _to_skill_list(generated_skills.get("soft"))
     else:
         generated_technical = _to_skill_list(generated_skills)
+        generated_soft      = []
 
     def dedupe(items: list[str]) -> list[str]:
-        seen = set()
-        result = []
+        seen, result = set(), []
         for item in items:
             key = item.lower()
-            if key in seen:
-                continue
-            seen.add(key)
-            result.append(item)
+            if key not in seen:
+                seen.add(key)
+                result.append(item)
         return result
 
     resume_data["skills"] = {
         "technical": ", ".join(dedupe(master_technical + generated_technical)),
-        "soft": ", ".join(dedupe(master_soft + generated_soft)),
+        "soft":      ", ".join(dedupe(master_soft + generated_soft)),
     }
     return resume_data
 
@@ -164,14 +184,16 @@ JSON STRUCTURE:
 }}"""
 
 
-def generate_resume_content(prompt: str) -> dict:
+# ── Sync LLM + ATS workers (run via run_in_executor) ──────────────────
+
+def _generate_resume_content_sync(prompt: str) -> dict:
+    """Calls Gemini/Sarvam synchronously — must be run in a thread."""
     resume_gen_model = os.getenv("RESUME_GENERATION_MODEL", "GEMINI").upper()
-    sarvam_api_key = os.getenv("SARVAM_API_KEY")
+    sarvam_api_key   = os.getenv("SARVAM_API_KEY")
 
     if resume_gen_model == "SARVAM" and sarvam_api_key:
         logger.info("Using Sarvam AI for resume generation")
         from sarvamai import SarvamAI
-
         client = SarvamAI(api_subscription_key=sarvam_api_key)
         response = client.chat.completions(
             messages=[{"content": prompt, "role": "user"}],
@@ -185,19 +207,18 @@ def generate_resume_content(prompt: str) -> dict:
             response_text = response["choices"][0]["message"]["content"].strip()
     else:
         logger.info("Using Gemini for resume generation")
-        response = model.generate_content(prompt)
+        response      = model.generate_content(prompt)
         response_text = response.text
 
     parsed_json = extract_json_from_response(response_text)
     if not parsed_json:
-        raise HTTPException(status_code=500, detail="Failed to parse AI response. Please try again.")
+        raise ValueError("Failed to parse AI response — empty or malformed JSON")
 
     normalized = normalize_data(parsed_json)
 
     for exp in normalized.get("experience", []):
         if isinstance(exp.get("description"), str):
             exp["description"] = [exp["description"]]
-
     for proj in normalized.get("projects", []):
         if isinstance(proj.get("description"), str):
             proj["description"] = [proj["description"]]
@@ -205,41 +226,26 @@ def generate_resume_content(prompt: str) -> dict:
     return enforce_content_limits(normalized)
 
 
-def apply_profile_fallbacks(resume_data: dict, master_profile: dict) -> dict:
-    resume_data = merge_skills(master_profile, resume_data)
-
-    if not resume_data.get("experience") and master_profile.get("experience"):
-        resume_data["experience"] = master_profile["experience"]
-    if not resume_data.get("projects") and master_profile.get("projects"):
-        resume_data["projects"] = master_profile["projects"]
-    if not resume_data.get("education") and master_profile.get("education"):
-        resume_data["education"] = master_profile["education"]
-    if not resume_data.get("certifications") and master_profile.get("certifications"):
-        resume_data["certifications"] = master_profile["certifications"]
-    if not resume_data.get("languages") and master_profile.get("languages"):
-        resume_data["languages"] = master_profile["languages"]
-    return enforce_content_limits(resume_data)
-
-
-def build_ats_report(job_description: str, resume_data: dict) -> dict:
+def _build_ats_report_sync(job_description: str, resume_data: dict) -> dict:
+    """Runs all ATS helpers synchronously — must be run in a thread."""
     resume_text = resume_data_to_text(resume_data)
 
-    semantic_result = calculate_semantic_score(job_description, resume_text)
-    keyword_result = calculate_keyword_score(job_description, resume_text)
-    section_result = calculate_section_score(resume_text)
-    impact_result = calculate_impact_score(resume_text)
+    semantic_result    = calculate_semantic_score(job_description, resume_text)
+    keyword_result     = calculate_keyword_score(job_description, resume_text)
+    section_result     = calculate_section_score(resume_text)
+    impact_result      = calculate_impact_score(resume_text)
     readability_result = calculate_readability_score(resume_text)
-    format_result = calculate_format_score(resume_text)
-    experience_info = detect_experience_level(resume_text)
-    content_analysis = calculate_content_analysis(resume_text)
+    format_result      = calculate_format_score(resume_text)
+    experience_info    = detect_experience_level(resume_text)
+    content_analysis   = calculate_content_analysis(resume_text)
 
     overall_ats_score = (
-        0.25 * keyword_result["score"]
-        + 0.20 * semantic_result
-        + 0.15 * section_result["score"]
-        + 0.15 * impact_result["score"]
-        + 0.10 * readability_result["score"]
-        + 0.15 * format_result["score"]
+        0.25 * keyword_result["score"]     +
+        0.20 * semantic_result             +
+        0.15 * section_result["score"]     +
+        0.15 * impact_result["score"]      +
+        0.10 * readability_result["score"] +
+        0.15 * format_result["score"]
     )
 
     improvements = []
@@ -247,7 +253,7 @@ def build_ats_report(job_description: str, resume_data: dict) -> dict:
         improvements.append({
             "category": "Keywords",
             "severity": "high" if keyword_result["score"] < 40 else "medium",
-            "message": f"Missing key terms: {', '.join(keyword_result['missing_keywords'][:5])}.",
+            "message":  f"Missing key terms: {', '.join(keyword_result['missing_keywords'][:5])}.",
         })
 
     missing_sections = [
@@ -259,44 +265,54 @@ def build_ats_report(job_description: str, resume_data: dict) -> dict:
         improvements.append({
             "category": "Structure",
             "severity": "high" if len(missing_sections) >= 2 else "medium",
-            "message": f"Missing resume sections: {', '.join(missing_sections)}.",
+            "message":  f"Missing resume sections: {', '.join(missing_sections)}.",
         })
 
     if impact_result["details"]["action_verb_count"] < 5:
         improvements.append({
             "category": "Impact",
             "severity": "medium",
-            "message": f"Only {impact_result['details']['action_verb_count']} unique action verbs found.",
+            "message":  f"Only {impact_result['details']['action_verb_count']} unique action verbs found.",
         })
     if impact_result["details"]["total_metrics"] < 3:
         improvements.append({
             "category": "Impact",
             "severity": "high",
-            "message": f"Only {impact_result['details']['total_metrics']} quantified metrics found.",
+            "message":  f"Only {impact_result['details']['total_metrics']} quantified metrics found.",
         })
 
     return {
-        "overall_ats_score": round(min(overall_ats_score, 100), 1),
+        "overall_ats_score":    round(min(overall_ats_score, 100), 1),
         "semantic_match_score": round(semantic_result, 1),
-        "keyword_score": round(keyword_result["score"], 1),
-        "section_score": round(section_result["score"], 1),
-        "impact_score": round(impact_result["score"], 1),
-        "readability_score": round(readability_result["score"], 1),
-        "format_score": round(format_result["score"], 1),
-        "found_keywords": keyword_result["found_keywords"],
-        "missing_keywords": keyword_result["missing_keywords"],
-        "section_feedback": section_result["feedback"],
-        "impact_details": impact_result["details"],
-        "readability_details": readability_result["details"],
-        "format_checks": format_result["checks"],
-        "experience_info": experience_info,
-        "improvements": improvements,
-        "content_analysis": content_analysis,
+        "keyword_score":        round(keyword_result["score"], 1),
+        "section_score":        round(section_result["score"], 1),
+        "impact_score":         round(impact_result["score"], 1),
+        "readability_score":    round(readability_result["score"], 1),
+        "format_score":         round(format_result["score"], 1),
+        "found_keywords":       keyword_result["found_keywords"],
+        "missing_keywords":     keyword_result["missing_keywords"],
+        "section_feedback":     section_result["feedback"],
+        "impact_details":       impact_result["details"],
+        "readability_details":  readability_result["details"],
+        "format_checks":        format_result["checks"],
+        "experience_info":      experience_info,
+        "improvements":         improvements,
+        "content_analysis":     content_analysis,
     }
 
 
+def apply_profile_fallbacks(resume_data: dict, master_profile: dict) -> dict:
+    resume_data = merge_skills(master_profile, resume_data)
+    for key in ("experience", "projects", "education", "certifications", "languages"):
+        if not resume_data.get(key) and master_profile.get(key):
+            resume_data[key] = master_profile[key]
+    return enforce_content_limits(resume_data)
+
+
+# ── Routes ─────────────────────────────────────────────────────────────
+
 @router.post("/api/parse-resume")
-async def parse_resume(file: UploadFile = File(...)):
+async def parse_resume(request: Request, file: UploadFile = File(...)):
     if file.content_type != "application/pdf":
         return {"data": ResumeSchema().model_dump()}
 
@@ -332,13 +348,16 @@ async def parse_resume(file: UploadFile = File(...)):
 
     try:
         logger.info("Sending resume text to Gemini for parsing")
-        response = model.generate_content(prompt)
+        loop     = asyncio.get_event_loop()
+        response = await loop.run_in_executor(
+            None, partial(model.generate_content, prompt)
+        )
         parsed_json = extract_json_from_response(response.text)
         if not parsed_json:
             return {"data": ResumeSchema().model_dump()}
 
         normalized = normalize_data(parsed_json)
-        validated = ResumeSchema(**normalized)
+        validated  = ResumeSchema(**normalized)
         return {"data": validated.model_dump()}
     except Exception as exc:
         logger.error("Resume parsing error: %s", exc)
@@ -346,47 +365,68 @@ async def parse_resume(file: UploadFile = File(...)):
 
 
 @router.post("/api/generate-tailored-resume")
-async def generate_tailored_resume(payload: TailorRequest):
-    job_description = payload.jobDescription
+async def generate_tailored_resume(request: Request, payload: TailorRequest):
+    job_description    = payload.jobDescription
     master_profile_str = json.dumps(payload.masterProfile, indent=2)
 
-    if len(job_description) > 50000:
+    if len(job_description) > 50_000:
         raise HTTPException(status_code=400, detail="Job description too long. Maximum 50,000 characters.")
-    if len(master_profile_str) > 100000:
+    if len(master_profile_str) > 100_000:
         raise HTTPException(status_code=400, detail="Master profile data too large.")
 
-    try:
-        prompt = build_tailoring_prompt(payload.masterProfile, job_description, payload.atsReport)
-        normalized = apply_profile_fallbacks(generate_resume_content(prompt), payload.masterProfile)
-        ats_report = build_ats_report(job_description, normalized)
+    async with _TAILORING_SEMAPHORE:
+        try:
+            loop = asyncio.get_event_loop()
 
-        should_retry = (
-            not payload.atsReport
-            and (
-                ats_report["overall_ats_score"] < 78
-                or ats_report["keyword_score"] < 85
-                or len(ats_report["missing_keywords"]) > 3
+            # ── First generation (in thread) ──
+            prompt     = build_tailoring_prompt(payload.masterProfile, job_description, payload.atsReport)
+            raw_resume = await loop.run_in_executor(
+                None, partial(_generate_resume_content_sync, prompt)
             )
-        )
+            normalized = apply_profile_fallbacks(raw_resume, payload.masterProfile)
 
-        if should_retry:
-            logger.info(
-                "Initial tailored resume under ATS target, retrying with ATS feedback: overall=%s keyword=%s missing=%s",
-                ats_report["overall_ats_score"],
-                ats_report["keyword_score"],
-                len(ats_report["missing_keywords"]),
+            # ── First ATS report (in thread) ──
+            ats_report = await loop.run_in_executor(
+                None, partial(_build_ats_report_sync, job_description, normalized)
             )
-            retry_prompt = build_tailoring_prompt(payload.masterProfile, job_description, ats_report)
-            retry_resume = apply_profile_fallbacks(generate_resume_content(retry_prompt), payload.masterProfile)
-            retry_report = build_ats_report(job_description, retry_resume)
 
-            if retry_report["overall_ats_score"] >= ats_report["overall_ats_score"]:
-                normalized = retry_resume
-                ats_report = retry_report
+            # ── Optional retry if ATS score is below threshold ──
+            should_retry = (
+                not payload.atsReport
+                and (
+                    ats_report["overall_ats_score"] < 78
+                    or ats_report["keyword_score"] < 85
+                    or len(ats_report["missing_keywords"]) > 3
+                )
+            )
 
-        return {"data": normalized, "atsReport": ats_report}
-    except HTTPException:
-        raise
-    except Exception as exc:
-        logger.error("Tailoring error: %s", exc)
-        raise HTTPException(status_code=500, detail="Resume generation failed. Please try again.")
+            if should_retry:
+                logger.info(
+                    "Retrying: overall=%.1f keyword=%.1f missing=%d",
+                    ats_report["overall_ats_score"],
+                    ats_report["keyword_score"],
+                    len(ats_report["missing_keywords"]),
+                )
+                retry_prompt  = build_tailoring_prompt(payload.masterProfile, job_description, ats_report)
+                raw_retry     = await loop.run_in_executor(
+                    None, partial(_generate_resume_content_sync, retry_prompt)
+                )
+                retry_resume  = apply_profile_fallbacks(raw_retry, payload.masterProfile)
+                retry_report  = await loop.run_in_executor(
+                    None, partial(_build_ats_report_sync, job_description, retry_resume)
+                )
+
+                if retry_report["overall_ats_score"] >= ats_report["overall_ats_score"]:
+                    normalized = retry_resume
+                    ats_report = retry_report
+
+            return {"data": normalized, "atsReport": ats_report}
+
+        except HTTPException:
+            raise
+        except ValueError as exc:
+            logger.error("Tailoring parse error: %s", exc)
+            raise HTTPException(status_code=500, detail="Resume generation failed. Please try again.")
+        except Exception as exc:
+            logger.error("Tailoring error: %s", exc)
+            raise HTTPException(status_code=500, detail="Resume generation failed. Please try again.")

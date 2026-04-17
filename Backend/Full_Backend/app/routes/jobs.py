@@ -4,79 +4,77 @@ Job Ingestion Route
 POST /api/ingest-jobs — Fetches jobs from Lever & Greenhouse ATS APIs
 concurrently (in batches) and inserts them into PostgreSQL incrementally.
 
-Features:
-  - Async concurrent fetching via aiohttp (batches of 20 companies)
-  - Incremental DB inserts after each batch (data available immediately)
-  - 30-day FIFO rotation: old jobs auto-deleted at start of each run
+Production fixes applied:
+  - All psycopg2 calls run via run_in_executor (never blocks the event loop)
+  - Connections are borrowed from a shared pool and always returned in finally
+  - ALTER TABLE removed: schema is managed by migrations/001_initial.sql
+  - DELETE batched (1 000 rows at a time) to avoid full-table WAL storms
+  - _INGEST_LOCK prevents overlapping ingest runs from piling up connections
 """
 
+import asyncio
+import logging
 import os
 import re
-import logging
-import asyncio
+import time
 from datetime import datetime
+from functools import partial
 from pathlib import Path
-from urllib.parse import urlparse
 
 import aiohttp
 import psycopg2
 from psycopg2.extras import execute_values
 from fastapi import APIRouter, HTTPException, Request
 
-router = APIRouter()
+from app.db_pool import get_db_connection
 
+router = APIRouter()
 logger = logging.getLogger("job_worker")
 
-# API Key for securing the ingest endpoint
 INGEST_API_KEY = os.environ.get("INGEST_API_KEY", "")
 
-# Paths
 BACKEND_DIR = Path(__file__).resolve().parent.parent.parent
-DATA_DIR = BACKEND_DIR / "data"
+DATA_DIR    = BACKEND_DIR / "data"
 
-# Concurrency settings
-BATCH_SIZE = 20  # companies per batch
-HTTP_TIMEOUT = 15  # seconds per request
+BATCH_SIZE   = 20   # companies per async fetch-batch
+HTTP_TIMEOUT = 15   # seconds per outbound HTTP request
 
-
-# ── Database ──────────────────────────────────────────────────────────
-
-def get_db_connection():
-    """Create a PostgreSQL connection from DATABASE_URL."""
-    db_url = os.environ.get("DATABASE_URL")
-    if not db_url:
-        raise Exception("DATABASE_URL not set in environment")
-
-    parsed = urlparse(db_url)
-    return psycopg2.connect(
-        host=parsed.hostname,
-        port=parsed.port or 5432,
-        dbname=parsed.path.lstrip("/"),
-        user=parsed.username,
-        password=parsed.password,
-    )
+# Prevents two concurrent ingest requests from running at the same time,
+# which would double the DB connection pressure and WAL write load.
+_INGEST_LOCK = asyncio.Lock()
 
 
-def ensure_ingested_at_column(conn):
-    """Add ingested_at column if it doesn't exist yet."""
-    with conn.cursor() as cur:
-        cur.execute("""
-            ALTER TABLE jobs ADD COLUMN IF NOT EXISTS ingested_at TIMESTAMP DEFAULT NOW();
-        """)
-    conn.commit()
+# ── Synchronous DB helpers (always called via run_in_executor) ─────────
+
+def cleanup_old_jobs(conn, batch_size: int = 1_000) -> int:
+    """
+    Batch-delete jobs older than 30 days.
+    Deletes at most `batch_size` rows per iteration so the WAL write is
+    spread over many small transactions instead of one massive one.
+    Uses the jobs_ingested_at_idx index (created in migration 001).
+    """
+    total_deleted = 0
+    while True:
+        with conn.cursor() as cur:
+            cur.execute("""
+                DELETE FROM jobs
+                WHERE id IN (
+                    SELECT id FROM jobs
+                    WHERE ingested_at < NOW() - INTERVAL '30 days'
+                    LIMIT %s
+                )
+            """, (batch_size,))
+            deleted = cur.rowcount
+        conn.commit()
+        total_deleted += deleted
+        if deleted < batch_size:
+            break
+        time.sleep(0.05)   # yield between batches so other queries can proceed
+    return total_deleted
 
 
-def cleanup_old_jobs(conn):
-    """Delete jobs older than 30 days (FIFO rotation)."""
-    with conn.cursor() as cur:
-        cur.execute("DELETE FROM jobs WHERE ingested_at < NOW() - INTERVAL '30 days';")
-        deleted = cur.rowcount
-    conn.commit()
-    return deleted
-
-
-def insert_jobs(conn, jobs_data):
-    """Insert jobs with ON CONFLICT DO NOTHING to skip duplicates."""
+def insert_jobs(conn, jobs_data: list) -> int:
+    """Insert a batch of jobs; skip exact duplicates via the unique index."""
     if not jobs_data:
         return 0
 
@@ -110,12 +108,11 @@ def insert_jobs(conn, jobs_data):
 # ── Async ATS Fetchers ────────────────────────────────────────────────
 
 async def fetch_lever_jobs_async(session: aiohttp.ClientSession, company: str):
-    """Fetch jobs from Lever's public API (async)."""
     url = f"https://api.lever.co/v0/postings/{company}?mode=json"
     try:
         async with session.get(url, timeout=aiohttp.ClientTimeout(total=HTTP_TIMEOUT)) as resp:
             if resp.status != 200:
-                logger.warning(f"  Lever {company}: HTTP {resp.status}")
+                logger.warning("Lever %s: HTTP %s", company, resp.status)
                 return []
 
             postings = await resp.json()
@@ -136,28 +133,26 @@ async def fetch_lever_jobs_async(session: aiohttp.ClientSession, company: str):
                         pass
 
                 jobs.append({
-                    "title": p.get("text", "Untitled"),
-                    "company": company.capitalize(),
-                    "location": location,
+                    "title":       p.get("text", "Untitled"),
+                    "company":     company.capitalize(),
+                    "location":    location,
                     "description": p.get("descriptionPlain", ""),
-                    "apply_url": p.get("hostedUrl") or p.get("applyUrl", ""),
-                    "source": "lever",
+                    "apply_url":   p.get("hostedUrl") or p.get("applyUrl", ""),
+                    "source":      "lever",
                     "date_posted": date_posted,
                 })
-
             return jobs
     except Exception as e:
-        logger.error(f"  Lever {company}: {e}")
+        logger.error("Lever %s: %s", company, e)
         return []
 
 
 async def fetch_greenhouse_jobs_async(session: aiohttp.ClientSession, company: str):
-    """Fetch jobs from Greenhouse's public API (async)."""
     url = f"https://boards-api.greenhouse.io/v1/boards/{company}/jobs?content=true"
     try:
         async with session.get(url, timeout=aiohttp.ClientTimeout(total=30)) as resp:
             if resp.status != 200:
-                logger.warning(f"  Greenhouse {company}: HTTP {resp.status}")
+                logger.warning("Greenhouse %s: HTTP %s", company, resp.status)
                 return []
 
             data = await resp.json()
@@ -185,43 +180,32 @@ async def fetch_greenhouse_jobs_async(session: aiohttp.ClientSession, company: s
                     description = re.sub(r"\s+", " ", description).strip()
 
                 jobs.append({
-                    "title": p.get("title", "Untitled"),
-                    "company": company.capitalize(),
-                    "location": location,
+                    "title":       p.get("title", "Untitled"),
+                    "company":     company.capitalize(),
+                    "location":    location,
                     "description": description,
-                    "apply_url": p.get("absolute_url", ""),
-                    "source": "greenhouse",
+                    "apply_url":   p.get("absolute_url", ""),
+                    "source":      "greenhouse",
                     "date_posted": date_posted,
                 })
-
             return jobs
     except Exception as e:
-        logger.error(f"  Greenhouse {company}: {e}")
+        logger.error("Greenhouse %s: %s", company, e)
         return []
 
 
 async def fetch_company_jobs(session: aiohttp.ClientSession, company: str):
-    """Fetch jobs from both Lever and Greenhouse concurrently for one company."""
-    lever_task = fetch_lever_jobs_async(session, company)
-    greenhouse_task = fetch_greenhouse_jobs_async(session, company)
+    lever_jobs, greenhouse_jobs = await asyncio.gather(
+        fetch_lever_jobs_async(session, company),
+        fetch_greenhouse_jobs_async(session, company),
+    )
+    return {"company": company, "lever_jobs": lever_jobs, "greenhouse_jobs": greenhouse_jobs}
 
-    lever_jobs, greenhouse_jobs = await asyncio.gather(lever_task, greenhouse_task)
-
-    return {
-        "company": company,
-        "lever_jobs": lever_jobs,
-        "greenhouse_jobs": greenhouse_jobs,
-    }
-
-
-# ── Helper ────────────────────────────────────────────────────────────
 
 def load_companies():
-    """Load company slugs from data/companies.txt."""
     companies_file = DATA_DIR / "companies.txt"
     if not companies_file.exists():
         raise FileNotFoundError(f"Companies file not found: {companies_file}")
-
     with open(companies_file) as f:
         return [line.strip() for line in f if line.strip() and not line.startswith("#")]
 
@@ -233,83 +217,92 @@ async def ingest_jobs(request: Request):
     """
     Trigger job ingestion from Lever & Greenhouse.
     Requires X-API-Key header for authentication.
+    Returns 409 if an ingestion is already running.
     """
-    # Verify API key
     api_key = request.headers.get("X-API-Key", "")
     if not INGEST_API_KEY or api_key != INGEST_API_KEY:
         raise HTTPException(status_code=403, detail="Forbidden")
 
+    # Reject concurrent ingest requests — a second call while the first is
+    # still running would open a second DB connection and double the load.
+    if _INGEST_LOCK.locked():
+        raise HTTPException(status_code=409, detail="Ingestion already in progress. Try again later.")
+
+    async with _INGEST_LOCK:
+        return await _run_ingest()
+
+
+async def _run_ingest():
+    loop = asyncio.get_event_loop()
+
     try:
         companies = load_companies()
-        conn = get_db_connection()
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
-        # Ensure schema is ready
-        ensure_ingested_at_column(conn)
+    total_fetched   = 0
+    total_inserted  = 0
+    total_errors    = 0
+    batches_processed = 0
 
-        # 30-day FIFO cleanup
-        deleted = cleanup_old_jobs(conn)
-        logger.info(f"Cleaned up {deleted} jobs older than 30 days")
+    # Borrow ONE connection from the pool for the entire ingest run.
+    # The context manager guarantees it is returned even on exception.
+    with get_db_connection() as conn:
 
-        total_fetched = 0
-        total_inserted = 0
-        total_errors = 0
-        batches_processed = 0
+        # 30-day FIFO cleanup — runs in a thread to avoid blocking event loop
+        deleted = await loop.run_in_executor(None, cleanup_old_jobs, conn)
+        logger.info("Cleaned up %d jobs older than 30 days", deleted)
 
-        # Use a TCP connector with connection limit to avoid overwhelming APIs
         connector = aiohttp.TCPConnector(limit=40, limit_per_host=10)
         async with aiohttp.ClientSession(connector=connector) as session:
 
-            # Process companies in batches
             for i in range(0, len(companies), BATCH_SIZE):
-                batch = companies[i : i + BATCH_SIZE]
+                batch     = companies[i : i + BATCH_SIZE]
                 batch_num = (i // BATCH_SIZE) + 1
-                logger.info(f"Batch {batch_num}: processing {len(batch)} companies ({i+1}-{i+len(batch)} of {len(companies)})")
+                logger.info(
+                    "Batch %d: processing %d companies (%d-%d of %d)",
+                    batch_num, len(batch), i + 1, i + len(batch), len(companies),
+                )
 
-                # Fetch all companies in this batch concurrently
-                tasks = [fetch_company_jobs(session, company) for company in batch]
+                tasks   = [fetch_company_jobs(session, c) for c in batch]
                 results = await asyncio.gather(*tasks, return_exceptions=True)
 
-                # Collect jobs from this batch and insert immediately
                 batch_jobs = []
                 for result in results:
                     if isinstance(result, Exception):
                         total_errors += 1
-                        logger.error(f"  Batch error: {result}")
+                        logger.error("Batch error: %s", result)
                         continue
-
-                    lever_jobs = result["lever_jobs"]
-                    greenhouse_jobs = result["greenhouse_jobs"]
-                    batch_jobs.extend(lever_jobs)
-                    batch_jobs.extend(greenhouse_jobs)
+                    batch_jobs.extend(result["lever_jobs"])
+                    batch_jobs.extend(result["greenhouse_jobs"])
 
                 total_fetched += len(batch_jobs)
 
-                # Insert this batch into DB immediately
                 if batch_jobs:
                     try:
-                        inserted = insert_jobs(conn, batch_jobs)
+                        # DB insert runs in thread — never blocks event loop
+                        inserted = await loop.run_in_executor(
+                            None, insert_jobs, conn, batch_jobs
+                        )
                         total_inserted += inserted
-                        logger.info(f"  Batch {batch_num}: inserted {inserted}, skipped {len(batch_jobs) - inserted} duplicates")
+                        logger.info(
+                            "Batch %d: inserted %d, skipped %d duplicates",
+                            batch_num, inserted, len(batch_jobs) - inserted,
+                        )
                     except Exception as e:
                         total_errors += 1
-                        logger.error(f"  Batch {batch_num} DB error: {e}")
+                        logger.error("Batch %d DB error: %s", batch_num, e)
                         conn.rollback()
 
                 batches_processed += 1
 
-        conn.close()
-
-        return {
-            "status": "success",
-            "jobs_fetched": total_fetched,
-            "jobs_inserted": total_inserted,
-            "duplicates_skipped": total_fetched - total_inserted,
-            "old_jobs_cleaned": deleted,
-            "errors": total_errors,
-            "companies_processed": len(companies),
-            "batches_processed": batches_processed,
-        }
-
-    except Exception as e:
-        logger.error(f"Ingestion failed: {e}")
-        raise HTTPException(status_code=500, detail="Job ingestion failed. Please try again.")
+    return {
+        "status":             "success",
+        "jobs_fetched":       total_fetched,
+        "jobs_inserted":      total_inserted,
+        "duplicates_skipped": total_fetched - total_inserted,
+        "old_jobs_cleaned":   deleted,
+        "errors":             total_errors,
+        "companies_processed": len(companies),
+        "batches_processed":  batches_processed,
+    }

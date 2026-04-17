@@ -1,16 +1,20 @@
 """
 AI Agent Planner Route
 ======================
-POST /api/agent/plan — Receives page state + user profile,
-calls local Ollama model, returns next action JSON.
+POST /api/agent/plan       — single next action from Ollama
+POST /api/agent/plan-batch — all actions for current page at once
 
-POST /api/agent/plan-batch — Same but returns multiple actions at once.
+Production fix: call_ollama() is now fully async using aiohttp.
+Previously it used requests.post() (blocking) which froze the entire
+uvicorn event loop for up to 30 seconds per call.
 """
 
-import os
 import json
 import logging
-import requests
+import os
+import re
+
+import aiohttp
 from fastapi import APIRouter, Header, HTTPException
 from pydantic import BaseModel
 from typing import Optional
@@ -18,26 +22,23 @@ from typing import Optional
 router = APIRouter()
 logger = logging.getLogger("agent_planner")
 
-# Ollama config from .env
-OLLAMA_BASE_URL = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434")
-OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "llama3")
+OLLAMA_BASE_URL  = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434")
+OLLAMA_MODEL     = os.environ.get("OLLAMA_MODEL", "llama3")
 INTERNAL_API_KEY = os.environ.get("INTERNAL_API_KEY", "vignova_internal_secret_key_123")
 
 
 # ── Request Models ────────────────────────────────────────────────────
 
 class PlanRequest(BaseModel):
-    fields: list        # Unmatched form fields
-    buttons: list       # Navigation/submit buttons
-    profile: dict       # User profile data
-    url: Optional[str] = ""
+    fields:  list
+    buttons: list
+    profile: dict
+    url:     Optional[str] = ""
 
 
 # ── Prompt Builder ────────────────────────────────────────────────────
 
 def build_prompt(fields, buttons, profile, url, batch=False):
-    """Build the system + user prompt for the Ollama model."""
-
     profile_str = "\n".join([f"  {k}: {v}" for k, v in profile.items() if v])
 
     fields_str = "\n".join([
@@ -48,7 +49,7 @@ def build_prompt(fields, buttons, profile, url, batch=False):
         f"    placeholder: {f.get('placeholder', '')}\n"
         f"    required: {f.get('required', False)}"
         + (f"\n    options: {json.dumps(f.get('options', []))}" if f.get('options') else "")
-        for f in fields[:12]  # Limit to avoid token overflow
+        for f in fields[:12]
     ])
 
     buttons_str = "\n".join([
@@ -71,7 +72,7 @@ The object must have: { "action", "selector", "value" }
 Return ONLY valid JSON. No explanation. No markdown. Example:
 {"action": "fill_input", "selector": "#email", "value": "john@example.com"}"""
 
-    prompt = f"""You are an AI assistant controlling a browser to fill out a job application form.
+    return f"""You are an AI assistant controlling a browser to fill out a job application form.
 
 Available actions:
 - fill_input: Set a text input or textarea value
@@ -107,52 +108,45 @@ Rules:
 - For country/location dropdowns, use the profile city/country data
 - IMPORTANT: For react-select dropdowns, the value should be the text to type/search for, not a code"""
 
-    return prompt
 
+# ── Async Ollama API Call ─────────────────────────────────────────────
 
-# ── Ollama API Call ───────────────────────────────────────────────────
-
-def call_ollama(prompt):
-    """Call the local Ollama model and return the response text."""
+async def call_ollama(prompt: str) -> str | None:
+    """
+    Call the local Ollama model asynchronously.
+    Uses aiohttp instead of requests.post so the uvicorn event loop is
+    never blocked — a single Ollama call can take 10-30 seconds.
+    """
     url = f"{OLLAMA_BASE_URL}/api/generate"
-
+    payload = {
+        "model":  OLLAMA_MODEL,
+        "prompt": prompt,
+        "stream": False,
+        "options": {"temperature": 0.1, "num_predict": 512},
+        "format": "json",
+    }
     try:
-        response = requests.post(
-            url,
-            json={
-                "model": OLLAMA_MODEL,
-                "prompt": prompt,
-                "stream": False,
-                "options": {
-                    "temperature": 0.1,  # Low temp for consistent output
-                    "num_predict": 512,
-                },
-                "format": "json",  # Ask Ollama for JSON output
-            },
-            timeout=30,
-        )
-
-        if response.status_code != 200:
-            logger.error(f"Ollama HTTP error: {response.status_code}")
-            return None
-
-        data = response.json()
-        return data.get("response", "")
-
-    except requests.RequestException as e:
-        logger.error(f"Ollama connection error: {e}")
+        async with aiohttp.ClientSession() as session:
+            async with session.post(
+                url,
+                json=payload,
+                timeout=aiohttp.ClientTimeout(total=30),
+            ) as resp:
+                if resp.status != 200:
+                    logger.error("Ollama HTTP error: %s", resp.status)
+                    return None
+                data = await resp.json(content_type=None)
+                return data.get("response", "")
+    except aiohttp.ClientError as e:
+        logger.error("Ollama connection error: %s", e)
         return None
 
 
 def parse_action(text):
-    """Parse AI response into action dict(s)."""
     if not text:
         return None
 
-    # Clean response
     text = text.strip()
-
-    # Remove markdown code blocks if present
     if text.startswith("```"):
         text = text.split("```")[1]
         if text.startswith("json"):
@@ -160,12 +154,8 @@ def parse_action(text):
         text = text.strip()
 
     try:
-        parsed = json.loads(text)
-        return parsed
+        return json.loads(text)
     except json.JSONDecodeError:
-        # Try to extract JSON from the text
-        import re
-        # Find JSON object
         obj_match = re.search(r'\{[^{}]+\}', text)
         if obj_match:
             try:
@@ -173,7 +163,6 @@ def parse_action(text):
             except json.JSONDecodeError:
                 pass
 
-        # Find JSON array
         arr_match = re.search(r'\[[\s\S]*\]', text)
         if arr_match:
             try:
@@ -181,7 +170,7 @@ def parse_action(text):
             except json.JSONDecodeError:
                 pass
 
-        logger.error(f"Could not parse AI response: {text[:200]}")
+        logger.error("Could not parse AI response: %s", text[:200])
         return None
 
 
@@ -191,23 +180,22 @@ def parse_action(text):
 async def plan_action(req: PlanRequest, x_api_key: str = Header(None)):
     if x_api_key != INTERNAL_API_KEY:
         raise HTTPException(status_code=401, detail="Unauthorized")
-    """Get a single next action from the AI."""
+
     try:
-        prompt = build_prompt(req.fields, req.buttons, req.profile, req.url, batch=False)
-        response_text = call_ollama(prompt)
+        prompt        = build_prompt(req.fields, req.buttons, req.profile, req.url, batch=False)
+        response_text = await call_ollama(prompt)
 
         if not response_text:
             return {"success": False, "error": "Ollama did not respond"}
 
         action = parse_action(response_text)
-
         if not action:
             return {"success": False, "error": "Could not parse AI response"}
 
         return {"success": True, "action": action}
 
     except Exception as e:
-        logger.error(f"Plan error: {e}")
+        logger.error("Plan error: %s", e)
         return {"success": False, "error": "Planning failed. Please try again."}
 
 
@@ -215,38 +203,36 @@ async def plan_action(req: PlanRequest, x_api_key: str = Header(None)):
 async def plan_batch(req: PlanRequest, x_api_key: str = Header(None)):
     if x_api_key != INTERNAL_API_KEY:
         raise HTTPException(status_code=401, detail="Unauthorized")
-    """Get multiple actions at once from the AI."""
+
     try:
-        prompt = build_prompt(req.fields, req.buttons, req.profile, req.url, batch=True)
-        response_text = call_ollama(prompt)
+        prompt        = build_prompt(req.fields, req.buttons, req.profile, req.url, batch=True)
+        response_text = await call_ollama(prompt)
 
         if not response_text:
             return {"success": False, "error": "Ollama did not respond"}
 
         result = parse_action(response_text)
-
         if result is None:
             return {"success": False, "error": "Could not parse AI response"}
 
-        # Ensure it's a list
         if isinstance(result, dict):
             result = [result]
 
         if not isinstance(result, list):
             return {"success": False, "error": "Invalid response format"}
 
-        # Validate each action
-        valid_actions = []
-        for action in result:
-            if isinstance(action, dict) and "action" in action and "selector" in action:
-                valid_actions.append({
-                    "action": action["action"],
-                    "selector": action["selector"],
-                    "value": action.get("value", ""),
-                })
+        valid_actions = [
+            {
+                "action":   action["action"],
+                "selector": action["selector"],
+                "value":    action.get("value", ""),
+            }
+            for action in result
+            if isinstance(action, dict) and "action" in action and "selector" in action
+        ]
 
         return {"success": True, "actions": valid_actions}
 
     except Exception as e:
-        logger.error(f"Batch plan error: {e}")
+        logger.error("Batch plan error: %s", e)
         return {"success": False, "error": "Batch planning failed. Please try again."}

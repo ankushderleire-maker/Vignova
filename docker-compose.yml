@@ -22,8 +22,10 @@ services:
     env_file:
       - .env
     depends_on:
-      - db
-      - backend
+      db:
+        condition: service_healthy   # wait until pg_isready passes
+      backend:
+        condition: service_started
     restart: unless-stopped
 
   # ----------------------------------------
@@ -39,14 +41,22 @@ services:
       - ENVIRONMENT=production
       - OLLAMA_BASE_URL=http://ollama:11434
       - GOOGLE_API_KEY=${GEMINI_API_KEY}
+      - WORKERS=2        # gunicorn worker count — raise to 4 on 4-core servers
     env_file:
       - .env
     volumes:
       - backend_uploads:/app/uploads
     depends_on:
-      - db
-      - ollama
+      db:
+        condition: service_healthy   # backend only starts after Postgres is ready
+      ollama:
+        condition: service_started
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
 
   # ----------------------------------------
   # Ollama
@@ -73,15 +83,40 @@ services:
   db:
     image: postgres:15-alpine
     container_name: vignova-db
+    command: >
+      postgres
+        -c max_connections=50
+        -c shared_buffers=256MB
+        -c effective_cache_size=768MB
+        -c work_mem=8MB
+        -c maintenance_work_mem=64MB
+        -c checkpoint_completion_target=0.9
+        -c wal_buffers=16MB
+        -c default_statistics_target=100
+        -c idle_in_transaction_session_timeout=30000
+        -c statement_timeout=60000
+        -c lock_timeout=10000
+        -c log_min_duration_statement=1000
     environment:
-      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_USER:     ${DB_USER:-postgres}
       POSTGRES_PASSWORD: ${DB_PASSWORD:-admin123}
-      POSTGRES_DB: ${DB_NAME:-resume_ai_saas}
+      POSTGRES_DB:       ${DB_NAME:-resume_ai_saas}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
       - "5432:5432"
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres} -d ${DB_NAME:-resume_ai_saas}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 1G
 
 volumes:
   postgres_data:

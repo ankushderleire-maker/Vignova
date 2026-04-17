@@ -51,11 +51,21 @@ def _load_keyword_cache() -> dict:
 
 
 def _save_keyword_cache(cache: dict) -> None:
+    """Atomic write: write to a temp file then rename, so a crash mid-write
+    never leaves a corrupted JSON file that causes all future requests to
+    bypass the cache and hit the Gemini API on every call."""
     try:
+        import os
         CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)
-        CACHE_PATH.write_text(json.dumps(cache, ensure_ascii=True, indent=2), encoding="utf-8")
+        tmp_path = CACHE_PATH.with_suffix(".tmp")
+        tmp_path.write_text(json.dumps(cache, ensure_ascii=True, indent=2), encoding="utf-8")
+        os.replace(tmp_path, CACHE_PATH)  # atomic on both POSIX and Windows
     except Exception as exc:
         logger.warning("Could not write ATS keyword cache: %s", exc)
+        try:
+            tmp_path.unlink(missing_ok=True)
+        except Exception:
+            pass
 
 
 def _extract_keywords_locally(jd_text: str) -> list[str]:

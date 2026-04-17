@@ -1,5 +1,6 @@
 fastapi
 uvicorn
+gunicorn
 python-dotenv
 pydantic
 pypdf
@@ -15,4 +16,4 @@ sarvamai
 psycopg2-binary
 requests
 aiohttp
-##
+slowapi
