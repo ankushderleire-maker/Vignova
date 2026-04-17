@@ -22,6 +22,7 @@ import google.generativeai as genai
 from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
 
 from app.config import model
+from app.limiter import limiter
 from app.services.ats_helpers import (
     calculate_format_score,
     calculate_impact_score,
@@ -66,6 +67,7 @@ def _compute_ats_scores(jd_text: str, resume_text: str) -> dict:
 # ── Routes ─────────────────────────────────────────────────────────────
 
 @router.post("/api/calculate-ats")
+@limiter.limit("20/minute")
 async def calculate_ats(
     request: Request,
     jd_text: str = Form(...),
@@ -219,6 +221,7 @@ async def calculate_ats(
 
 
 @router.post("/api/enhance-ats-report")
+@limiter.limit("10/minute")
 async def enhance_ats_report(
     request: Request,
     jd_text:    str = Form(...),

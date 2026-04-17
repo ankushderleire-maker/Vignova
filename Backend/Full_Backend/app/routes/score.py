@@ -14,9 +14,10 @@ import logging
 import re
 from functools import partial
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 from sentence_transformers import util
 
+from app.limiter import limiter
 from app.models.schemas import ScoreRequest
 from app.services.ml_models import get_match_model
 
@@ -32,7 +33,8 @@ def _encode_pair(jd_text: str, profile_text: str):
 
 
 @router.post("/api/score-job")
-async def score_job(payload: ScoreRequest):
+@limiter.limit("30/minute")
+async def score_job(request: Request, payload: ScoreRequest):
     try:
         # ── Keyword scoring (pure Python — fast, no thread needed) ──
         jd_clean         = payload.jobDescription.lower()

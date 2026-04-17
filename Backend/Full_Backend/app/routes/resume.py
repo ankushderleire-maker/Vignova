@@ -22,6 +22,7 @@ from functools import partial
 from fastapi import APIRouter, File, HTTPException, Request, UploadFile
 
 from app.config import model
+from app.limiter import limiter
 from app.models.schemas import ResumeSchema, TailorRequest
 from app.services.ats_helpers import (
     calculate_format_score,
@@ -312,6 +313,7 @@ def apply_profile_fallbacks(resume_data: dict, master_profile: dict) -> dict:
 # ── Routes ─────────────────────────────────────────────────────────────
 
 @router.post("/api/parse-resume")
+@limiter.limit("10/minute")
 async def parse_resume(request: Request, file: UploadFile = File(...)):
     if file.content_type != "application/pdf":
         return {"data": ResumeSchema().model_dump()}
@@ -365,6 +367,7 @@ async def parse_resume(request: Request, file: UploadFile = File(...)):
 
 
 @router.post("/api/generate-tailored-resume")
+@limiter.limit("5/minute")
 async def generate_tailored_resume(request: Request, payload: TailorRequest):
     job_description    = payload.jobDescription
     master_profile_str = json.dumps(payload.masterProfile, indent=2)

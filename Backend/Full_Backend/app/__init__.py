@@ -1,14 +1,10 @@
 """
 FastAPI application factory
 ===========================
-Changes from original:
-  - slowapi rate limiter wired up (in-memory, per-IP)
-  - startup event runs DB migrations exactly once via db_pool.run_migrations()
-  - rate limits applied to expensive endpoints:
-      /api/calculate-ats          → 20 req/min/IP
-      /api/enhance-ats-report     → 10 req/min/IP
-      /api/generate-tailored-resume → 5 req/min/IP
-      /api/score-job              → 30 req/min/IP
+Rate limits are applied via @limiter.limit() decorators directly on each
+route function (in their own modules), not post-hoc here.  This is the
+pattern slowapi requires: the decorated function must have request: Request
+in its signature, which is enforced at decoration time.
 """
 
 import asyncio
@@ -17,16 +13,12 @@ import os
 
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
-from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
-from slowapi.util import get_remote_address
+
+from app.limiter import limiter
 
 logger = logging.getLogger("app")
-
-# ── Rate limiter (in-memory, per worker process) ──────────────────────
-# With 2 gunicorn workers the effective limit is 2× the configured value,
-# which is acceptable without a Redis backend.
-limiter = Limiter(key_func=get_remote_address)
 
 app = FastAPI(
     docs_url="/docs" if os.getenv("ENVIRONMENT", "development") == "development" else None,
@@ -67,7 +59,6 @@ async def startup():
         loop = asyncio.get_event_loop()
         await loop.run_in_executor(None, run_migrations)
     except Exception as exc:
-        # Log but don't crash — app still works without DB (for non-DB routes)
         logger.error("DB migration failed at startup: %s", exc)
 
 
@@ -83,16 +74,3 @@ app.include_router(ats_router)
 app.include_router(score_router)
 app.include_router(jobs_router)
 app.include_router(plan_router)
-
-
-# ── Rate-limit decorators applied after routers are registered ────────
-# We decorate the actual route functions so slowapi can find them.
-
-from app.routes.ats    import calculate_ats, enhance_ats_report
-from app.routes.resume import generate_tailored_resume, parse_resume
-from app.routes.score  import score_job
-
-limiter.limit("20/minute")(calculate_ats)
-limiter.limit("10/minute")(enhance_ats_report)
-limiter.limit("5/minute")(generate_tailored_resume)
-limiter.limit("30/minute")(score_job)
