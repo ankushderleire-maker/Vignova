@@ -6,8 +6,8 @@ services:
     build:
       context: ./LandingCode
     container_name: vignova-landing
-    ports:
-      - "3001:80"
+    expose:
+      - "80"
     restart: unless-stopped
 
   # ----------------------------------------
@@ -17,10 +17,16 @@ services:
     build:
       context: ./resume-saas-v4
     container_name: vignova-dashboard
-    ports:
-      - "3000:3000"
+    expose:
+      - "3000"
     env_file:
       - .env
+      - ./resume-saas-v4/.env
+    environment:
+      # Force the docker hostname for the DB. Overrides any @localhost
+      # that might have leaked in from a dev-machine .env.
+      - DATABASE_URL=postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-admin123}@db:5432/${DB_NAME:-resume_ai_saas}
+      - AI_BACKEND_URL=http://backend:8000
     depends_on:
       db:
         condition: service_healthy   # wait until pg_isready passes
@@ -35,28 +41,33 @@ services:
     build:
       context: ./Backend/Full_Backend
     container_name: vignova-backend
-    ports:
-      - "8000:8000"
+    expose:
+      - "8000"
     environment:
       - ENVIRONMENT=production
       - OLLAMA_BASE_URL=http://ollama:11434
       - GOOGLE_API_KEY=${GEMINI_API_KEY}
       - WORKERS=2        # gunicorn worker count — raise to 4 on 4-core servers
+      # Docker-side DB host override
+      - DATABASE_URL=postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-admin123}@db:5432/${DB_NAME:-resume_ai_saas}
+      # CORS: browser calls from the public dashboard must be allowed
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-https://app.vignova.io,https://vignova.io,https://www.vignova.io}
     env_file:
       - .env
+      - ./Backend/Full_Backend/.env
     volumes:
       - backend_uploads:/app/uploads
     depends_on:
       db:
         condition: service_healthy   # backend only starts after Postgres is ready
       ollama:
-        condition: service_started
+        condition: service_healthy   # wait for the model to be pulled
     restart: unless-stopped
     deploy:
       resources:
         limits:
           cpus: '2'
-          memory: 2G
+          memory: 3G
 
   # ----------------------------------------
   # Ollama
@@ -73,8 +84,17 @@ services:
       "
     volumes:
       - ollama_models:/root/.ollama
-    ports:
-      - "11434:11434"
+    expose:
+      - "11434"
+    healthcheck:
+      # `ollama list` only returns success once the server is up AND
+      # at least the first model has been pulled; this prevents the
+      # backend from firing requests against a warming-up Ollama.
+      test: ["CMD-SHELL", "ollama list | grep -q deepseek || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
     restart: unless-stopped
 
   # ----------------------------------------
@@ -103,8 +123,11 @@ services:
       POSTGRES_DB:       ${DB_NAME:-resume_ai_saas}
     volumes:
       - postgres_data:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"
+    # Postgres is internal-only — the host port has been removed. If you
+    # need to psql from the host, add `-p 5432:5432` at runtime, e.g.
+    #   docker compose run --service-ports db
+    expose:
+      - "5432"
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres} -d ${DB_NAME:-resume_ai_saas}"]
@@ -117,6 +140,34 @@ services:
         limits:
           cpus: '2'
           memory: 1G
+
+  # ----------------------------------------
+  # nginx — edge proxy, terminates TLS, routes by Host header
+  # ----------------------------------------
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: vignova-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./letsencrypt:/etc/letsencrypt:ro
+      - ./certbot-webroot:/var/www/certbot:ro
+    depends_on:
+      landing:
+        condition: service_started
+      dashboard:
+        condition: service_started
+      backend:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/healthz", "-T", "2"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
 
 volumes:
   postgres_data:

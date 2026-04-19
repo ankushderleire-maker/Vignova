@@ -10,6 +10,7 @@ from nltk.stem import WordNetLemmatizer
 from sentence_transformers import util
 import google.generativeai as genai
 
+from app.config import model as _gemini_model
 from app.services.ml_models import semantic_model
 
 logger = logging.getLogger("ats_helpers")
@@ -211,8 +212,7 @@ def calculate_keyword_score(jd_text: str, resume_text: str) -> dict:
                     text_response = response['choices'][0]['message']['content'].strip()
             else:
                 logger.info("Using Gemini for ATS keyword extraction")
-                model = genai.GenerativeModel('gemini-2.5-flash')
-                response = model.generate_content(
+                response = _gemini_model.generate_content(
                     prompt,
                     generation_config=genai.GenerationConfig(
                         temperature=0,

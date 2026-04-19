@@ -94,17 +94,31 @@ def merge_skills(master_profile: dict, resume_data: dict) -> dict:
     return resume_data
 
 
+_JD_MAX_CHARS     = 8_000   # ~2k tokens — enough for full JD context
+_PROFILE_MAX_CHARS = 12_000  # ~3k tokens — covers all sections
+
+
+def _trim(text: str, max_chars: int) -> str:
+    return text[:max_chars] + "\n[truncated]" if len(text) > max_chars else text
+
+
 def build_tailoring_prompt(master_profile: dict, job_description: str, ats_report=None) -> str:
-    master_profile_str = json.dumps(master_profile, indent=2)
+    master_profile_str = _trim(json.dumps(master_profile, indent=2), _PROFILE_MAX_CHARS)
 
     ats_context = ""
     if ats_report:
+        # Only send the actionable parts of the report, not the full blob
+        slim_report = {
+            "overall_ats_score": ats_report.get("overall_ats_score"),
+            "keyword_score": ats_report.get("keyword_score"),
+            "missing_keywords": ats_report.get("missing_keywords", [])[:10],
+            "improvements": ats_report.get("improvements", [])[:5],
+        }
         ats_context = (
             "\n\n=== REFINING PREVIOUS ATS SCORE ===\n"
-            "The candidate previously scored poorly in ATS due to these issues:\n"
-            f"{json.dumps(ats_report, indent=2)}\n"
-            "PAY SPECIAL ATTENTION to the Improvements, Missing Keywords, and weaker scoring "
-            "dimensions from this report. Fix these exact issues in the new resume.\n"
+            "The candidate previously scored poorly in ATS. Key issues to fix:\n"
+            f"{json.dumps(slim_report, indent=2)}\n"
+            "Fix these exact issues — focus on missing keywords and improvements.\n"
         )
 
     return f"""You are an Expert Resume Writer and ATS Optimization Specialist.
@@ -160,7 +174,7 @@ CRITICAL JSON RULE: NEVER place double-quote characters inside JSON string value
 - Keep ATS-friendly section names clearly represented: Summary, Skills, Experience, Education, Projects when content exists.{ats_context}
 
 JOB DESCRIPTION:
-{job_description}
+{_trim(job_description, _JD_MAX_CHARS)}
 
 MASTER PROFILE:
 {master_profile_str}
@@ -326,6 +340,9 @@ async def parse_resume(request: Request, file: UploadFile = File(...)):
     if not raw_text:
         return {"data": ResumeSchema().model_dump()}
 
+    # Resumes beyond 10k chars are usually noise; truncate to save tokens
+    raw_text = raw_text[:10_000]
+
     prompt = f"""
     You are a resume parsing API.
     STRICT RULES:
@@ -393,14 +410,14 @@ async def generate_tailored_resume(request: Request, payload: TailorRequest):
                 None, partial(_build_ats_report_sync, job_description, normalized)
             )
 
-            # ── Optional retry if ATS score is below threshold ──
+            # ── Optional retry — only for genuinely poor results to save API quota ──
+            # Previous thresholds (<78 overall OR <85 keyword OR >3 missing) fired on
+            # ~80% of resumes, doubling API cost. Now only retry when the result is
+            # clearly unacceptable.
             should_retry = (
                 not payload.atsReport
-                and (
-                    ats_report["overall_ats_score"] < 78
-                    or ats_report["keyword_score"] < 85
-                    or len(ats_report["missing_keywords"]) > 3
-                )
+                and ats_report["overall_ats_score"] < 55
+                and ats_report["keyword_score"] < 60
             )
 
             if should_retry:
@@ -432,4 +449,7 @@ async def generate_tailored_resume(request: Request, payload: TailorRequest):
             raise HTTPException(status_code=500, detail="Resume generation failed. Please try again.")
         except Exception as exc:
             logger.error("Tailoring error: %s", exc)
+            msg = str(exc).lower()
+            if "429" in str(exc) or "quota" in msg or "resource_exhausted" in msg:
+                raise HTTPException(status_code=429, detail="Our AI is a little busy right now. Please wait a moment and try again.")
             raise HTTPException(status_code=500, detail="Resume generation failed. Please try again.")

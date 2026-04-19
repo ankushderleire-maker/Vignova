@@ -63,14 +63,26 @@ async def startup():
 
 
 # ── Routers ───────────────────────────────────────────────────────────
-from app.routes.resume import router as resume_router
-from app.routes.ats    import router as ats_router
-from app.routes.score  import router as score_router
-from app.routes.jobs   import router as jobs_router
-from app.routes.plan   import router as plan_router
+from app.routes.resume     import router as resume_router
+from app.routes.ats        import router as ats_router
+from app.routes.score      import router as score_router
+from app.routes.jobs       import router as jobs_router
+from app.routes.plan       import router as plan_router
+from app.routes.interview  import router as interview_router
+# Job Scanner
+from app.routes.scan        import router as scan_router
+# ATS ingestion (admin-triggered + cron-ready)
+from app.routes.ats_ingest  import router as ats_ingest_router
 
 app.include_router(resume_router)
 app.include_router(ats_router)
 app.include_router(score_router)
 app.include_router(jobs_router)
 app.include_router(plan_router)
+app.include_router(interview_router)
+
+# Job Scanner (Find Jobs — Scan Portals)
+app.include_router(scan_router)
+
+# ATS ingestion trigger (POST /api/ats/ingest — admins/cron)
+app.include_router(ats_ingest_router)

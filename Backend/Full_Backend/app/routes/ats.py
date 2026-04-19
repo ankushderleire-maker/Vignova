@@ -23,6 +23,7 @@ from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
 
 from app.config import model
 from app.limiter import limiter
+from app.utils.llm_cache import llm_cache
 from app.services.ats_helpers import (
     calculate_format_score,
     calculate_impact_score,
@@ -220,11 +221,15 @@ async def calculate_ats(
     }
 
 
+_ATS_JD_MAX      = 5_000   # ~1.25k tokens
+_ATS_RESUME_MAX  = 6_000   # ~1.5k tokens
+
+
 @router.post("/api/enhance-ats-report")
 @limiter.limit("10/minute")
 async def enhance_ats_report(
     request: Request,
-    jd_text:    str = Form(...),
+    jd_text:     str = Form(...),
     resume_text: str = Form(...),
     ats_scores:  str = Form(...),
 ):
@@ -233,77 +238,69 @@ async def enhance_ats_report(
     except json.JSONDecodeError as e:
         raise HTTPException(status_code=400, detail=f"Invalid ats_scores JSON: {e}")
 
-    found_kw    = json.dumps(scores.get("found_keywords", []))
-    missing_kw  = json.dumps(scores.get("missing_keywords", []))
-    section_fb  = json.dumps(scores.get("section_feedback", {}))
-    impact_det  = json.dumps(scores.get("impact_details", {}))
-    read_det    = json.dumps(scores.get("readability_details", {}))
-    fmt_checks  = json.dumps(scores.get("format_checks", {}))
-    improvements = json.dumps(scores.get("improvements", []))
+    # Check cache first — same inputs produce same analysis
+    cached = llm_cache.get("ats_enhance", jd_text[:500], resume_text[:500], ats_scores[:200])
+    if cached is not None:
+        return cached
 
-    prompt = f"""You are an expert ATS analyst. A resume has been algorithmically scored against a job description using keyword matching, semantic similarity, section detection, impact analysis, readability checks, and format checks.
+    # Truncate heavy text fields to keep prompt under ~4k tokens
+    jd_trimmed     = jd_text[:_ATS_JD_MAX]
+    resume_trimmed = resume_text[:_ATS_RESUME_MAX]
 
-Your job is to provide DETAILED, ACTIONABLE expert insights based on these REAL scores. Do NOT recalculate scores — use the provided ones as ground truth.
+    found_kw     = json.dumps(scores.get("found_keywords", [])[:15])
+    missing_kw   = json.dumps(scores.get("missing_keywords", [])[:15])
+    section_fb   = json.dumps(scores.get("section_feedback", {}))
+    impact_det   = json.dumps(scores.get("impact_details", {}))
+    improvements = json.dumps(scores.get("improvements", [])[:5])
 
-=== ATS SCORES (use these exactly, do not override) ===
-Overall Score: {scores.get('overall_ats_score', 0)}%
-Keyword Score: {scores.get('keyword_score', 0)}%
-Semantic Score: {scores.get('semantic_score', 0)}%
-Section Score: {scores.get('section_score', 0)}%
-Impact Score: {scores.get('impact_score', 0)}%
-Readability Score: {scores.get('readability_score', 0)}%
-Format Score: {scores.get('format_score', 0)}%
+    prompt = f"""You are an expert ATS analyst. A resume has been algorithmically scored against a job description.
+Provide DETAILED, ACTIONABLE insights based on these REAL scores — do NOT recalculate them.
+
+=== ATS SCORES ===
+Overall: {scores.get('overall_ats_score', 0)}%  Keyword: {scores.get('keyword_score', 0)}%
+Semantic: {scores.get('semantic_score', 0)}%  Section: {scores.get('section_score', 0)}%
+Impact: {scores.get('impact_score', 0)}%  Readability: {scores.get('readability_score', 0)}%
+Format: {scores.get('format_score', 0)}%
 
 Found Keywords: {found_kw}
 Missing Keywords: {missing_kw}
 Section Feedback: {section_fb}
 Impact Details: {impact_det}
-Readability Details: {read_det}
-Format Checks: {fmt_checks}
 Existing Improvements: {improvements}
 
-=== JOB DESCRIPTION ===
-{jd_text}
+=== JOB DESCRIPTION (excerpt) ===
+{jd_trimmed}
 
-=== RESUME TEXT ===
-{resume_text}
+=== RESUME TEXT (excerpt) ===
+{resume_trimmed}
 
-=== INSTRUCTIONS ===
-Based on the REAL scores above, produce a detailed expert report. Be specific and reference actual content from the resume and JD.
-
-Return JSON with this exact structure:
+Return JSON (no markdown):
 {{
   "executive_summary": "<2-3 sentence expert summary>",
   "keyword_insights": {{
-    "analysis": "<paragraph about keyword coverage>",
-    "critical_missing": ["<most important missing keywords>"],
-    "keyword_placement_tips": ["<specific advice on WHERE to place them>"]
+    "analysis": "<keyword coverage paragraph>",
+    "critical_missing": ["<top 5 missing keywords>"],
+    "keyword_placement_tips": ["<where to place them>"]
   }},
   "experience_review": {{
-    "analysis": "<how well experience aligns with JD>",
-    "strong_points": ["<specific strong aspects>"],
-    "gaps": ["<specific experience gaps>"]
+    "analysis": "<alignment with JD>",
+    "strong_points": ["<2-3 strong aspects>"],
+    "gaps": ["<2-3 gaps>"]
   }},
   "impact_review": {{
-    "analysis": "<assessment of bullet quality>",
+    "analysis": "<bullet quality>",
     "weak_bullets": ["<quote actual weak bullets>"],
-    "rewrite_suggestions": [{{"original": "<weak bullet>", "improved": "<rewritten>"}}]
+    "rewrite_suggestions": [{{"original": "<weak>", "improved": "<rewritten>"}}]
   }},
   "section_recommendations": [{{"section": "<name>", "status": "<strong|needs_improvement|missing>", "feedback": "<specific>", "suggestion": "<what to change>"}}],
-  "formatting_tips": ["<specific ATS formatting improvements>"],
+  "formatting_tips": ["<ATS formatting improvements>"],
   "competitive_insights": {{
-    "differentiators": ["<what makes this resume stand out>"],
-    "missing_edge": ["<what could differentiate from other candidates>"]
+    "differentiators": ["<what stands out>"],
+    "missing_edge": ["<what could differentiate>"]
   }},
-  "action_plan": [{{"priority": 1, "action": "<specific instruction>", "impact": "<high|medium|low>", "expected_score_boost": "<estimated points>"}}]
+  "action_plan": [{{"priority": 1, "action": "<instruction>", "impact": "<high|medium|low>", "expected_score_boost": "<pts>"}}]
 }}
-
-RULES:
-- action_plan: max 8 items, highest impact first
-- rewrite_suggestions: 2-4 concrete rewrites of actual resume bullets
-- Quote actual text from the resume — do not invent content
-- Be brutally specific — no generic advice like "add more keywords"
-- Reference actual scores when explaining what needs work"""
+Rules: action_plan max 8 items; rewrite_suggestions 2-4 items; quote actual resume text; no generic advice."""
 
     generation_config = genai.GenerationConfig(
         response_mime_type="application/json",
@@ -311,16 +308,20 @@ RULES:
     )
 
     try:
-        loop   = asyncio.get_event_loop()
-        # Gemini SDK call is synchronous — run in thread to avoid blocking event loop
+        loop = asyncio.get_event_loop()
         response = await loop.run_in_executor(
             None,
             partial(model.generate_content, prompt, generation_config=generation_config),
         )
-        return json.loads(response.text)
+        result = json.loads(response.text)
+        llm_cache.set("ats_enhance", result, jd_text[:500], resume_text[:500], ats_scores[:200])
+        return result
     except json.JSONDecodeError as e:
         logger.error("Enhancement JSON parse error: %s", e)
         raise HTTPException(status_code=500, detail="Failed to parse AI report. Please try again.")
     except Exception as e:
         logger.error("ATS enhancement error: %s", e, exc_info=True)
+        msg = str(e).lower()
+        if "429" in str(e) or "quota" in msg:
+            raise HTTPException(status_code=429, detail="Our AI is busy right now. Please wait a moment and try again.")
         raise HTTPException(status_code=500, detail="ATS enhancement failed. Please try again.")

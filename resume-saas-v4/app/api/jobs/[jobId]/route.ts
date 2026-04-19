@@ -14,9 +14,6 @@ export async function PATCH(
 
     const { jobId } = await params;
     const body = await req.json();
-
-    // --- THE FIX IS HERE ---
-    // Destructure ALL possible fields from the body, not just status
     const { status, company, jobTitle, description, location, jobUrl } = body;
 
     const updatedJob = await db.jobApplication.update({
@@ -25,12 +22,10 @@ export async function PATCH(
         userId: (session?.user as any)?.id as string,
       },
       data: {
-        // Only update the field if it exists in the request body
-        // We use the spread syntax to conditionally add fields to the update object
         ...(status && { status }),
         ...(company && { company }),
         ...(jobTitle && { jobTitle }),
-        ...(description !== undefined && { description }), // Allow empty strings
+        ...(description !== undefined && { description }),
         ...(location !== undefined && { location }),
         ...(jobUrl !== undefined && { jobUrl }),
       },

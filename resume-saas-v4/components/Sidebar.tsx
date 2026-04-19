@@ -40,6 +40,7 @@ const navigationGroups = [
       { name: "Job Tracker", href: "/dashboard/jobs", icon: Briefcase },
       { name: "ATS Score", href: "/dashboard/ats-score", icon: ScanLine, isNew: true },
       { name: "Find Jobs", href: "/dashboard/find-jobs", icon: Search, isNew: true },
+      { name: "Job Scrapper", href: "/dashboard/job-scrapper", icon: Sparkles, isNew: true },
     ],
   },
   {

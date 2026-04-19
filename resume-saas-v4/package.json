@@ -6,7 +6,10 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "db:push": "prisma db push",
+    "db:migrate:raw": "node scripts/apply-raw-migrations.mjs",
+    "db:migrate": "npm run db:push && npm run db:migrate:raw"
   },
   "dependencies": {
     "@hello-pangea/dnd": "^18.0.1",
