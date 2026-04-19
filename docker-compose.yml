@@ -23,9 +23,6 @@ services:
       - .env
       - ./resume-saas-v4/.env
     environment:
-      # Force the docker hostname for the DB. Overrides any @localhost
-      # that might have leaked in from a dev-machine .env.
-      - DATABASE_URL=postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-admin123}@db:5432/${DB_NAME:-resume_ai_saas}
       - AI_BACKEND_URL=http://backend:8000
     depends_on:
       db:
@@ -48,9 +45,6 @@ services:
       - OLLAMA_BASE_URL=http://ollama:11434
       - GOOGLE_API_KEY=${GEMINI_API_KEY}
       - WORKERS=2        # gunicorn worker count — raise to 4 on 4-core servers
-      # Docker-side DB host override
-      - DATABASE_URL=postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-admin123}@db:5432/${DB_NAME:-resume_ai_saas}
-      # CORS: browser calls from the public dashboard must be allowed
       - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-https://app.vignova.io,https://vignova.io,https://www.vignova.io}
     env_file:
       - .env
