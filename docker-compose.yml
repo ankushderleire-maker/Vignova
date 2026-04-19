@@ -6,8 +6,8 @@ services:
     build:
       context: ./LandingCode
     container_name: vignova-landing
-    expose:
-      - "80"
+    ports:
+      - "3001:80"
     restart: unless-stopped
 
   # ----------------------------------------
@@ -17,8 +17,8 @@ services:
     build:
       context: ./resume-saas-v4
     container_name: vignova-dashboard
-    expose:
-      - "3000"
+    ports:
+      - "3000:3000"
     env_file:
       - .env
       - ./resume-saas-v4/.env
@@ -41,8 +41,8 @@ services:
     build:
       context: ./Backend/Full_Backend
     container_name: vignova-backend
-    expose:
-      - "8000"
+    ports:
+      - "8000:8000"
     environment:
       - ENVIRONMENT=production
       - OLLAMA_BASE_URL=http://ollama:11434
@@ -141,33 +141,8 @@ services:
           cpus: '2'
           memory: 1G
 
-  # ----------------------------------------
-  # nginx — edge proxy, terminates TLS, routes by Host header
-  # ----------------------------------------
-  nginx:
-    image: nginx:1.27-alpine
-    container_name: vignova-nginx
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./letsencrypt:/etc/letsencrypt:ro
-      - ./certbot-webroot:/var/www/certbot:ro
-    depends_on:
-      landing:
-        condition: service_started
-      dashboard:
-        condition: service_started
-      backend:
-        condition: service_started
-    healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/healthz", "-T", "2"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 10s
-    restart: unless-stopped
+  # nginx container removed — aaPanel's host nginx handles SSL/TLS and
+  # reverse-proxies to the exposed ports (3000, 3001, 8000) directly.
 
 volumes:
   postgres_data:
