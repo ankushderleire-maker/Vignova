@@ -22,13 +22,17 @@ jobs:
             echo "Saving current version..."
             PREV_COMMIT=$(git rev-parse HEAD)
 
-            echo "Reset & pull latest..."
-            git reset --hard
-            git pull origin Deploy
+            echo "Fetching latest Deploy branch..."
+            git fetch origin Deploy
+            git reset --hard origin/Deploy
+
+            NEW_COMMIT=$(git rev-parse HEAD)
+            echo "Was: $PREV_COMMIT"
+            echo "Now: $NEW_COMMIT"
 
             echo "Detecting changed services..."
 
-            CHANGED=$(git diff --name-only $PREV_COMMIT HEAD)
+            CHANGED=$(git diff --name-only $PREV_COMMIT $NEW_COMMIT)
 
             REBUILD_LANDING=false
             REBUILD_DASHBOARD=false
@@ -42,6 +46,13 @@ jobs:
             echo "Landing: $REBUILD_LANDING"
             echo "Dashboard: $REBUILD_DASHBOARD"
             echo "Backend: $REBUILD_BACKEND"
+
+            if [ "$REBUILD_LANDING" = false ] && [ "$REBUILD_DASHBOARD" = false ] && [ "$REBUILD_BACKEND" = false ]; then
+              echo "⚠️ No service directories changed — nothing to rebuild."
+              echo "Changed files were:"
+              echo "$CHANGED"
+              exit 0
+            fi
 
             echo "Deploying..."
 
@@ -59,12 +70,12 @@ jobs:
 
             echo "Running health check..."
 
-            sleep 10
+            sleep 15
 
-            if ! curl -f http://127.0.0.1:3001 > /dev/null; then
-              echo "❌ Deployment failed! Rolling back..."
+            if ! curl -sf http://127.0.0.1:3000 > /dev/null 2>&1; then
+              echo "❌ Dashboard health check failed! Rolling back..."
               git reset --hard $PREV_COMMIT
-              docker compose up -d --build
+              docker compose up -d --build dashboard
               exit 1
             fi
 
