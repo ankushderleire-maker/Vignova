@@ -1,16 +1,16 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, Variants } from 'framer-motion';
 import { Sparkles, CheckCircle2, Zap, MousePointer2, Download } from 'lucide-react';
 
 const fullText = "Tailor resume for given Job Descriptions.";
 
-const container = {
+const container: Variants = {
   hidden: { opacity: 0 },
   show: { opacity: 1, transition: { staggerChildren: 0.1, delayChildren: 0.1 } },
   exit: { opacity: 0, transition: { duration: 0.2 } }
 };
-const item = {
+const item: Variants = {
   hidden: { opacity: 0, y: 15 },
   show: { opacity: 1, y: 0, transition: { duration: 0.5, ease: [0.16, 1, 0.3, 1] } }
 };
