@@ -1,52 +1,68 @@
-"use client";
-
-import React from 'react';
 import Link from 'next/link';
-import { Twitter, Linkedin, Github, Mail } from 'lucide-react';
+import { Mail } from 'lucide-react';
 
-export const Footer = () => {
-    return (
-        <footer className="bg-[#0f172a] border-t border-white/10 py-12">
-            <div className="max-w-7xl mx-auto px-4">
-                <div className="grid md:grid-cols-4 gap-8 mb-8">
-                    <div className="col-span-1 md:col-span-2">
-                        <h3 className="text-xl font-bold text-white mb-4">Vignova</h3>
-                        <p className="text-gray-400 max-w-sm">
-                            Building the future of career advancement with AI-powered tools.
-                            Create, optimize, and land your dream job.
-                        </p>
-                    </div>
+export default function Footer() {
+  const currentYear = new Date().getFullYear();
 
-                    <div>
-                        <h4 className="text-white font-semibold mb-4">Product</h4>
-                        <ul className="space-y-2">
-                            <li><Link href="#" className="text-gray-400 hover:text-blue-400">Features</Link></li>
-                            <li><Link href="#" className="text-gray-400 hover:text-blue-400">Templates</Link></li>
-                            <li><Link href="#" className="text-gray-400 hover:text-blue-400">Pricing</Link></li>
-                        </ul>
-                    </div>
-
-                    <div>
-                        <h4 className="text-white font-semibold mb-4">Company</h4>
-                        <ul className="space-y-2">
-                            <li><Link href="#" className="text-gray-400 hover:text-blue-400">About</Link></li>
-                            <li><Link href="#" className="text-gray-400 hover:text-blue-400">Blog</Link></li>
-                            <li><Link href="#" className="text-gray-400 hover:text-blue-400">Contact</Link></li>
-                        </ul>
-                    </div>
-                </div>
-
-                <div className="border-t border-white/10 pt-8 flex flex-col md:flex-row justify-between items-center">
-                    <p className="text-gray-500 text-sm">
-                        © {new Date().getFullYear()} Vignova. All rights reserved.
-                    </p>
-                    <div className="flex gap-4 mt-4 md:mt-0">
-                        <Link href="#" className="text-gray-400 hover:text-white"><Twitter className="w-5 h-5" /></Link>
-                        <Link href="#" className="text-gray-400 hover:text-white"><Linkedin className="w-5 h-5" /></Link>
-                        <Link href="#" className="text-gray-400 hover:text-white"><Github className="w-5 h-5" /></Link>
-                    </div>
-                </div>
-            </div>
-        </footer>
-    );
-};
+  return (
+    <footer className="bg-[#0A192F] pt-24 pb-12 border-t border-white/10 text-slate-300">
+      <div className="container mx-auto px-4 md:px-6 max-w-6xl">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-12 mb-20">
+          <div className="col-span-1 md:col-span-1">
+            <Link href="/" className="flex items-center gap-1 mb-6 group w-fit">
+              <img 
+                src="/logo.png" 
+                alt="Vignova Logo" 
+                width={56} 
+                height={56} 
+                className="object-contain group-hover:scale-105 transition-transform"
+              />
+              <span className="text-[32px] font-extrabold tracking-normal text-white uppercase" style={{ fontFamily: "'Inter', 'Helvetica Neue', sans-serif" }}>VIGNOVA</span>
+            </Link>
+            <p className="text-sm font-light leading-relaxed mb-6 max-w-[280px]">
+              AI-powered career platform. Create tailored resumes, optimize for ATS systems, and apply to jobs faster.
+            </p>
+            <a href="mailto:contact@vignova.io" className="flex items-center gap-2 text-sm text-slate-400 hover:text-white transition-colors">
+              <Mail className="w-4 h-4" />
+              contact@vignova.io
+            </a>
+          </div>
+          
+          <div className="md:ml-auto">
+            <h4 className="font-semibold text-white tracking-tight mb-6">Product</h4>
+            <ul className="space-y-4 text-sm font-light">
+              <li><Link href="/how-it-works" className="hover:text-white transition-colors">How It Works</Link></li>
+            </ul>
+          </div>
+          
+          <div className="md:ml-auto">
+            <h4 className="font-semibold text-white tracking-tight mb-6">Company</h4>
+            <ul className="space-y-4 text-sm font-light">
+              <li><Link href="/about" className="hover:text-white transition-colors">About Us</Link></li>
+              <li><Link href="/blog" className="hover:text-white transition-colors">Blog</Link></li>
+              <li><Link href="/contact" className="hover:text-white transition-colors">Contact</Link></li>
+            </ul>
+          </div>
+          
+          <div className="md:ml-auto">
+            <h4 className="font-semibold text-white tracking-tight mb-6">Legal</h4>
+            <ul className="space-y-4 text-sm font-light">
+              <li><Link href="/privacy" className="hover:text-white transition-colors">Privacy Policy</Link></li>
+              <li><Link href="/terms" className="hover:text-white transition-colors">Terms</Link></li>
+              <li><Link href="/refund" className="hover:text-white transition-colors">Refund Policy</Link></li>
+            </ul>
+          </div>
+        </div>
+        
+        <div className="pt-8 border-t border-white/10 flex flex-col md:flex-row items-center justify-between gap-4">
+          <p className="text-sm font-light text-slate-500">
+            &copy; {currentYear} Vignova. All rights reserved.
+          </p>
+          <p className="text-sm font-light text-slate-500">
+            Built with AI. Designed for job seekers.
+          </p>
+        </div>
+      </div>
+    </footer>
+  );
+}

@@ -1,84 +1,121 @@
-"use client";
+'use client';
 
-import React from 'react';
-import { motion } from 'framer-motion';
-import { Star } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { useState, useEffect } from 'react';
 
-const reviews = [
-    {
-        name: "Sarah Jenkins",
-        role: "UX Designer",
-        content: "I landed my dream job at Spotify within a week of using Vignova. The AI suggestions were spot on!",
-        rating: 5
-    },
-    {
-        name: "Michael Chen",
-        role: "Software Engineer",
-        content: "The ATS optimization feature is a game changer. My application response rate went from 5% to 40%.",
-        rating: 5
-    },
-    {
-        name: "Emily Rodriguez",
-        role: "Marketing Manager",
-        content: "Beautiful templates and super easy to use. I love how I can switch designs with one click.",
-        rating: 5
-    },
-    {
-        name: "David Kim",
-        role: "Data Analyst",
-        content: "Finally, a resume builder that actually works. The AI writing assistant saved me hours of struggle.",
-        rating: 5
-    },
-    {
-        name: "Jessica Lee",
-        role: "Product Manager",
-        content: "Highly recommend! The premium features are worth every penny. The analytics dashboard is also a nice touch.",
-        rating: 4
-    }
+const testimonials = [
+  {
+    quote: "Vignova completely transformed my job search. The AI resume analyzer caught things I'd missed for months. I landed a senior role at a top tech company within 3 weeks.",
+    author: "Sarah J.",
+    role: "Senior Software Engineer",
+    avatar: "https://randomuser.me/api/portraits/women/44.jpg"
+  },
+  {
+    quote: "The mock interviews were frighteningly realistic. By the time I had my actual interviews, I felt like I had already done them. It changed everything.",
+    author: "Michael T.",
+    role: "Product Manager",
+    avatar: "https://randomuser.me/api/portraits/men/32.jpg"
+  },
+  {
+    quote: "As an international grad, navigating the tech market was overwhelming. The career roadmap and targeted skill suggestions gave me the exact focus I needed.",
+    author: "David L.",
+    role: "Data Scientist",
+    avatar: "https://randomuser.me/api/portraits/men/46.jpg"
+  },
+  {
+    quote: "The ATS scanner is incredibly precise. It highlighted exactly which keywords I was missing for a specific role, and my interview rate skyrocketed.",
+    author: "Emily C.",
+    role: "Marketing Director",
+    avatar: "https://randomuser.me/api/portraits/women/68.jpg"
+  },
+  {
+    quote: "I used the master profile to autofill dozens of applications in minutes. What used to take my whole weekend now takes me less than an hour.",
+    author: "James P.",
+    role: "UX Designer",
+    avatar: "https://randomuser.me/api/portraits/men/22.jpg"
+  },
+  {
+    quote: "Vignova isn't just a resume builder; it's a complete career strategist. The tailored suggestions made me realize my true worth in the current market.",
+    author: "Priya R.",
+    role: "Cloud Architect",
+    avatar: "https://randomuser.me/api/portraits/women/90.jpg"
+  }
 ];
 
-export const Testimonials = () => {
-    return (
-        <section className="py-24 bg-slate-50 border-y border-slate-200">
-            <div className="max-w-7xl mx-auto px-4">
-                <div className="text-center max-w-3xl mx-auto mb-16">
-                    <h2 className="text-3xl md:text-4xl font-bold text-slate-900 mb-4">
-                        Loved by Professionals
-                    </h2>
-                    <p className="text-slate-500 text-lg">
-                        Join thousands of job seekers who found success with our platform.
-                    </p>
-                </div>
+export default function Testimonials() {
+  const [page, setPage] = useState(0);
 
-                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {reviews.slice(0, 3).map((review, index) => (
-                        <motion.div
-                            key={index}
-                            initial={{ opacity: 0, scale: 0.9 }}
-                            whileInView={{ opacity: 1, scale: 1 }}
-                            viewport={{ once: true }}
-                            transition={{ duration: 0.5, delay: index * 0.1 }}
-                            className="bg-white p-6 rounded-2xl border border-slate-200 relative shadow-[0_2px_10px_-3px_rgba(0,0,0,0.05)]"
-                        >
-                            <div className="flex gap-1 mb-4 text-yellow-500">
-                                {[...Array(review.rating)].map((_, i) => (
-                                    <Star key={i} className="w-4 h-4 fill-current" />
-                                ))}
-                            </div>
-                            <p className="text-slate-600 mb-6 italic">"{review.content}"</p>
-                            <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center text-white font-bold text-sm">
-                                    {review.name.charAt(0)}
-                                </div>
-                                <div>
-                                    <h4 className="text-slate-900 font-medium text-sm">{review.name}</h4>
-                                    <p className="text-slate-500 text-xs">{review.role}</p>
-                                </div>
-                            </div>
-                        </motion.div>
-                    ))}
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setPage((prev) => (prev === 0 ? 1 : 0));
+    }, 6000);
+    return () => clearInterval(timer);
+  }, []);
+
+  return (
+    <section className="relative py-20 bg-[#F5F8FA] border-t border-border/50 overflow-hidden">
+      {/* Abstract Ambient Background Glows */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
+        <div className="absolute top-[20%] -left-[10%] w-[50%] h-[50%] rounded-full bg-gradient-to-br from-blue-500/30 to-transparent blur-[100px] animate-orb"></div>
+        <div className="absolute -bottom-[10%] -right-[10%] w-[60%] h-[60%] rounded-full bg-gradient-to-tl from-indigo-500/40 to-transparent blur-[120px] animate-orb-slow"></div>
+      </div>
+      <div className="container mx-auto px-4 md:px-6 relative z-10">
+        <h2 className="text-sm font-semibold tracking-widest uppercase text-gray-400 text-center mb-16">
+          Trusted by ambitious professionals
+        </h2>
+
+        {/* Carousel Container */}
+        <div className="w-full max-w-6xl mx-auto overflow-hidden px-2 py-4 relative min-h-[400px] sm:min-h-[350px] md:min-h-[280px]">
+          <AnimatePresence mode="popLayout" initial={false}>
+            <motion.div 
+              key={page}
+              initial={{ x: '100%', opacity: 0 }}
+              animate={{ x: 0, opacity: 1 }}
+              exit={{ x: '-100%', opacity: 0 }}
+              transition={{ type: "spring", stiffness: 50, damping: 20 }}
+              className="w-full grid grid-cols-1 md:grid-cols-3 gap-12 px-4"
+            >
+              {(page === 0 ? testimonials.slice(0, 3) : testimonials.slice(3, 6)).map((t, index) => (
+                <div key={`t-${page}-${index}`} className="flex flex-col justify-between h-full">
+                  <div className="mb-8">
+                    <p className="text-xl text-foreground leading-relaxed font-light">"{t.quote}"</p>
+                  </div>
+                  <div className="flex items-center gap-4 mt-auto">
+                    {t.avatar ? (
+                      <div className="w-12 h-12 rounded-full overflow-hidden shrink-0 border border-gray-200 shadow-sm relative">
+                        <img src={t.avatar} alt={t.author} className="w-full h-full object-cover" />
+                      </div>
+                    ) : (
+                      <div className="w-12 h-12 rounded-full bg-white shadow-sm flex items-center justify-center text-sm font-bold text-gray-500 border border-gray-100 shrink-0">
+                        {t.author.charAt(0)}
+                      </div>
+                    )}
+                    <div>
+                      <h5 className="font-semibold text-foreground tracking-tight">{t.author}</h5>
+                      <p className="text-xs font-medium text-gray-400 uppercase tracking-widest">{t.role}</p>
+                    </div>
+                  </div>
                 </div>
-            </div>
-        </section>
-    );
-};
+              ))}
+            </motion.div>
+          </AnimatePresence>
+        </div>
+
+        {/* Carousel Indicators */}
+        <div className="flex justify-center items-center gap-3 mt-12">
+          <button 
+            onClick={() => setPage(0)}
+            className={`h-1.5 rounded-full transition-all duration-300 ${page === 0 ? 'w-8 bg-blue-500' : 'w-2 bg-gray-300 hover:bg-gray-400'}`}
+            aria-label="View first 3 testimonials"
+          />
+          <button 
+            onClick={() => setPage(1)}
+            className={`h-1.5 rounded-full transition-all duration-300 ${page === 1 ? 'w-8 bg-blue-500' : 'w-2 bg-gray-300 hover:bg-gray-400'}`}
+            aria-label="View next 3 testimonials"
+          />
+        </div>
+
+      </div>
+    </section>
+  );
+}

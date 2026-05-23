@@ -17,8 +17,9 @@ export default function DashboardLayoutContent({
     // Matches: /dashboard/jobs/[jobId]
     // Excludes: /dashboard/jobs (the list page)
     const isStudio = pathname.startsWith("/dashboard/jobs/") && pathname.split("/").length > 3;
+    const isInterview = pathname === "/dashboard/interview-prep";
 
-    if (isStudio) {
+    if (isStudio || isInterview) {
         return (
             <div className="flex h-screen bg-[var(--background)] text-[var(--foreground)] overflow-hidden font-sans">
                 {/* Full screen content without sidebar/header */}

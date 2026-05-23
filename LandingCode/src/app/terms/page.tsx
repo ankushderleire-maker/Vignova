@@ -1,120 +1,57 @@
-import React from 'react';
-import { PageLayout } from '@/components/landing/PageLayout';
+import Header from '@/components/Header';
+import Footer from '@/components/Footer';
 
-export const metadata = {
-    title: 'Terms of Service – Vignova',
-    description: 'Vignova terms of service. Understand the rules and guidelines for using our platform.',
-};
+export default function TermsAndConditions() {
+  return (
+    <main className="min-h-screen bg-[#F5F8FA] overflow-hidden">
+      <Header />
+      <section className="pt-32 pb-24 px-4 md:px-8 max-w-4xl mx-auto">
+        <div className="mb-12">
+          <h1 className="text-4xl md:text-5xl font-black text-[#0A192F] tracking-tight mb-4">Terms and Conditions</h1>
+          <p className="text-slate-500">Last updated: {new Date().toLocaleDateString()}</p>
+        </div>
+        
+        <div className="bg-white rounded-3xl shadow-xl shadow-blue-500/5 p-8 md:p-12 text-slate-600 font-light leading-relaxed space-y-8">
+          
+          <div>
+            <h2 className="text-2xl font-bold text-[#0A192F] mb-4">1. Agreement to Terms</h2>
+            <p>By viewing or using Vignova, you agree to be bound by these Terms and Conditions. If you do not agree with any of these terms, you are prohibited from using or accessing this site.</p>
+          </div>
+          
+          <div>
+            <h2 className="text-2xl font-bold text-[#0A192F] mb-4">2. Use License</h2>
+            <p className="mb-2">Permission is granted to temporarily use the Vignova platform for personal, non-commercial use. This is the grant of a license, not a transfer of title, and under this license you may not:</p>
+            <ul className="list-disc pl-5 space-y-2">
+              <li>modify or copy the materials;</li>
+              <li>use the materials for any commercial purpose, or for any public display;</li>
+              <li>attempt to decompile or reverse engineer any software contained on Vignova;</li>
+              <li>transfer the materials to another person or "mirror" the materials on any other server.</li>
+            </ul>
+          </div>
+          
+          <div>
+            <h2 className="text-2xl font-bold text-[#0A192F] mb-4">3. Accounts & Subscriptions</h2>
+            <p>When you create an account with us, you must provide us information that is accurate, complete, and current at all times. You are responsible for safeguarding the password that you use to access the Service and for any activities or actions under your password. Certain aspects of the Service are provided for a fee or other charge. If you elect to use paid aspects of the Service, you agree to the pricing and payment terms.</p>
+          </div>
+          
+          <div>
+            <h2 className="text-2xl font-bold text-[#0A192F] mb-4">4. AI-Generated Content</h2>
+            <p>Vignova uses Artificial Intelligence to generate and optimize resumes and cover letters. While we strive for high quality, we do not guarantee the accuracy, completeness, or usefulness of any AI-generated content. You are solely responsible for reviewing and verifying all generated documents before using them in any job application.</p>
+          </div>
 
-export default function TermsPage() {
-    return (
-        <PageLayout>
-            <article className="max-w-3xl">
-                <h1 className="text-4xl md:text-5xl font-bold text-slate-900 tracking-tight mb-6">
-                    Terms of Service
-                </h1>
-                <p className="text-slate-500 text-lg mb-12">
-                    Last updated: March 14, 2026
-                </p>
+          <div>
+            <h2 className="text-2xl font-bold text-[#0A192F] mb-4">5. Disclaimer</h2>
+            <p>The materials on Vignova's website are provided on an 'as is' basis. Vignova makes no warranties, expressed or implied, and hereby disclaims and negates all other warranties including, without limitation, implied warranties or conditions of merchantability, fitness for a particular purpose, or non-infringement of intellectual property or other violation of rights.</p>
+          </div>
+          
+          <div>
+            <h2 className="text-2xl font-bold text-[#0A192F] mb-4">6. Contact Us</h2>
+            <p>If you have any questions about these Terms, please contact us at contact@vignova.io.</p>
+          </div>
 
-                <div className="space-y-10 text-slate-600 leading-relaxed">
-                    <section>
-                        <h2 className="text-xl font-bold text-slate-900 mb-4">1. Acceptance of Terms</h2>
-                        <p>
-                            By accessing or using Vignova (&quot;the Service&quot;), you agree to be bound by these Terms of Service.
-                            If you do not agree to these terms, please do not use the Service. Vignova reserves the right
-                            to modify these terms at any time, and continued use constitutes acceptance of updated terms.
-                        </p>
-                    </section>
-
-                    <section>
-                        <h2 className="text-xl font-bold text-slate-900 mb-4">2. Service Description</h2>
-                        <p>
-                            Vignova is an AI-powered career platform that provides resume generation, ATS optimization,
-                            job application tracking, and browser extension services. The platform uses artificial intelligence
-                            to help job seekers create tailored resumes and manage their job search process.
-                        </p>
-                    </section>
-
-                    <section>
-                        <h2 className="text-xl font-bold text-slate-900 mb-4">3. User Accounts</h2>
-                        <ul className="list-disc list-inside space-y-2 pl-4 text-slate-500">
-                            <li>You must provide accurate and complete information when creating an account.</li>
-                            <li>You are responsible for maintaining the security of your account credentials.</li>
-                            <li>You must be at least 16 years old to use the Service.</li>
-                            <li>One person may not maintain more than one account.</li>
-                        </ul>
-                    </section>
-
-                    <section>
-                        <h2 className="text-xl font-bold text-slate-900 mb-4">4. Acceptable Use</h2>
-                        <p className="mb-4">You agree not to:</p>
-                        <ul className="list-disc list-inside space-y-2 pl-4 text-slate-500">
-                            <li>Use the Service for any unlawful purpose or to create fraudulent resumes.</li>
-                            <li>Attempt to reverse-engineer, decompile, or exploit our AI systems.</li>
-                            <li>Share your account credentials with third parties.</li>
-                            <li>Use automated tools to scrape or extract data from the Service.</li>
-                            <li>Upload malicious content or attempt to compromise our systems.</li>
-                        </ul>
-                    </section>
-
-                    <section>
-                        <h2 className="text-xl font-bold text-slate-900 mb-4">5. AI-Generated Content</h2>
-                        <p>
-                            Vignova uses AI to generate resume content and provide recommendations. While we strive for
-                            accuracy, AI-generated content should be reviewed by you before use. You are ultimately
-                            responsible for the accuracy and truthfulness of information in your resumes.
-                            Vignova does not guarantee job placement or interview outcomes.
-                        </p>
-                    </section>
-
-                    <section>
-                        <h2 className="text-xl font-bold text-slate-900 mb-4">6. Intellectual Property</h2>
-                        <p>
-                            You retain ownership of all personal content and career information you provide to the Service.
-                            Resumes generated by the Service are yours to use freely. Vignova retains ownership of its
-                            platform, AI models, templates, and proprietary technology.
-                        </p>
-                    </section>
-
-                    <section>
-                        <h2 className="text-xl font-bold text-slate-900 mb-4">7. Subscription & Credits</h2>
-                        <p>
-                            Certain features of Vignova require a subscription or credits. Credit-based features are
-                            consumed upon use and are non-refundable once used. Subscription plans auto-renew unless
-                            cancelled before the renewal date. Refund requests for unused subscription periods may
-                            be considered on a case-by-case basis.
-                        </p>
-                    </section>
-
-                    <section>
-                        <h2 className="text-xl font-bold text-slate-900 mb-4">8. Limitation of Liability</h2>
-                        <p>
-                            Vignova is provided &quot;as is&quot; without warranties of any kind. We are not liable for any
-                            indirect, incidental, or consequential damages arising from your use of the Service.
-                            Our total liability shall not exceed the amount you paid for the Service in the
-                            twelve months preceding the claim.
-                        </p>
-                    </section>
-
-                    <section>
-                        <h2 className="text-xl font-bold text-slate-900 mb-4">9. Termination</h2>
-                        <p>
-                            We may suspend or terminate your account if you violate these terms. You may delete your
-                            account at any time. Upon termination, your data will be deleted in accordance with our
-                            Privacy Policy.
-                        </p>
-                    </section>
-
-                    <section>
-                        <h2 className="text-xl font-bold text-slate-900 mb-4">10. Contact</h2>
-                        <p>
-                            For any questions about these terms, contact us at{' '}
-                            <a href="mailto:hello@vignova.io" className="text-blue-600 hover:underline">hello@vignova.io</a>.
-                        </p>
-                    </section>
-                </div>
-            </article>
-        </PageLayout>
-    );
+        </div>
+      </section>
+      <Footer />
+    </main>
+  );
 }

@@ -1,128 +1,61 @@
-"use client";
+import Header from '@/components/Header';
+import Footer from '@/components/Footer';
+import { Mail, MapPin } from 'lucide-react';
 
-import React from 'react';
-import { PageLayout } from '@/components/landing/PageLayout';
-import { Mail, MapPin, MessageCircle } from 'lucide-react';
-import { motion } from 'framer-motion';
-
-const fadeUp = {
-    hidden: { opacity: 0, y: 25 },
-    visible: {
-        opacity: 1,
-        y: 0,
-        transition: { duration: 0.7, ease: [0.25, 0.1, 0.25, 1] as [number, number, number, number] }
-    },
-};
-
-const contactMethods = [
-    {
-        icon: Mail,
-        title: "Email Us",
-        description: "For general inquiries, support, or partnership opportunities.",
-        value: "hello@vignova.io",
-        href: "mailto:hello@vignova.io",
-    },
-    {
-        icon: MessageCircle,
-        title: "Support",
-        description: "Get help with your account, billing, or technical issues.",
-        value: "support@vignova.io",
-        href: "mailto:support@vignova.io",
-    },
-    {
-        icon: MapPin,
-        title: "Location",
-        description: "We are a remote-first team building the future of job search.",
-        value: "Global / Remote",
-        href: null,
-    },
-];
-
-export default function ContactPage() {
-    return (
-        <PageLayout>
-            <div className="max-w-3xl">
-                <motion.div
-                    initial="hidden"
-                    animate="visible"
-                    variants={fadeUp}
-                >
-                    <h1 className="text-4xl md:text-5xl font-bold text-slate-900 tracking-tight mb-4">
-                        Get in Touch
-                    </h1>
-                    <p className="text-slate-500 text-lg mb-12">
-                        Have questions about Vignova? We&apos;d love to hear from you. Reach out and our team
-                        will get back to you as soon as possible.
-                    </p>
-                </motion.div>
-
-                <motion.div
-                    initial="hidden"
-                    animate="visible"
-                    variants={{
-                        hidden: { opacity: 0 },
-                        visible: { opacity: 1, transition: { staggerChildren: 0.12 } }
-                    }}
-                    className="grid md:grid-cols-3 gap-6 mb-16"
-                >
-                    {contactMethods.map((method, index) => (
-                        <motion.div
-                            key={index}
-                            variants={fadeUp}
-                            className="p-6 rounded-2xl bg-white border border-slate-200 group hover:border-blue-200 transition-colors duration-300 shadow-[0_2px_10px_-3px_rgba(0,0,0,0.05)]"
-                        >
-                            <div className="w-12 h-12 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center mb-4 group-hover:border-blue-200 transition-colors">
-                                <method.icon className="w-5 h-5 text-blue-600" />
-                            </div>
-                            <h3 className="text-lg font-bold text-slate-900 mb-2">{method.title}</h3>
-                            <p className="text-slate-500 text-sm mb-3">{method.description}</p>
-                            {method.href ? (
-                                <a href={method.href} className="text-blue-600 text-sm font-medium hover:underline">
-                                    {method.value}
-                                </a>
-                            ) : (
-                                <span className="text-slate-600 text-sm font-medium">{method.value}</span>
-                            )}
-                        </motion.div>
-                    ))}
-                </motion.div>
-
-                <motion.div
-                    initial="hidden"
-                    animate="visible"
-                    variants={fadeUp}
-                    className="p-8 rounded-2xl bg-slate-50 border border-slate-200"
-                >
-                    <h2 className="text-2xl font-bold text-slate-900 mb-2">Frequently Asked</h2>
-                    <p className="text-slate-500 mb-8">Quick answers to common questions.</p>
-
-                    <div className="space-y-6">
-                        {[
-                            {
-                                q: "Is Vignova free to use?",
-                                a: "Vignova offers a free tier with limited credits. Premium plans unlock unlimited resume generation, advanced ATS analysis, and priority support."
-                            },
-                            {
-                                q: "How does the Chrome extension work?",
-                                a: "The Vignova Chrome extension detects job listings on LinkedIn, Indeed, and other job boards. It enables one-click resume tailoring, keyword matching, and autofill for applications."
-                            },
-                            {
-                                q: "Is my data secure?",
-                                a: "Yes. We use end-to-end encryption, secure cloud infrastructure on Google Cloud, and never share your data with third parties for advertising."
-                            },
-                            {
-                                q: "Can I export my resumes?",
-                                a: "Absolutely. Resumes can be exported as PDF using our professional ATS-friendly templates at any time."
-                            },
-                        ].map((faq, i) => (
-                            <div key={i} className="border-b border-slate-200 pb-6 last:border-0 last:pb-0">
-                                <h3 className="text-slate-900 font-semibold mb-2">{faq.q}</h3>
-                                <p className="text-slate-500 text-sm leading-relaxed">{faq.a}</p>
-                            </div>
-                        ))}
-                    </div>
-                </motion.div>
+export default function ContactUs() {
+  return (
+    <main className="min-h-screen bg-[#F5F8FA] overflow-hidden">
+      <Header />
+      <section className="pt-32 pb-24 px-4 md:px-8 max-w-4xl mx-auto">
+        <div className="mb-12 text-center">
+          <h1 className="text-4xl md:text-5xl font-black text-[#0A192F] tracking-tight mb-4">Contact Us</h1>
+          <p className="text-xl text-slate-500">We'd love to hear from you. Here's how you can reach us.</p>
+        </div>
+        
+        <div className="bg-white rounded-3xl shadow-xl shadow-blue-500/5 p-8 md:p-12">
+          <div className="grid md:grid-cols-2 gap-12">
+            <div>
+              <h2 className="text-2xl font-bold text-[#0A192F] mb-6">Get in Touch</h2>
+              <p className="text-slate-600 mb-8 leading-relaxed">
+                Whether you have a question about features, pricing, need a demo, or anything else, our team is ready to answer all your questions.
+              </p>
+              
+              <div className="space-y-6">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-full bg-blue-50 flex items-center justify-center text-blue-600">
+                    <Mail className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <p className="font-semibold text-[#0A192F]">Email Support</p>
+                    <a href="mailto:contact@vignova.io" className="text-blue-600 hover:underline">contact@vignova.io</a>
+                  </div>
+                </div>
+                
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-600">
+                    <MapPin className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <p className="font-semibold text-[#0A192F]">Location</p>
+                    <p className="text-slate-600">Dublin, Ireland</p>
+                  </div>
+                </div>
+              </div>
             </div>
-        </PageLayout>
-    );
+            
+            <div className="bg-[#F8FAFC] p-8 rounded-2xl border border-slate-100">
+               <h3 className="text-xl font-bold text-[#0A192F] mb-4">Response Time</h3>
+               <p className="text-slate-600 leading-relaxed mb-4">
+                 Our standard support hours are Monday through Friday, 9am to 5pm EST. 
+               </p>
+               <p className="text-slate-600 leading-relaxed">
+                 We aim to respond to all inquiries within 24-48 hours. For urgent billing issues, please include "URGENT" in your email subject line.
+               </p>
+            </div>
+          </div>
+        </div>
+      </section>
+      <Footer />
+    </main>
+  );
 }

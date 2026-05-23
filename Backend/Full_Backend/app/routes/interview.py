@@ -46,6 +46,20 @@ class AnalyzeRequest(BaseModel):
     answers: List[AnswerItem]
 
 
+class ConversationTurn(BaseModel):
+    role: str  # "interviewer" | "candidate"
+    content: str
+
+
+class ChatRequest(BaseModel):
+    job_title: str
+    company: Optional[str] = ""
+    job_description: str = ""
+    user_profile: Optional[dict] = None
+    conversation_history: List[ConversationTurn] = []
+    total_questions: Optional[int] = 5
+
+
 # ── Helpers ────────────────────────────────────────────────────────────
 
 def _truncate(text: str, max_chars: int = 3000) -> str:
@@ -247,6 +261,84 @@ async def generate_questions(request: Request, data: QuestionsRequest):
             raise HTTPException(status_code=status, detail=message)
 
 
+def _chat_sync(
+    job_title: str,
+    company: str,
+    jd_text: str,
+    user_profile: dict,
+    history: list,
+    total_questions: int,
+) -> dict:
+    profile_summary = _build_profile_summary(user_profile) if user_profile else ""
+    interviewer_turns = sum(1 for t in history if t["role"] == "interviewer")
+    is_final = interviewer_turns >= total_questions
+    is_final_str = "true" if is_final else "false"
+    candidate_bg = ("Candidate background:\n" + profile_summary) if profile_summary else ""
+
+    history_text = "\n".join(
+        ("Alex" if t["role"] == "interviewer" else "Candidate") + ": " + t["content"]
+        for t in history
+    )
+
+    if interviewer_turns == 0:
+        turn_instructions = (
+            "This is the OPENING. Warmly greet the candidate, introduce yourself as Alex "
+            "(Senior Interviewer), briefly mention the role and company, make them feel at ease, "
+            "then ask them to introduce themselves professionally."
+        )
+    elif is_final:
+        turn_instructions = (
+            "This is the CLOSING. Thank the candidate genuinely for their time, "
+            "give a brief warm closing comment about the conversation, "
+            "and let them know you'll now compile their feedback. "
+            "Do NOT ask any more questions."
+        )
+    else:
+        question_focus = {
+            1: "A targeted question about their technical skills or relevant experience for this role.",
+            2: "A deeper technical or domain-specific question based on the job description.",
+            3: "A behavioural question using STAR method — ask about a real past situation/challenge.",
+            4: "A situational or problem-solving question related to responsibilities in the JD.",
+        }.get(interviewer_turns, "A relevant follow-up question probing their fit for the role.")
+        turn_instructions = (
+            f"This is question {interviewer_turns} of {total_questions - 1}. "
+            f"In ONE short sentence, briefly acknowledge the candidate's last answer naturally "
+            f"(e.g. 'Great background!', 'That's a solid example.'). "
+            f"Then ask: {question_focus}"
+        )
+
+    prompt = f"""You are Alex, a Senior Interviewer at {company or 'a leading company'}, conducting a real job interview for {job_title}.
+
+Personality: Warm, professional, encouraging. You make candidates feel at ease while maintaining high standards.
+{candidate_bg}
+
+Role: {job_title} at {company or 'N/A'}
+Job Description: {_truncate(jd_text, 1500)}
+
+Conversation so far:
+{history_text if history_text else "(Interview is just beginning)"}
+
+Your next turn as Alex:
+{turn_instructions}
+
+Rules:
+- Keep your response under 70 words total
+- Be natural and conversational — speak as a real interviewer would
+- When asking technical questions, reference specific technologies or requirements from the JD
+- Do NOT say "Question X:" or number your questions
+- Do NOT be robotic or use interview clichés
+
+Return ONLY valid JSON:
+{{"message": "<your response as Alex>", "is_final": {is_final_str}}}"""
+
+    response = model.generate_content(prompt)
+    result = _parse_json_response(response.text)
+    if "message" not in result:
+        raise ValueError("Invalid chat response")
+    result["is_final"] = bool(result.get("is_final", is_final))
+    return result
+
+
 @router.post("/api/interview/analyze")
 @limiter.limit("5/minute")
 async def analyze_interview(request: Request, data: AnalyzeRequest):
@@ -270,5 +362,31 @@ async def analyze_interview(request: Request, data: AnalyzeRequest):
             return {"success": True, **result}
         except Exception as exc:
             logger.error("Interview analysis failed: %s", exc)
+            status, message = _friendly_error(exc)
+            raise HTTPException(status_code=status, detail=message)
+
+
+@router.post("/api/interview/chat")
+@limiter.limit("30/minute")
+async def interview_chat(request: Request, data: ChatRequest):
+    async with _SEMAPHORE:
+        loop = asyncio.get_event_loop()
+        try:
+            history = [{"role": t.role, "content": t.content} for t in data.conversation_history]
+            result = await loop.run_in_executor(
+                None,
+                partial(
+                    _chat_sync,
+                    data.job_title,
+                    data.company or "",
+                    data.job_description,
+                    data.user_profile or {},
+                    history,
+                    data.total_questions or 5,
+                ),
+            )
+            return {"success": True, **result}
+        except Exception as exc:
+            logger.error("Interview chat failed: %s", exc)
             status, message = _friendly_error(exc)
             raise HTTPException(status_code=status, detail=message)
