@@ -13,8 +13,37 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Vignova | Job Copilot",
-  description: "Tailor resumes, track job applications, and autofill job forms automatically using AI. Generate optimized resumes, improve ATS scores, and apply faster with Vignova.",
+  metadataBase: new URL("https://vignova.io"),
+  title: "Vignova - The #1 AI Career Copilot",
+  description: "Navigate your career with precision. AI-driven resume analysis, intelligent job matching, and personalized interview prep to help you land your dream role faster.",
+  keywords: ["AI Resume Builder", "ATS Scanner", "Career Copilot", "Mock Interviews", "Job Tracker"],
+  authors: [{ name: "Vignova" }],
+  openGraph: {
+    type: "website",
+    locale: "en_US",
+    url: "https://vignova.io",
+    title: "Vignova - The #1 AI Career Copilot",
+    description: "AI-driven resume analysis, intelligent job matching, and personalized interview prep.",
+    siteName: "Vignova",
+    images: [
+      {
+        url: "/og-image.jpg", // Assuming an image exists or will be added
+        width: 1200,
+        height: 630,
+        alt: "Vignova Preview",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Vignova - The #1 AI Career Copilot",
+    description: "AI-driven resume analysis, intelligent job matching, and personalized interview prep.",
+    creator: "@vignova",
+    images: ["/og-image.jpg"],
+  },
+  alternates: {
+    canonical: "https://vignova.io",
+  },
 };
 
 export default function RootLayout({
@@ -23,21 +52,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-white relative text-slate-900 overflow-x-hidden`}
-      >
-        {/* Persistent Global Ambient Background */}
-        <div className="fixed inset-0 z-[-1] pointer-events-none overflow-hidden bg-white">
-          {/* Left Edge Glow - Soft Blue */}
-          <div className="absolute top-1/2 left-0 w-[600px] h-[800px] bg-blue-500/5 blur-[150px] rounded-full -translate-x-1/2 -translate-y-1/2 opacity-80" />
-
-          {/* Right Edge Glow - Soft Blue */}
-          <div className="absolute top-1/2 right-0 w-[600px] h-[800px] bg-blue-500/4 blur-[150px] rounded-full translate-x-1/2 -translate-y-1/2 opacity-80" />
-        </div>
-
-        {children}
-      </body>
+    <html
+      lang="en"
+      className={`${geistSans.variable} ${geistMono.variable} ${geistSans.className} h-full antialiased`}
+    >
+      <body className={`${geistSans.className} min-h-full flex flex-col`}>{children}</body>
     </html>
   );
 }

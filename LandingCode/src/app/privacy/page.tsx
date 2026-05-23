@@ -1,116 +1,63 @@
-import React from 'react';
-import { PageLayout } from '@/components/landing/PageLayout';
+import Header from '@/components/Header';
+import Footer from '@/components/Footer';
 
-export const metadata = {
-    title: 'Privacy Policy – Vignova',
-    description: 'Vignova privacy policy. Learn how we handle your data securely and responsibly.',
-};
+export default function PrivacyPolicy() {
+  return (
+    <main className="min-h-screen bg-[#F5F8FA] overflow-hidden">
+      <Header />
+      <section className="pt-32 pb-24 px-4 md:px-8 max-w-4xl mx-auto">
+        <div className="mb-12">
+          <h1 className="text-4xl md:text-5xl font-black text-[#0A192F] tracking-tight mb-4">Privacy Policy</h1>
+          <p className="text-slate-500">Last updated: {new Date().toLocaleDateString()}</p>
+        </div>
+        
+        <div className="bg-white rounded-3xl shadow-xl shadow-blue-500/5 p-8 md:p-12 text-slate-600 font-light leading-relaxed space-y-8">
+          
+          <div>
+            <h2 className="text-2xl font-bold text-[#0A192F] mb-4">1. Introduction</h2>
+            <p>Welcome to Vignova. We respect your privacy and are committed to protecting your personal data. This privacy policy will inform you as to how we look after your personal data when you visit our website and tell you about your privacy rights and how the law protects you.</p>
+          </div>
+          
+          <div>
+            <h2 className="text-2xl font-bold text-[#0A192F] mb-4">2. The Data We Collect About You</h2>
+            <p className="mb-2">We may collect, use, store and transfer different kinds of personal data about you which we have grouped together as follows:</p>
+            <ul className="list-disc pl-5 space-y-2">
+              <li><strong>Identity Data</strong> includes first name, last name, username or similar identifier.</li>
+              <li><strong>Contact Data</strong> includes email address and telephone numbers.</li>
+              <li><strong>Career Data</strong> includes resumes, CVs, job history, skills, and cover letters provided by you.</li>
+              <li><strong>Technical Data</strong> includes internet protocol (IP) address, browser type and version, time zone setting and location, operating system and platform.</li>
+            </ul>
+          </div>
+          
+          <div>
+            <h2 className="text-2xl font-bold text-[#0A192F] mb-4">3. How We Use Your Personal Data</h2>
+            <p className="mb-2">We will only use your personal data when the law allows us to. Most commonly, we will use your personal data in the following circumstances:</p>
+            <ul className="list-disc pl-5 space-y-2">
+              <li>Where we need to perform the contract we are about to enter into or have entered into with you (e.g., generating tailored resumes).</li>
+              <li>Where it is necessary for our legitimate interests and your interests and fundamental rights do not override those interests.</li>
+              <li>Where we need to comply with a legal obligation.</li>
+            </ul>
+          </div>
+          
+          <div>
+            <h2 className="text-2xl font-bold text-[#0A192F] mb-4">4. Data Security</h2>
+            <p>We have put in place appropriate security measures to prevent your personal data from being accidentally lost, used or accessed in an unauthorized way, altered or disclosed. In addition, we limit access to your personal data to those employees, agents, contractors and other third parties who have a business need to know.</p>
+          </div>
 
-export default function PrivacyPage() {
-    return (
-        <PageLayout>
-            <article className="max-w-3xl">
-                <h1 className="text-4xl md:text-5xl font-bold text-slate-900 tracking-tight mb-6">
-                    Privacy Policy
-                </h1>
-                <p className="text-slate-500 text-lg mb-12">
-                    Last updated: March 14, 2026
-                </p>
+          <div>
+            <h2 className="text-2xl font-bold text-[#0A192F] mb-4">5. Third-Party Links</h2>
+            <p>This website and application may include links to third-party websites, plug-ins and applications. Clicking on those links or enabling those connections may allow third parties to collect or share data about you. We do not control these third-party websites and are not responsible for their privacy statements.</p>
+          </div>
+          
+          <div>
+            <h2 className="text-2xl font-bold text-[#0A192F] mb-4">6. Contact Details</h2>
+            <p>If you have any questions about this privacy policy or our privacy practices, please contact us in the following ways:</p>
+            <p className="mt-2 font-medium text-blue-600">Email address: contact@vignova.io</p>
+          </div>
 
-                <div className="space-y-10 text-slate-600 leading-relaxed">
-                    <section>
-                        <h2 className="text-xl font-bold text-slate-900 mb-4">1. Introduction</h2>
-                        <p>
-                            Vignova (&quot;we&quot;, &quot;our&quot;, or &quot;us&quot;) is committed to protecting your privacy.
-                            This Privacy Policy explains how we collect, use, and safeguard your personal information
-                            when you use our AI-powered career platform, browser extension, and associated services.
-                        </p>
-                    </section>
-
-                    <section>
-                        <h2 className="text-xl font-bold text-slate-900 mb-4">2. Information We Collect</h2>
-                        <p className="mb-4">We collect the following types of information:</p>
-                        <ul className="list-disc list-inside space-y-2 pl-4 text-slate-500">
-                            <li><span className="text-slate-900 font-medium">Account Information:</span> Name, email address, and authentication credentials when you create an account.</li>
-                            <li><span className="text-slate-900 font-medium">Career Profile Data:</span> Resume content, work experience, education, skills, and career preferences you provide to generate tailored resumes.</li>
-                            <li><span className="text-slate-900 font-medium">Job Application Data:</span> Job descriptions, application statuses, and tracking information you store in our platform.</li>
-                            <li><span className="text-slate-900 font-medium">Usage Data:</span> Analytics such as pages visited, features used, and session duration to improve our services.</li>
-                            <li><span className="text-slate-900 font-medium">Extension Data:</span> Job listing information processed by our Chrome extension for autofill and matching features.</li>
-                        </ul>
-                    </section>
-
-                    <section>
-                        <h2 className="text-xl font-bold text-slate-900 mb-4">3. How We Use Your Information</h2>
-                        <ul className="list-disc list-inside space-y-2 pl-4 text-slate-500">
-                            <li>Generate AI-tailored resumes optimized for specific job descriptions.</li>
-                            <li>Provide ATS compatibility scoring and keyword analysis.</li>
-                            <li>Track and manage your job applications.</li>
-                            <li>Autofill job application forms via our browser extension.</li>
-                            <li>Improve our AI models and platform features.</li>
-                            <li>Communicate service updates and important announcements.</li>
-                        </ul>
-                    </section>
-
-                    <section>
-                        <h2 className="text-xl font-bold text-slate-900 mb-4">4. Browser Extension & URL Tracking</h2>
-                        <p className="mb-4">
-                            Our browser extension requests access to your browsing context (the &lt;all_urls&gt; permission) to function effectively across the web.
-                        </p>
-                        <ul className="list-disc list-inside space-y-2 pl-4 text-slate-500 mb-4">
-                            <li><span className="text-slate-900 font-medium">Why we need it:</span> Job applications are hosted on thousands of different domains (e.g., Workday, Greenhouse, LinkedIn). The extension must activate universally to detect form fields on any job board you visit.</li>
-                            <li><span className="text-slate-900 font-medium">What we collect:</span> We only scan the Document Object Model (DOM) of active job application forms to extract field labels (e.g., &quot;First Name&quot;, &quot;Resume&quot;).</li>
-                            <li><span className="text-slate-900 font-medium">Privacy guarantee:</span> We <strong>do not</strong> read, track, or scrape your web browsing history outside of an active job application. This data is only transmitted to generate your tailored applications and is never sold to third parties.</li>
-                        </ul>
-                    </section>
-
-                    <section>
-                        <h2 className="text-xl font-bold text-slate-900 mb-4">5. Data Security</h2>
-                        <p>
-                            We implement industry-standard security measures including encryption at rest and in transit,
-                            secure cloud infrastructure (Google Cloud), and regular security audits. Your career data is
-                            stored in encrypted databases and is never shared with third parties for advertising purposes.
-                        </p>
-                    </section>
-
-                    <section>
-                        <h2 className="text-xl font-bold text-slate-900 mb-4">6. AI Processing</h2>
-                        <p>
-                            Vignova uses Google Gemini AI to process your career information and generate tailored resumes.
-                            Your data is processed securely and is not used to train external AI models.
-                            All AI-generated content is created specifically for your use and is not stored beyond your account.
-                        </p>
-                    </section>
-
-                    <section>
-                        <h2 className="text-xl font-bold text-slate-900 mb-4">7. Data Retention</h2>
-                        <p>
-                            We retain your personal data for as long as your account is active. You can request deletion
-                            of your account and all associated data at any time by contacting us at{' '}
-                            <a href="mailto:hello@vignova.io" className="text-blue-600 hover:underline">hello@vignova.io</a>.
-                        </p>
-                    </section>
-
-                    <section>
-                        <h2 className="text-xl font-bold text-slate-900 mb-4">8. Your Rights</h2>
-                        <p className="mb-4">You have the right to:</p>
-                        <ul className="list-disc list-inside space-y-2 pl-4 text-slate-500">
-                            <li>Access and download your personal data.</li>
-                            <li>Request correction of inaccurate information.</li>
-                            <li>Request deletion of your account and data.</li>
-                            <li>Opt out of non-essential communications.</li>
-                            <li>Export your resumes and career profile.</li>
-                        </ul>
-                    </section>
-
-                    <section>
-                        <h2 className="text-xl font-bold text-slate-900 mb-4">9. Contact Us</h2>
-                        <p>
-                            For privacy-related questions or requests, contact us at{' '}
-                            <a href="mailto:hello@vignova.io" className="text-blue-600 hover:underline">hello@vignova.io</a>.
-                        </p>
-                    </section>
-                </div>
-            </article>
-        </PageLayout>
-    );
+        </div>
+      </section>
+      <Footer />
+    </main>
+  );
 }

@@ -1,376 +1,214 @@
-"use client";
+'use client';
+import { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { ArrowRight, Zap } from 'lucide-react';
+import ResumeFlow from './hero/ResumeFlow';
+import TrackerFlow from './hero/TrackerFlow';
+import JobsFlow from './hero/JobsFlow';
+import SavedFlow from './hero/SavedFlow';
+import ProfileFlow from './hero/ProfileFlow';
+import AtsFlow from './hero/AtsFlow';
 
-import React, { useEffect, useState } from "react";
-import Link from "next/link";
-import { motion, AnimatePresence } from "framer-motion";
-import { ArrowRight, Sparkles, CheckCircle, BrainCircuit, ScanLine } from "lucide-react";
+type Feature = 'profile' | 'resume' | 'ats' | 'saved' | 'tracker' | 'jobs';
+const featureOrder: Feature[] = ['profile', 'resume', 'ats', 'saved', 'tracker', 'jobs'];
 
-export const Hero = () => {
-    const [textIndex, setTextIndex] = useState(0);
-    const [step, setStep] = useState(0);
-    const words = ["AI-Powered", "Professional", "ATS-Friendly", "Beautiful"];
+export default function Hero() {
+  const [active, setActive] = useState<Feature>('resume');
+  const [cycleKey, setCycleKey] = useState(0);
 
-    useEffect(() => {
-        const interval = setInterval(() => {
-            setTextIndex((prev) => (prev + 1) % words.length);
-        }, 3000); // Slightly slower for better readability
-        return () => clearInterval(interval);
-    }, []);
+  // Smooth, fast continuous cycle matching the UI animation durations
+  useEffect(() => {
+    let tid: NodeJS.Timeout;
+    const duration = (active === 'resume' || active === 'ats') ? 4500 : (active === 'profile') ? 2500 : 3500;
+    tid = setTimeout(() => {
+      const next = featureOrder[(featureOrder.indexOf(active) + 1) % featureOrder.length];
+      setActive(next);
+      setCycleKey(k => k + 1);
+    }, duration);
+    return () => clearTimeout(tid);
+  }, [active, cycleKey]);
 
-    useEffect(() => {
-        let timeout: NodeJS.Timeout;
-        if (step === 0) {
-            timeout = setTimeout(() => setStep(1), 2000);
-        } else {
-            timeout = setTimeout(() => setStep(0), 4000);
-        }
-        return () => clearTimeout(timeout);
-    }, [step]);
+  return (
+    <section className="relative bg-[#F5F8FA] overflow-hidden min-h-[95vh] flex items-center pt-32 pb-12 lg:pt-40 lg:pb-20">
+      {/* Abstract Ambient Background Glows */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
+        <div className="absolute -top-[20%] -left-[10%] w-[70%] h-[70%] rounded-full bg-gradient-to-br from-blue-500/40 to-transparent blur-[100px] animate-orb"></div>
+        <div className="absolute top-[20%] -right-[20%] w-[80%] h-[80%] rounded-full bg-gradient-to-tl from-indigo-500/30 to-transparent blur-[120px] animate-orb-slow"></div>
+        <div className="absolute -bottom-[30%] left-[10%] w-[60%] h-[60%] rounded-full bg-gradient-to-tr from-violet-500/30 to-transparent blur-[120px] animate-orb"></div>
+      </div>
+      <div className="w-full px-4 md:px-8 xl:px-12 2xl:px-20 max-w-[1700px] mx-auto relative z-10 pointer-events-none">
+        <div className="flex flex-col lg:flex-row items-center justify-center gap-8 lg:gap-12 xl:gap-16">
 
-    const containerVariants = {
-        hidden: { opacity: 0 },
-        visible: {
-            opacity: 1,
-            transition: { staggerChildren: 0.1, delayChildren: 0.3 }
-        }
-    };
+          {/* Left Column (Dynamic Hero Info & CTA) */}
+          <div className="w-full lg:w-[480px] xl:w-[500px] flex flex-col justify-center items-center text-center shrink-0 z-20 pointer-events-auto mt-4 lg:mt-8">
 
-    const itemVariants = {
-        hidden: { opacity: 0, y: 10 },
-        visible: { opacity: 1, y: 0, transition: { duration: 0.5 } }
-    };
+            {/* Catchy Badge */}
+            <motion.div 
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.1 }}
+              className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 border border-blue-100 text-blue-600 text-xs font-bold tracking-widest uppercase mb-4 shadow-sm"
+            >
+               ✨ The #1 AI Career Copilot
+            </motion.div>
 
-    return (
-        <section className="relative min-h-screen flex items-center pt-20 overflow-hidden bg-white">
-
-            {/* --- BACKGROUND ANIMATION START --- */}
-            <div className="absolute inset-0 z-0 pointer-events-none">
-                {/* Layer 1: Base Static Grey Grid */}
-                <div
-                    className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px]"
-                />
-
-                {/* Layer 2: Green Glowing Grid with Moving Mask */}
-                <motion.div
-                    animate={{
-                        maskPosition: ["0% 0%", "100% 100%"], // Moves the mask diagonally
-                    }}
-                    transition={{
-                        duration: 8,
-                        repeat: Infinity,
-                        ease: "linear",
-                    }}
-                    className="absolute inset-0 bg-[linear-gradient(to_right,#22c55e_1px,transparent_1px),linear-gradient(to_bottom,#22c55e_1px,transparent_1px)] bg-[size:24px_24px] opacity-20"
-                    style={{
-                        // This mask creates the "beam" effect
-                        maskImage: "linear-gradient(135deg, transparent 40%, black 50%, transparent 60%)",
-                        maskSize: "200% 200%",
-                        maskRepeat: "no-repeat",
-                    }}
-                />
-
-                {/* Ambient Glow */}
-                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-blue-600/10 blur-[120px] rounded-full -z-10" />
-            </div>
-            {/* --- BACKGROUND ANIMATION END --- */}
-
-
-            <div className="max-w-7xl mx-auto px-4 grid lg:grid-cols-2 gap-8 lg:gap-12 items-center relative z-10 w-full">
-
-                {/* Left Content */}
-                <motion.div
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ duration: 0.6 }}
-                    className="space-y-6 lg:space-y-8 max-w-2xl"
-                >
-                    <div className="inline-flex items-center px-4 py-2 rounded-full border border-blue-600/30 bg-blue-900/10 text-blue-500 text-sm font-medium backdrop-blur-sm">
-                        <Sparkles className="w-4 h-4 mr-2" />
-                        <span>The Future of Resume Building</span>
-                    </div>
-
-                    {/* TEXT ANIMATION FIX */}
-                    <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold tracking-tight text-slate-900 leading-[1.1]">
-                        Vignova —
-
-                        {/* Container with slightly larger height to allow for descenders, but hidden vertically */}
-                        <span className="block h-[1.25em] overflow-hidden relative my-2">
-                            <AnimatePresence mode="wait">
-                                <motion.span
-                                    key={words[textIndex]}
-                                    // Vertical Reveal Animation
-                                    initial={{ y: "100%" }}
-                                    animate={{ y: "0%" }}
-                                    exit={{ y: "-100%" }}
-                                    transition={{ duration: 0.5, ease: "easeInOut" }}
-                                    className="block text-transparent bg-clip-text bg-gradient-to-r from-blue-500 to-blue-400 absolute top-0 left-0 w-full pt-1 pb-2 leading-none"
-                                >
-                                    {words[textIndex]}
-                                </motion.span>
-                            </AnimatePresence>
-                            {/* Invisible placeholder to maintain width based on longest word */}
-                            <span className="invisible pt-1 pb-2 leading-none block">{words[textIndex]}</span>
-                        </span>
-
-                        Resume.
+            {/* Dynamic Text synced with animations */}
+            <div className="flex-1 flex flex-col justify-center relative min-h-[260px] w-full mb-6">
+              <AnimatePresence mode="wait">
+                {active === 'profile' && (
+                  <motion.div key="text-profile" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="absolute inset-0 flex flex-col justify-center items-center w-full">
+                    <h1 className="text-5xl md:text-6xl font-extrabold text-[#0A192F] tracking-tight leading-tight mb-6">
+                      Master Profile, <br />
+                      <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#0A192F] to-[#2563EB]">in One Place.</span>
                     </h1>
-
-                    <p className="text-lg md:text-xl text-slate-500 max-w-xl leading-relaxed">
-                        Create a professional, ATS-optimized resume in minutes with our AI-powered platform.
+                    <p className="text-lg text-slate-500 font-light leading-relaxed max-w-lg mx-auto">
+                      Build a comprehensive master profile that our AI uses to instantly tailor every application.
                     </p>
+                  </motion.div>
+                )}
+                {active === 'resume' && (
+                  <motion.div key="text-resume" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="absolute inset-0 flex flex-col justify-center items-center w-full">
+                    <h1 className="text-5xl md:text-6xl font-extrabold text-[#0A192F] tracking-tight leading-tight mb-6">
+                      Think Fast, <br /><span className="text-transparent bg-clip-text bg-gradient-to-r from-[#0A192F] to-[#2563EB]">Build Faster.</span>
+                    </h1>
+                    <p className="text-lg text-slate-500 font-light leading-relaxed max-w-lg mx-auto">
+                      Our AI engine analyzes your master profile and the job description to generate a tailored, ATS-optimized resume in seconds.
+                    </p>
+                  </motion.div>
+                )}
+                {active === 'ats' && (
+                  <motion.div key="text-ats" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="absolute inset-0 flex flex-col justify-center items-center w-full">
+                    <h1 className="text-5xl md:text-6xl font-extrabold text-[#0A192F] tracking-tight leading-tight mb-6">
+                      Beat the Bots, <br /><span className="text-transparent bg-clip-text bg-gradient-to-r from-[#0A192F] to-[#2563EB]">Every Time.</span>
+                    </h1>
+                    <p className="text-lg text-slate-500 font-light leading-relaxed max-w-lg mx-auto">
+                      Deep resume analysis powered by local AI models to ensure you pass ATS screening before you apply.
+                    </p>
+                  </motion.div>
+                )}
+                {active === 'saved' && (
+                  <motion.div key="text-saved" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="absolute inset-0 flex flex-col justify-center items-center w-full">
+                    <h1 className="text-5xl md:text-6xl font-extrabold text-[#0A192F] tracking-tight leading-tight mb-6">Your Perfect <br /><span className="text-transparent bg-clip-text bg-gradient-to-r from-[#0A192F] to-[#2563EB]">Resume Hub.</span></h1>
+                    <p className="text-lg lg:text-xl text-gray-500 font-light tracking-tight leading-relaxed max-w-md mx-auto">Keep all your targeted resumes organized in one place. Download or preview them instantly.</p>
+                  </motion.div>
+                )}
+                {active === 'tracker' && (
+                  <motion.div key="text-tracker" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="absolute inset-0 flex flex-col justify-center items-center w-full">
+                    <h1 className="text-5xl md:text-6xl font-extrabold text-[#0A192F] tracking-tight leading-tight mb-6">Never Lose <br /><span className="text-transparent bg-clip-text bg-gradient-to-r from-[#0A192F] to-[#2563EB]">Track Again.</span></h1>
+                    <p className="text-lg lg:text-xl text-gray-500 font-light tracking-tight leading-relaxed max-w-md mx-auto">A beautiful Kanban board to track every application, interview, and offer automatically.</p>
+                  </motion.div>
+                )}
+                {active === 'jobs' && (
+                  <motion.div key="text-jobs" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="absolute inset-0 flex flex-col justify-center items-center w-full">
+                    <h1 className="text-5xl md:text-6xl font-extrabold text-[#0A192F] tracking-tight leading-tight mb-6">Find Roles that <br /><span className="text-transparent bg-clip-text bg-gradient-to-r from-[#0A192F] to-[#2563EB]">match You.</span></h1>
+                    <p className="text-lg lg:text-xl text-gray-500 font-light tracking-tight leading-relaxed max-w-md mx-auto">Search and discover high-matching positions based on your exact skillset and preferences.</p>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
 
-                    <div className="flex flex-col sm:flex-row gap-4 pt-2">
-                        <Link
-                            href="/dashboard"
-                            className="inline-flex items-center justify-center px-8 py-3 text-base font-bold text-black transition-all duration-300 bg-blue-600 rounded-xl hover:bg-blue-500 hover:scale-105 hover:shadow-[0_0_20px_rgba(34,197,94,0.4)]"
-                        >
-                            Create My Resume
-                            <ArrowRight className="w-5 h-5 ml-2" />
-                        </Link>
-                        <Link
-                            href="#demo"
-                            className="inline-flex items-center justify-center px-8 py-3 text-base font-bold text-slate-900 transition-all duration-300 bg-white/5 border border-slate-200 rounded-xl hover:bg-white/10 hover:border-white/20"
-                        >
-                            View Examples
-                        </Link>
+            {/* CTA Buttons */}
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ type: "spring", stiffness: 100, damping: 20, delay: 0.3 }}
+              className="flex flex-col items-center gap-4">
+              {/* Social Proof Badge */}
+              <div className="flex items-center gap-3">
+                <div className="flex -space-x-2.5">
+                  {[
+                    'https://randomuser.me/api/portraits/women/44.jpg',
+                    'https://randomuser.me/api/portraits/men/32.jpg',
+                    'https://randomuser.me/api/portraits/women/68.jpg',
+                    'https://randomuser.me/api/portraits/men/46.jpg',
+                    'https://randomuser.me/api/portraits/women/90.jpg'
+                  ].map((src, i) => (
+                    <div key={i} className="w-8 h-8 rounded-full border-2 border-white shadow-sm overflow-hidden bg-gray-100">
+                      <img src={src} alt="User" className="w-full h-full object-cover" />
                     </div>
-
-                    <div className="flex items-center gap-6 text-sm text-slate-500 pt-2">
-                        <div className="flex items-center gap-2">
-                            <CheckCircle className="w-4 h-4 text-blue-600" />
-                            <span>ATS Optimized</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <CheckCircle className="w-4 h-4 text-blue-600" />
-                            <span>AI Writing Assistant</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <CheckCircle className="w-4 h-4 text-blue-600" />
-                            <span>Skill Enhanced as per JD</span>
-                        </div>
+                  ))}
+                </div>
+                <div className="flex flex-col">
+                  <div className="flex items-center gap-1">
+                    <span className="text-sm font-bold text-[#0A192F]">4.9</span>
+                    <div className="flex">
+                      {[...Array(5)].map((_, i) => (
+                        <svg key={i} className="w-3.5 h-3.5 text-amber-400 fill-current" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" /></svg>
+                      ))}
                     </div>
-                </motion.div>
+                  </div>
+                  <span className="text-xs text-gray-400 font-medium">Trusted by 10,000+ job seekers</span>
+                </div>
+              </div>
 
-                {/* Right Animation (Same as before, sized for laptop) */}
-                <div className="relative flex items-center justify-center h-[500px] lg:h-[600px] w-full">
-                    <motion.div
-                        initial={{ opacity: 0, scale: 0.9 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        transition={{ duration: 0.8 }}
-                        className="relative w-full max-w-[400px] h-full max-h-[550px]"
-                    >
-                        {/* Glassmorphism Card Container */}
-                        <div className="absolute inset-0 bg-gradient-to-br from-zinc-900/90 to-black/90 rounded-2xl border border-slate-200 backdrop-blur-xl shadow-2xl overflow-hidden">
+              <div className="flex items-center gap-3">
+                <button onClick={() => window.location.href = 'https://app.vignova.io/login'} className="h-13 px-8 rounded-xl bg-[#0A192F] text-white font-semibold text-sm hover:bg-[#0d2240] transition-all shadow-lg shadow-black/10 flex items-center gap-2">
+                  Get started free <ArrowRight className="w-4 h-4" />
+                </button>
+                <button onClick={() => window.location.href = 'https://app.vignova.io/login'} className="h-13 px-6 rounded-xl bg-white border border-gray-200 text-[#0A192F] font-semibold text-sm hover:bg-gray-50 transition-all shadow-sm flex items-center gap-2">
+                  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="5 3 19 12 5 21 5 3" /></svg>
+                  Watch demo
+                </button>
+              </div>
+            </motion.div>
+          </div>
 
-                            {/* Animated Scanning Beam */}
-                            <motion.div
-                                animate={{
-                                    top: step === 0 ? ["-10%", "120%"] : "120%",
-                                    opacity: step === 0 ? 1 : 0
-                                }}
-                                transition={{ duration: 2, repeat: step === 0 ? Infinity : 0, ease: "linear" }}
-                                className="absolute left-0 right-0 h-24 bg-gradient-to-b from-transparent via-blue-600/10 to-transparent z-20 pointer-events-none"
-                            />
-                            <motion.div
-                                animate={{
-                                    top: step === 0 ? ["-10%", "120%"] : "120%",
-                                    opacity: step === 0 ? 1 : 0
-                                }}
-                                transition={{ duration: 2, repeat: step === 0 ? Infinity : 0, ease: "linear" }}
-                                className="absolute left-0 right-0 h-[1px] bg-blue-600/50 shadow-[0_0_15px_rgba(34,197,94,0.8)] z-30"
-                            />
+          {/* Right Column: UI Showcase Block */}
+          <div className="w-full lg:w-[50%] xl:w-[60%] flex flex-col justify-start items-center min-w-0 mt-10 lg:mt-0">
+            {/* Scaling Wrapper for Mockup */}
+            <div className="transform scale-[0.35] min-[380px]:scale-[0.4] sm:scale-[0.55] md:scale-[0.75] lg:scale-[0.85] xl:scale-100 origin-top h-[210px] min-[380px]:h-[240px] sm:h-[330px] md:h-[450px] lg:h-[510px] xl:h-[600px] flex justify-center w-full">
+              
+              {/* Permanent Dashboard Frame */}
+              <div className="relative w-[960px] h-[600px] bg-white rounded-2xl shadow-[0_30px_100px_-15px_rgba(0,0,0,0.15)] border-8 border-gray-100 flex flex-col overflow-hidden pointer-events-none shrink-0">
+                {/* Mock App Header */}
+              <div className="h-12 bg-[#0A0A0A] w-full flex items-center justify-between px-5 z-20 shrink-0 border-b border-gray-800 relative">
+                <div className="flex items-center gap-2"><span className="text-green-500 font-extrabold text-lg">V</span><span className="text-white font-bold text-xs tracking-widest uppercase">Vignova</span></div>
 
-                            {/* Resume Content */}
-                            <div className="p-6 md:p-8 space-y-6 md:space-y-8 relative z-10 h-full flex flex-col">
-                                {/* Header */}
-                                <div className="flex gap-4 items-center border-b border-slate-200 pb-6">
-                                    <div className="w-16 h-16 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center overflow-hidden shrink-0 relative">
-                                        {step === 0 ? (
-                                            <div className="w-12 h-12 rounded-full bg-gradient-to-tr from-blue-600/20 to-blue-500/20" />
-                                        ) : (
-                                            <>
-                                                <motion.div
-                                                    initial={{ opacity: 0 }}
-                                                    animate={{ opacity: 1 }}
-                                                    className="absolute inset-0 bg-gradient-to-br from-red-900 to-black flex items-center justify-center text-slate-900 font-bold text-xl"
-                                                >
-                                                    JS
-                                                </motion.div>
-                                                <motion.img
-                                                    initial={{ opacity: 0 }}
-                                                    animate={{ opacity: 1 }}
-                                                    src="https://upload.wikimedia.org/wikipedia/en/a/a2/Jack_Sparrow_In_Pirates_of_the_Caribbean-_At_World%27s_End.JPG"
-                                                    onError={(e) => {
-                                                        e.currentTarget.style.display = 'none';
-                                                    }}
-                                                    alt="Profile"
-                                                    className="w-full h-full object-cover relative z-10"
-                                                />
-                                            </>
-                                        )}
-                                    </div>
-                                    <div className="space-y-2 flex-1">
-                                        {step === 0 ? (
-                                            <>
-                                                <div className="h-5 bg-zinc-700 w-1/2 rounded animate-pulse" />
-                                                <div className="h-3 bg-slate-100 w-1/3 rounded" />
-                                            </>
-                                        ) : (
-                                            <motion.div
-                                                initial="hidden"
-                                                animate="visible"
-                                                variants={containerVariants}
-                                                key="text-header"
-                                            >
-                                                <motion.div variants={itemVariants} className="text-xl font-bold text-slate-900">Captain Jack Sparrow</motion.div>
-                                                <motion.div variants={itemVariants} className="text-xs text-blue-500 font-medium">Conqueror of the Seven Seas</motion.div>
-                                            </motion.div>
-                                        )}
-                                    </div>
-                                </div>
-
-                                {/* Body Content */}
-                                <div className="space-y-4 md:space-y-6 flex-1">
-                                    <div className="space-y-3">
-                                        {step === 0 ? (
-                                            <>
-                                                <div className="h-3 bg-blue-900/30 w-1/4 rounded border-l-2 border-blue-600 pl-2" />
-                                                <div className="space-y-2 pl-3 border-l border-slate-200">
-                                                    <div className="h-2 bg-zinc-700/50 w-full rounded" />
-                                                    <div className="h-2 bg-zinc-700/50 w-5/6 rounded" />
-                                                </div>
-                                            </>
-                                        ) : (
-                                            <motion.div
-                                                initial="hidden"
-                                                animate="visible"
-                                                variants={containerVariants}
-                                                key="text-body-1"
-                                                className="space-y-2"
-                                            >
-                                                <motion.h3 variants={itemVariants} className="text-xs font-bold text-slate-600 border-l-2 border-blue-600 pl-2 uppercase tracking-wide">Summary</motion.h3>
-                                                <motion.p variants={itemVariants} className="text-[10px] text-slate-500 leading-relaxed pl-3 border-l border-slate-200">
-                                                    Infamous pirate with a knack for escaping impossible situations. Seeking a position that involves significantly more rum.
-                                                </motion.p>
-                                            </motion.div>
-                                        )}
-                                    </div>
-
-                                    <div className="space-y-3">
-                                        {step === 0 ? (
-                                            <>
-                                                <div className="h-3 bg-blue-900/30 w-1/4 rounded border-l-2 border-blue-600 pl-2" />
-                                                <div className="space-y-2 pl-3 border-l border-slate-200">
-                                                    <div className="h-2 bg-zinc-700/50 w-full rounded" />
-                                                    <div className="h-2 bg-zinc-700/50 w-5/6 rounded" />
-                                                </div>
-                                            </>
-                                        ) : (
-                                            <motion.div
-                                                initial="hidden"
-                                                animate="visible"
-                                                variants={containerVariants}
-                                                key="text-body-2"
-                                                className="space-y-2"
-                                            >
-                                                <motion.h3 variants={itemVariants} className="text-xs font-bold text-slate-600 border-l-2 border-blue-600 pl-2 uppercase tracking-wide">Experience</motion.h3>
-                                                <motion.div variants={itemVariants} className="pl-3 border-l border-slate-200 space-y-1">
-                                                    <div className="flex justify-between text-[10px] text-slate-900">
-                                                        <span>The Black Pearl</span>
-                                                    </div>
-                                                    <p className="text-[10px] text-slate-500 leading-relaxed">
-                                                        Managed a diverse crew. Successfully retrieved the Pearl from Barbossa.
-                                                    </p>
-                                                    <div className="flex justify-between text-[10px] text-slate-900 mt-3">
-                                                        <span>East India Trading Co.</span>
-                                                    </div>
-                                                    <p className="text-[10px] text-slate-500 leading-relaxed">
-                                                        Contractor. Liberated cargo. Acquired the Wicked Wench.
-                                                    </p>
-                                                </motion.div>
-                                            </motion.div>
-                                        )}
-                                    </div>
-
-                                    {/* Additional Skills Section to fill space */}
-                                    <div className="space-y-3">
-                                        {step === 0 ? (
-                                            <>
-                                                <div className="h-3 bg-blue-900/30 w-1/4 rounded border-l-2 border-blue-600 pl-2" />
-                                                <div className="space-y-2 pl-3 border-l border-slate-200 flex gap-2">
-                                                    <div className="h-2 bg-zinc-700/50 w-8 rounded" />
-                                                    <div className="h-2 bg-zinc-700/50 w-12 rounded" />
-                                                    <div className="h-2 bg-zinc-700/50 w-10 rounded" />
-                                                    <div className="h-2 bg-zinc-700/50 w-14 rounded" />
-                                                </div>
-                                            </>
-                                        ) : (
-                                            <motion.div
-                                                initial="hidden"
-                                                animate="visible"
-                                                variants={containerVariants}
-                                                key="text-body-3"
-                                                className="space-y-2"
-                                            >
-                                                <motion.h3 variants={itemVariants} className="text-xs font-bold text-slate-600 border-l-2 border-blue-600 pl-2 uppercase tracking-wide">Skills</motion.h3>
-                                                <motion.div variants={itemVariants} className="pl-3 border-l border-slate-200 flex flex-wrap gap-2 text-[9px] text-blue-500 font-mono">
-                                                    <span className="bg-blue-600/10 px-1.5 py-0.5 rounded">Navigation</span>
-                                                    <span className="bg-blue-600/10 px-1.5 py-0.5 rounded">Sword Fighting</span>
-                                                    <span className="bg-blue-600/10 px-1.5 py-0.5 rounded">Negotiation</span>
-                                                    <span className="bg-blue-600/10 px-1.5 py-0.5 rounded">Leadership</span>
-                                                    <span className="bg-blue-600/10 px-1.5 py-0.5 rounded">Escapology</span>
-                                                    <span className="bg-blue-600/10 px-1.5 py-0.5 rounded">Seamanship</span>
-                                                    <span className="bg-blue-600/10 px-1.5 py-0.5 rounded">Treasure Hunting</span>
-                                                    <span className="bg-blue-600/10 px-1.5 py-0.5 rounded">Charisma</span>
-                                                </motion.div>
-                                            </motion.div>
-                                        )}
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Floating Badges */}
-                        <motion.div
-                            initial={{ opacity: 0, scale: 0.8 }}
-                            animate={{
-                                opacity: step === 0 ? 1 : 0,
-                                scale: step === 0 ? 1 : 0.8,
-                                y: step === 0 ? 0 : 10
-                            }}
-                            className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white/90 border border-blue-500/30 p-3 md:p-4 rounded-xl shadow-2xl flex items-center gap-3 backdrop-blur-md z-40 whitespace-nowrap"
-                        >
-                            <div className="p-2 bg-blue-500/10 rounded-lg">
-                                <BrainCircuit className="w-5 h-5 md:w-6 md:h-6 text-blue-500 animate-pulse" />
-                            </div>
-                            <div>
-                                <div className="text-slate-900 font-bold text-xs md:text-sm">AI Analysis</div>
-                                <div className="text-[10px] md:text-xs text-blue-400 font-mono">Processing...</div>
-                            </div>
-                        </motion.div>
-
-                        <motion.div
-                            initial={{ opacity: 0, scale: 0.8 }}
-                            animate={{
-                                opacity: step === 1 ? 1 : 0,
-                                scale: step === 1 ? 1 : 0.8,
-                                y: step === 1 ? 0 : 10
-                            }}
-                            transition={{ delay: step === 1 ? 0.5 : 0 }}
-                            className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white/90 border border-blue-600/30 p-3 md:p-4 rounded-xl shadow-[0_0_30px_rgba(0,0,0,0.5)] flex items-center gap-3 backdrop-blur-md z-40 whitespace-nowrap"
-                        >
-                            <div className="p-2 bg-blue-600/10 rounded-lg">
-                                <ScanLine className="w-5 h-5 md:w-6 md:h-6 text-blue-600" />
-                            </div>
-                            <div>
-                                <div className="text-slate-900 font-bold text-xs md:text-sm">ATS Check</div>
-                                <div className="text-[10px] md:text-xs text-blue-500 font-mono">98% Match</div>
-                            </div>
-                        </motion.div>
-                    </motion.div>
+                {/* Dynamic Feature Text in Header */}
+                <div className="absolute left-1/2 -translate-x-1/2 text-gray-400 font-bold text-[10px] tracking-[0.2em] uppercase flex items-center overflow-hidden">
+                  <AnimatePresence mode="wait">
+                    <motion.span key={active} initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }} className="flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                      {active === 'profile' && 'Master Profile Sync'}
+                      {active === 'resume' && 'AI Resume Studio'}
+                      {active === 'ats' && 'ATS Score Analysis'}
+                      {active === 'saved' && 'Resume Vault'}
+                      {active === 'tracker' && 'Application Tracker'}
+                      {active === 'jobs' && 'AI Job Matching'}
+                    </motion.span>
+                  </AnimatePresence>
                 </div>
 
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-1.5 bg-amber-500/10 text-amber-500 px-2.5 py-1 rounded-full text-[10px] font-bold border border-amber-500/20"><Zap className="w-3 h-3" /> 3 Credits</div>
+                  <div className="w-7 h-7 rounded-full bg-white text-black flex items-center justify-center font-bold text-xs">A</div>
+                </div>
+              </div>
+
+              {/* Dynamic Feature Content Canvas */}
+              <div className="flex-1 relative bg-gray-50/50 overflow-hidden">
+                <AnimatePresence mode="wait">
+                  {active === 'profile' && <ProfileFlow key={`pf-${cycleKey}`} />}
+                  {active === 'resume' && <ResumeFlow key={`rf-${cycleKey}`} />}
+                  {active === 'ats' && <AtsFlow key={`af-${cycleKey}`} />}
+                  {active === 'saved' && <SavedFlow key={`sf-${cycleKey}`} />}
+                  {active === 'tracker' && <TrackerFlow key={`tf-${cycleKey}`} />}
+                  {active === 'jobs' && <JobsFlow key={`jf-${cycleKey}`} />}
+                </AnimatePresence>
+              </div>
+              </div>
             </div>
-        </section>
-    );
-};
+
+            {/* Pagination / Feature Indicators Below Animation */}
+            <div className="flex items-center justify-center gap-3 mt-8 max-w-[1200px] w-full pointer-events-auto">
+              <div onClick={() => { setActive('profile'); setCycleKey(k => k + 1); }} className={`h-1.5 rounded-full cursor-pointer transition-all duration-300 ${active === 'profile' ? 'w-8 bg-blue-600' : 'w-2 bg-gray-300 hover:bg-gray-400'}`} />
+              <div onClick={() => { setActive('resume'); setCycleKey(k => k + 1); }} className={`h-1.5 rounded-full cursor-pointer transition-all duration-300 ${active === 'resume' ? 'w-8 bg-blue-600' : 'w-2 bg-gray-300 hover:bg-gray-400'}`} />
+              <div onClick={() => { setActive('ats'); setCycleKey(k => k + 1); }} className={`h-1.5 rounded-full cursor-pointer transition-all duration-300 ${active === 'ats' ? 'w-8 bg-blue-600' : 'w-2 bg-gray-300 hover:bg-gray-400'}`} />
+              <div onClick={() => { setActive('saved'); setCycleKey(k => k + 1); }} className={`h-1.5 rounded-full cursor-pointer transition-all duration-300 ${active === 'saved' ? 'w-8 bg-blue-600' : 'w-2 bg-gray-300 hover:bg-gray-400'}`} />
+              <div onClick={() => { setActive('tracker'); setCycleKey(k => k + 1); }} className={`h-1.5 rounded-full cursor-pointer transition-all duration-300 ${active === 'tracker' ? 'w-8 bg-blue-600' : 'w-2 bg-gray-300 hover:bg-gray-400'}`} />
+              <div onClick={() => { setActive('jobs'); setCycleKey(k => k + 1); }} className={`h-1.5 rounded-full cursor-pointer transition-all duration-300 ${active === 'jobs' ? 'w-8 bg-blue-600' : 'w-2 bg-gray-300 hover:bg-gray-400'}`} />
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </section>
+  );
+}

@@ -15,7 +15,8 @@ import {
   Sparkles,
   Chrome,
   FileText,
-  ScanLine
+  ScanLine,
+  Mic
 } from "lucide-react";
 
 const navigationGroups = [
@@ -41,6 +42,12 @@ const navigationGroups = [
       { name: "ATS Score", href: "/dashboard/ats-score", icon: ScanLine, isNew: true },
       { name: "Find Jobs", href: "/dashboard/find-jobs", icon: Search, isNew: true },
       { name: "Job Scrapper", href: "/dashboard/job-scrapper", icon: Sparkles, isNew: true },
+    ],
+  },
+  {
+    label: "Interview",
+    items: [
+      { name: "Interview Prep", href: "/dashboard/interview-prep", icon: Mic, isPro: true },
     ],
   },
   {
