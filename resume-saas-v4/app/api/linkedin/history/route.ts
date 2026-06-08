@@ -6,12 +6,14 @@ import { db } from "@/lib/db";
 export async function GET(req: Request) {
     try {
         const session = await getServerSession(authOptions);
-        if (!session?.user?.id) {
+        const userId = (session?.user as any)?.id;
+        
+        if (!userId) {
             return new NextResponse("Unauthorized", { status: 401 });
         }
 
         const latest = await db.linkedInAnalysis.findFirst({
-            where: { userId: session.user.id },
+            where: { userId },
             orderBy: { createdAt: 'desc' }
         });
 
