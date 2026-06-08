@@ -69,7 +69,7 @@ export const PLACEHOLDER_RESUME_DATA: ResumeData = {
     languages: ["English", "Hindi", "Marathi"]
 };
 
-export type TemplateId = 'modern' | 'classic' | 'creative' | 'professional' | 'minimal' | 'executive' | 'elegant' | 'tech' | 'corporate' | 'luxe' | 'nordic' | 'bold' | 'compact' | 'accent' | 'diamond';
+export type TemplateId = 'modern' | 'classic' | 'creative' | 'professional' | 'minimal' | 'executive' | 'elegant' | 'tech' | 'corporate' | 'luxe' | 'nordic' | 'bold' | 'compact' | 'accent' | 'diamond' | 'cascade' | 'horizon' | 'atlas' | 'prism' | 'chronicle';
 
 export interface TemplateMetadata {
     id: TemplateId;
@@ -175,6 +175,38 @@ export const TEMPLATES: TemplateMetadata[] = [
         description: 'Emerald geometric two-column',
         thumbnail: '/templates/diamond-thumb.png',
         isPremium: true
+    },
+    {
+        id: 'cascade',
+        name: 'Cascade',
+        description: 'Indigo sidebar with clean main column',
+        thumbnail: '/templates/cascade-thumb.png',
+    },
+    {
+        id: 'horizon',
+        name: 'Horizon',
+        description: 'Teal gradient header, skill chips',
+        thumbnail: '/templates/horizon-thumb.png',
+    },
+    {
+        id: 'atlas',
+        name: 'Atlas',
+        description: 'Swiss grid design with red accents',
+        thumbnail: '/templates/atlas-thumb.png',
+        isPremium: true
+    },
+    {
+        id: 'prism',
+        name: 'Prism',
+        description: 'Purple gradient, rounded badges',
+        thumbnail: '/templates/prism-thumb.png',
+        isPremium: true
+    },
+    {
+        id: 'chronicle',
+        name: 'Chronicle',
+        description: 'Timeline layout with amber accents',
+        thumbnail: '/templates/chronicle-thumb.png',
     }
 ];
 

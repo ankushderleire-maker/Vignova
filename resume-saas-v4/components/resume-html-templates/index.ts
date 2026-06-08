@@ -16,6 +16,13 @@ export { BoldTemplate, BOLD_STYLES, generateBoldHtml } from './BoldTemplate';
 export { CompactTemplate, COMPACT_STYLES, generateCompactHtml } from './CompactTemplate';
 export { AccentTemplate, ACCENT_STYLES, generateAccentHtml } from './AccentTemplate';
 export { DiamondTemplate, DIAMOND_STYLES, generateDiamondHtml } from './DiamondTemplate';
+// New templates
+export { CascadeTemplate, CASCADE_STYLES, generateCascadeHtml } from './CascadeTemplate';
+export { HorizonTemplate, HORIZON_STYLES, generateHorizonHtml } from './HorizonTemplate';
+export { AtlasTemplate, ATLAS_STYLES, generateAtlasHtml } from './AtlasTemplate';
+export { PrismTemplate, PRISM_STYLES, generatePrismHtml } from './PrismTemplate';
+export { ChronicleTemplate, CHRONICLE_STYLES, generateChronicleHtml } from './ChronicleTemplate';
+
 export type { HtmlTemplateProps } from './BaseTemplate';
 export { getSettings, getCssVariables, BaseWrapper, BASE_STYLES } from './BaseTemplate';
 
@@ -35,6 +42,11 @@ import { generateBoldHtml } from './BoldTemplate';
 import { generateCompactHtml } from './CompactTemplate';
 import { generateAccentHtml } from './AccentTemplate';
 import { generateDiamondHtml } from './DiamondTemplate';
+import { generateCascadeHtml } from './CascadeTemplate';
+import { generateHorizonHtml } from './HorizonTemplate';
+import { generateAtlasHtml } from './AtlasTemplate';
+import { generatePrismHtml } from './PrismTemplate';
+import { generateChronicleHtml } from './ChronicleTemplate';
 
 export type TemplateId =
     | 'classic'
@@ -51,7 +63,12 @@ export type TemplateId =
     | 'bold'
     | 'compact'
     | 'accent'
-    | 'diamond';
+    | 'diamond'
+    | 'cascade'
+    | 'horizon'
+    | 'atlas'
+    | 'prism'
+    | 'chronicle';
 
 /**
  * Map of template IDs to their HTML generator functions
@@ -72,6 +89,11 @@ export const HTML_TEMPLATE_GENERATORS: Record<TemplateId, (data: any, designSett
     compact: generateCompactHtml,
     accent: generateAccentHtml,
     diamond: generateDiamondHtml,
+    cascade: generateCascadeHtml,
+    horizon: generateHorizonHtml,
+    atlas: generateAtlasHtml,
+    prism: generatePrismHtml,
+    chronicle: generateChronicleHtml,
 };
 
 /**
