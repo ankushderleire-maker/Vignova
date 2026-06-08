@@ -47,8 +47,8 @@ export function StatCard({ title, count, icon: Icon, trend, color = "var(--prima
                 {/* Content */}
                 <div className="mt-auto flex justify-between items-center bg-transparent">
                     <div className="flex-1">
-                        <p className="text-[var(--text-secondary)] text-sm mb-1">{title}</p>
-                        <p className="text-[2.5rem] leading-none font-bold text-[var(--foreground)] tracking-tight">
+                        <p className="text-[var(--text-secondary)] text-xs sm:text-sm mb-1">{title}</p>
+                        <p className="text-[1.75rem] sm:text-[2.5rem] leading-none font-bold text-[var(--foreground)] tracking-tight">
                             {animatedCount}
                         </p>
                     </div>

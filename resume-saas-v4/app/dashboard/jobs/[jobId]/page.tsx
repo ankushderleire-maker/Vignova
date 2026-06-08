@@ -99,6 +99,7 @@ function ResumeStudioPageContent() {
     const [isGenerating, setIsGenerating] = useState(false);
     const [hasGenerated, setHasGenerated] = useState(false);
     const [activeTab, setActiveTab] = useState<"jd" | "profile" | "saved">("jd");
+    const [mobilePanelView, setMobilePanelView] = useState<"editor" | "preview">("editor");
 
     // --- DATA FETCHING ---
     useEffect(() => {
@@ -252,6 +253,7 @@ function ResumeStudioPageContent() {
 
             setResumeData(formattedData);
             setHasGenerated(true);
+            setMobilePanelView("preview");
 
             // 4. Save
             const saveRes = await fetch("/api/resumes", {
@@ -371,27 +373,25 @@ function ResumeStudioPageContent() {
         <div className="h-full flex flex-col bg-[var(--background)] text-[var(--foreground)] overflow-hidden w-full">
 
             {/* HEADER */}
-            <div className="h-16 border-b border-[var(--border-color)] flex items-center justify-between px-6 bg-[var(--sidebar-bg)] shrink-0 w-full z-20 relative">
-                <div className="flex items-center gap-4">
-                    <button onClick={() => router.back()} className="p-2 hover:bg-black/5 dark:hover:bg-white/10 rounded-lg text-[var(--text-secondary)] hover:text-[var(--foreground)] transition">
-                        <ArrowLeft className="h-5 w-5" />
+            <div className="h-14 md:h-16 border-b border-[var(--border-color)] flex items-center justify-between px-3 md:px-6 bg-[var(--sidebar-bg)] shrink-0 w-full z-20 relative">
+                <div className="flex items-center gap-2 md:gap-4 min-w-0">
+                    <button onClick={() => router.back()} className="p-1.5 md:p-2 hover:bg-black/5 dark:hover:bg-white/10 rounded-lg text-[var(--text-secondary)] hover:text-[var(--foreground)] transition shrink-0">
+                        <ArrowLeft className="h-4 w-4 md:h-5 md:w-5" />
                     </button>
-                    <div className="flex items-center gap-3">
-                        <div className="p-2 bg-[var(--primary)]/10 rounded-lg">
-                            <Zap className="h-5 w-5 text-[var(--primary)]" />
+                    <div className="flex items-center gap-2 md:gap-3 min-w-0">
+                        <div className="p-1.5 md:p-2 bg-[var(--primary)]/10 rounded-lg shrink-0">
+                            <Zap className="h-4 w-4 md:h-5 md:w-5 text-[var(--primary)]" />
                         </div>
-                        <div>
-                            <h1 className="font-bold text-xl text-[var(--foreground)]">AI Studio</h1>
-                            <p className="text-xs text-[var(--text-secondary)]">{job.jobTitle} • {job.company}</p>
+                        <div className="min-w-0">
+                            <h1 className="font-bold text-base md:text-xl text-[var(--foreground)] leading-tight">AI Studio</h1>
+                            <p className="text-[10px] md:text-xs text-[var(--text-secondary)] truncate">{job.jobTitle} • {job.company}</p>
                         </div>
                     </div>
                 </div>
 
                 {hasGenerated && resumeData && (
-                    <div className="flex items-center gap-4">
-                        {/* Template Switcher moved to Sidebar Tabs */}
-
-                        {/* CHECK ATS SCORE BUTTON */}
+                    <div className="flex items-center gap-1.5 md:gap-4 shrink-0">
+                        {/* CHECK ATS SCORE — hidden on mobile */}
                         <button
                             onClick={() => {
                                 if (!currentResumeId) {
@@ -408,22 +408,23 @@ function ResumeStudioPageContent() {
                                 }
                                 router.push(`/dashboard/ats-score?jobId=${job.id}&resumeId=${currentResumeId}`);
                             }}
-                            className="flex items-center gap-2 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-all shadow-sm"
+                            className="hidden sm:flex items-center gap-2 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-all shadow-sm"
                         >
                             <Target className="h-3.5 w-3.5" />
-                            Check ATS Score
+                            <span className="hidden md:inline">Check ATS Score</span>
+                            <span className="sm:inline md:hidden">ATS</span>
                         </button>
 
                         {/* SAVE BUTTON */}
                         <button
                             onClick={() => setIsSaveDialogOpen(true)}
-                            className="flex items-center gap-2 bg-black/5 dark:bg-white/10 text-[var(--foreground)] hover:bg-black/10 dark:hover:bg-white/20 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors border border-[var(--border-color)] shadow-sm"
+                            className="flex items-center gap-1.5 bg-black/5 dark:bg-white/10 text-[var(--foreground)] hover:bg-black/10 dark:hover:bg-white/20 px-2.5 md:px-3 py-1.5 rounded-lg text-xs font-bold transition-colors border border-[var(--border-color)] shadow-sm"
                         >
                             <Save className="h-3.5 w-3.5 text-orange-500" />
-                            Save
+                            <span className="hidden sm:inline">Save</span>
                         </button>
 
-                        {/* DOWNLOAD BUTTON (Using HTML-to-PDF) */}
+                        {/* DOWNLOAD BUTTON */}
                         <PdfDownloadButton
                             data={resumeData}
                             templateId={selectedTemplate}
@@ -445,10 +446,26 @@ function ResumeStudioPageContent() {
 
 
 
+            {/* Mobile panel tab switcher */}
+            <div className="flex md:hidden border-b border-[var(--border-color)] bg-[var(--sidebar-bg)] shrink-0">
+                <button
+                    onClick={() => setMobilePanelView("editor")}
+                    className={`flex-1 py-2.5 text-xs font-bold uppercase tracking-wider transition-all ${mobilePanelView === "editor" ? "text-[var(--primary)] border-b-2 border-[var(--primary)]" : "text-[var(--text-secondary)]"}`}
+                >
+                    {hasGenerated ? "Editor" : "Setup"}
+                </button>
+                <button
+                    onClick={() => setMobilePanelView("preview")}
+                    className={`flex-1 py-2.5 text-xs font-bold uppercase tracking-wider transition-all ${mobilePanelView === "preview" ? "text-[var(--primary)] border-b-2 border-[var(--primary)]" : "text-[var(--text-secondary)]"}`}
+                >
+                    Preview
+                </button>
+            </div>
+
             <div className="flex-1 flex overflow-hidden w-full relative">
 
                 {/* === LEFT PANEL (EDITOR / REVIEW) === */}
-                <div className="flex flex-col border-r border-[var(--border-color)] bg-[var(--sidebar-bg)] shrink-0 z-10 shadow-2xl w-[45%] xl:w-[45%] max-w-[45%] transition-all duration-300 ease-in-out overflow-hidden">
+                <div className={`${mobilePanelView === "editor" ? "flex" : "hidden"} md:flex flex-col border-r border-[var(--border-color)] bg-[var(--sidebar-bg)] shrink-0 z-10 shadow-2xl w-full md:w-[45%] xl:w-[45%] md:max-w-[45%] transition-all duration-300 ease-in-out overflow-hidden`}>
                     {!hasGenerated ? (
                         <>
                             {/* PRE-GENERATION VIEW */}
@@ -489,6 +506,7 @@ function ResumeStudioPageContent() {
                                                         setHasGenerated(true);
                                                         setCurrentResumeId(resume.id);
                                                         setCurrentResumeName(resume.name);
+                                                        setMobilePanelView("preview");
                                                     }}
                                                     className="w-full text-left bg-black/5 dark:bg-white/5 p-3 rounded-lg border border-[var(--border-color)] hover:border-[var(--primary)]/50 hover:bg-black/10 dark:hover:bg-white/10 transition group"
                                                 >
@@ -678,7 +696,7 @@ function ResumeStudioPageContent() {
                 </div>
 
                 {/* === RIGHT PANEL (PDF PREVIEW / IS GENERATING VIEW) === */}
-                <div className="flex-1 min-w-0 bg-black/5 dark:bg-[#525659] relative flex flex-col h-full border-l border-[var(--border-color)] overflow-hidden">
+                <div className={`${mobilePanelView === "preview" ? "flex" : "hidden"} md:flex flex-1 min-w-0 bg-black/5 dark:bg-[#525659] relative flex-col h-full border-l border-[var(--border-color)] overflow-hidden`}>
                     {isGenerating ? (
                         <div className="flex-1 flex flex-col items-center justify-center p-10 text-center text-[var(--foreground)] relative overflow-hidden bg-[var(--background)]">
                             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-[var(--primary)]/5 rounded-full blur-[120px] animate-pulse pointer-events-none"></div>
