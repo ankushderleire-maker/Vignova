@@ -46,19 +46,19 @@ export function StatsGraph({ data, period, onPeriodChange }: StatsGraphProps) {
         <div className={styles.cardWrapper} style={{ "--border-color": "var(--primary)" } as React.CSSProperties}>
             <div className={styles.innerCard}>
                 {/* Header */}
-                <div className="flex items-center justify-between mb-6">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
                     <div>
-                        <h2 className="text-xl font-bold text-[var(--foreground)] mb-1">Daily Statistics</h2>
-                        <p className="text-[var(--text-secondary)] text-sm">Resume generation activity</p>
+                        <h2 className="text-lg sm:text-xl font-bold text-[var(--foreground)] mb-0.5">Daily Statistics</h2>
+                        <p className="text-[var(--text-secondary)] text-xs sm:text-sm">Resume generation activity</p>
                     </div>
 
                     {/* Period Selector */}
-                    <div className="flex bg-[var(--sidebar-bg)] rounded-lg p-1 gap-1 border border-[var(--border-color)] shadow-sm">
+                    <div className="flex bg-[var(--sidebar-bg)] rounded-lg p-1 gap-1 border border-[var(--border-color)] shadow-sm self-start sm:self-auto">
                         {periods.map((p) => (
                             <button
                                 key={p.value}
                                 onClick={() => onPeriodChange(p.value as any)}
-                                className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${period === p.value
+                                className={`px-3 sm:px-4 py-1.5 rounded-md text-xs sm:text-sm font-medium transition-all ${period === p.value
                                     ? "bg-[var(--primary)] text-white shadow-lg shadow-[var(--primary)]/20"
                                     : "text-[var(--text-secondary)] hover:text-[var(--foreground)] hover:bg-black/5 dark:hover:bg-white/5"
                                     }`}

@@ -128,12 +128,17 @@ export default function GeneratorPage() {
       {/* JOB LIST */}
       <div className="mt-2">
 
-        {/* Table Header */}
-        <div id="tour-generator" className="grid grid-cols-12 gap-4 px-4 py-3 border-b border-[var(--border-color)] bg-transparent text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider">
+        {/* Desktop table header */}
+        <div id="tour-generator" className="hidden md:grid grid-cols-12 gap-4 px-4 py-3 border-b border-[var(--border-color)] bg-transparent text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider">
           <div className="col-span-5">Job Details</div>
           <div className="col-span-3">Status</div>
           <div className="col-span-2">Date Added</div>
           <div className="col-span-2 text-right">Action</div>
+        </div>
+        {/* Mobile header */}
+        <div className="flex md:hidden items-center justify-between px-4 py-2.5 border-b border-[var(--border-color)] text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider">
+          <span>Job Details</span>
+          <span>Action</span>
         </div>
 
         {/* List Items */}
@@ -144,56 +149,87 @@ export default function GeneratorPage() {
             </div>
           ) : (
             jobs.map((job) => (
-              <div key={job.id} className="grid grid-cols-12 gap-4 px-4 py-2.5 items-center hover:bg-black/5 dark:hover:bg-white/5 transition-colors group">
+              <div key={job.id} className="hover:bg-black/5 dark:hover:bg-white/5 transition-colors group">
 
-                {/* 1. Job Details */}
-                <div className="col-span-5 min-w-0">
-                  <h3
-                    className="font-bold text-[var(--foreground)] text-sm group-hover:text-[var(--primary)] transition-colors truncate"
-                    title={job.jobTitle}
-                  >
-                    {job.jobTitle}
-                  </h3>
-                  <div
-                    className="flex items-center gap-2 text-[var(--text-secondary)] text-xs mt-1 truncate"
-                    title={job.company}
-                  >
-                    <FileText className="h-3 w-3 shrink-0" /> <span className="truncate">{job.company}</span>
+                {/* Mobile card row */}
+                <div className="flex md:hidden items-center gap-3 px-4 py-3">
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-bold text-[var(--foreground)] text-sm group-hover:text-[var(--primary)] transition-colors truncate">
+                      {job.jobTitle}
+                    </h3>
+                    <div className="flex items-center gap-2 text-[var(--text-secondary)] text-xs mt-0.5 truncate">
+                      <FileText className="h-3 w-3 shrink-0" />
+                      <span className="truncate">{job.company}</span>
+                    </div>
+                    <span className={`inline-block mt-1 px-2 py-0.5 rounded text-[10px] font-bold border tracking-wider ${
+                      job.status === 'SAVED' ? 'bg-gray-500/10 text-gray-400 border-gray-500/20' :
+                      job.status === 'TAILORING' ? 'bg-purple-500/10 text-purple-400 border-purple-500/20' :
+                      'bg-[var(--primary)]/10 text-[var(--primary)] border-[var(--primary)]/20'
+                    }`}>
+                      {job.status.replace("_", " ")}
+                    </span>
+                  </div>
+                  <div className="shrink-0">
+                    {generatingId === job.id ? (
+                      <button disabled className="flex items-center gap-1.5 bg-[var(--primary)]/50 text-white px-3 py-2 rounded-lg text-xs font-bold">
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        <span>Loading...</span>
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => handleGenerate(job.id)}
+                        className="flex items-center gap-1.5 bg-[var(--primary)] text-[var(--background)] hover:bg-[var(--foreground)] hover:text-[var(--background)] px-3 py-2 rounded-lg text-xs font-bold transition-all shadow-md"
+                      >
+                        <Zap className="h-3.5 w-3.5 fill-current" />
+                        AI Studio
+                      </button>
+                    )}
                   </div>
                 </div>
 
-                {/* 2. Status Badge */}
-                <div className="col-span-3">
-                  <span className={`px-2 py-0.5 rounded text-[10px] font-bold border tracking-wider ${job.status === 'SAVED' ? 'bg-gray-500/10 text-gray-400 border-gray-500/20' :
-                    job.status === 'TAILORING' ? 'bg-purple-500/10 text-purple-400 border-purple-500/20' :
+                {/* Desktop table row */}
+                <div className="hidden md:grid grid-cols-12 gap-4 px-4 py-2.5 items-center">
+                  {/* 1. Job Details */}
+                  <div className="col-span-5 min-w-0">
+                    <h3 className="font-bold text-[var(--foreground)] text-sm group-hover:text-[var(--primary)] transition-colors truncate" title={job.jobTitle}>
+                      {job.jobTitle}
+                    </h3>
+                    <div className="flex items-center gap-2 text-[var(--text-secondary)] text-xs mt-1 truncate" title={job.company}>
+                      <FileText className="h-3 w-3 shrink-0" /> <span className="truncate">{job.company}</span>
+                    </div>
+                  </div>
+                  {/* 2. Status Badge */}
+                  <div className="col-span-3">
+                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold border tracking-wider ${
+                      job.status === 'SAVED' ? 'bg-gray-500/10 text-gray-400 border-gray-500/20' :
+                      job.status === 'TAILORING' ? 'bg-purple-500/10 text-purple-400 border-purple-500/20' :
                       'bg-[var(--primary)]/10 text-[var(--primary)] border-[var(--primary)]/20'
                     }`}>
-                    {job.status.replace("_", " ")}
-                  </span>
-                </div>
-
-                {/* 3. Date */}
-                <div className="col-span-2 text-sm text-[var(--text-secondary)]">
-                  {new Date(job.createdAt).toLocaleDateString()}
-                </div>
-
-                {/* 4. Action Button */}
-                <div className="col-span-2 flex justify-end">
-                  {generatingId === job.id ? (
-                    <button disabled className="flex items-center gap-1.5 bg-[var(--primary)]/50 text-white px-3 py-1.5 rounded-md text-xs font-bold">
-                      <Loader2 className="h-3 w-3 animate-spin" />
-                      Processing...
-                    </button>
-                  ) : (
-                    <button
-                      onClick={() => handleGenerate(job.id)}
-                      data-tour="ai-studio"
-                      className="flex items-center gap-1.5 bg-[var(--primary)] text-[var(--background)] hover:bg-[var(--foreground)] hover:text-[var(--background)] px-3 py-1.5 rounded-md text-xs font-bold transition-all shadow-md hover:shadow-lg"
-                    >
-                      <Zap className="h-3 w-3 fill-current" />
-                      AI Studio
-                    </button>
-                  )}
+                      {job.status.replace("_", " ")}
+                    </span>
+                  </div>
+                  {/* 3. Date */}
+                  <div className="col-span-2 text-sm text-[var(--text-secondary)]">
+                    {new Date(job.createdAt).toLocaleDateString()}
+                  </div>
+                  {/* 4. Action Button */}
+                  <div className="col-span-2 flex justify-end">
+                    {generatingId === job.id ? (
+                      <button disabled className="flex items-center gap-1.5 bg-[var(--primary)]/50 text-white px-3 py-1.5 rounded-md text-xs font-bold">
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                        Processing...
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => handleGenerate(job.id)}
+                        data-tour="ai-studio"
+                        className="flex items-center gap-1.5 bg-[var(--primary)] text-[var(--background)] hover:bg-[var(--foreground)] hover:text-[var(--background)] px-3 py-1.5 rounded-md text-xs font-bold transition-all shadow-md hover:shadow-lg"
+                      >
+                        <Zap className="h-3 w-3 fill-current" />
+                        AI Studio
+                      </button>
+                    )}
+                  </div>
                 </div>
 
               </div>
