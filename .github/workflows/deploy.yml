@@ -1,9 +1,9 @@
-name: Deploy to VPS
+name: Smart Deploy to VPS
 
 on:
   push:
     branches:
-      - deploy
+      - Deploy
 
 jobs:
   deploy:
@@ -16,16 +16,71 @@ jobs:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VIGNOVA_VPS }}
+          timeout: 30m
           script: |
             cd /www/wwwroot/Vignova
 
-            echo "Pulling latest code..."
-            git pull origin deploy
+            echo "Saving current version..."
+            PREV_COMMIT=$(git rev-parse HEAD)
 
-            echo "Rebuilding containers..."
-            docker-compose down
-            docker-compose build --no-cache
-            docker-compose up -d
+            echo "Fetching latest Deploy branch..."
+            git fetch origin Deploy
+            git reset --hard origin/Deploy
 
-            echo "Cleaning old images..."
-            docker system prune -f
+            NEW_COMMIT=$(git rev-parse HEAD)
+            echo "Was: $PREV_COMMIT"
+            echo "Now: $NEW_COMMIT"
+
+            echo "Detecting changed services..."
+
+            CHANGED=$(git diff --name-only $PREV_COMMIT $NEW_COMMIT)
+
+            REBUILD_LANDING=false
+            REBUILD_DASHBOARD=false
+            REBUILD_BACKEND=false
+
+            echo "$CHANGED" | grep -q "LandingCode" && REBUILD_LANDING=true
+            echo "$CHANGED" | grep -q "resume-saas-v4" && REBUILD_DASHBOARD=true
+            echo "$CHANGED" | grep -q "Backend" && REBUILD_BACKEND=true
+
+            echo "Changes detected:"
+            echo "Landing: $REBUILD_LANDING"
+            echo "Dashboard: $REBUILD_DASHBOARD"
+            echo "Backend: $REBUILD_BACKEND"
+
+            if [ "$REBUILD_LANDING" = false ] && [ "$REBUILD_DASHBOARD" = false ] && [ "$REBUILD_BACKEND" = false ]; then
+              echo "⚠️ No service directories changed — nothing to rebuild."
+              echo "Changed files were:"
+              echo "$CHANGED"
+              exit 0
+            fi
+
+            echo "Deploying..."
+
+            if [ "$REBUILD_LANDING" = true ]; then
+              docker compose up -d --build landing
+            fi
+
+            if [ "$REBUILD_DASHBOARD" = true ]; then
+              docker compose up -d --build dashboard
+            fi
+
+            if [ "$REBUILD_BACKEND" = true ]; then
+              docker compose up -d --build backend
+            fi
+
+            echo "Running health check..."
+
+            sleep 15
+
+            if ! curl -sf http://127.0.0.1:3000 > /dev/null 2>&1; then
+              echo "❌ Dashboard health check failed! Rolling back..."
+              git reset --hard $PREV_COMMIT
+              docker compose up -d --build dashboard
+              exit 1
+            fi
+
+            echo "✅ Deployment successful!"
+
+            echo "Cleaning unused images..."
+            docker image prune -f

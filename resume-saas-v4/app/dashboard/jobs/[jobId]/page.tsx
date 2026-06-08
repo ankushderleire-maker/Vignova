@@ -178,9 +178,18 @@ function ResumeStudioPageContent() {
         setIsGenerating(true);
 
         try {
-            // 1. Deduct Credit
-            const creditRes = await fetch("/api/credits/deduct", { method: "POST" });
-            if (creditRes.status === 403) {
+            // Single atomic call: checks credits, calls backend, deducts only on success
+            const response = await fetch("/api/resume/generate", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    jobDescription: currentJob.description,
+                    masterProfile: currentProfile,
+                    atsReport: atsReport
+                }),
+            });
+
+            if (response.status === 403) {
                 setDialogConfig({
                     isOpen: true,
                     type: 'alert',
@@ -192,23 +201,6 @@ function ResumeStudioPageContent() {
                 setIsGenerating(false);
                 return;
             }
-
-            // 2. Generate
-            console.log("SENDING TO BACKEND:", {
-                jobDescription: currentJob.description,
-                masterProfile: "Skipped Logging (Too Large)",
-                hasAtsReport: !!atsReport
-            });
-
-            const response = await fetch("http://localhost:8000/api/generate-tailored-resume", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    jobDescription: currentJob.description,
-                    masterProfile: currentProfile,
-                    atsReport: atsReport
-                }),
-            });
 
             if (!response.ok) throw new Error("Failed to generate resume");
 

@@ -35,11 +35,7 @@ export default function SettingsPage() {
 
     return (
         <div className="p-8 max-w-5xl mx-auto text-[var(--foreground)] animate-slide-down">
-            <h1 className="text-3xl font-bold mb-2 flex items-center gap-3 text-[var(--foreground)]">
-                <Palette className="h-8 w-8 text-[var(--primary)]" />
-                Appearance
-            </h1>
-            <p className="text-[var(--text-secondary)] mb-8">Customize how Vignova looks for you.</p>
+
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 {themes.map((t) => (

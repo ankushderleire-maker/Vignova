@@ -1,63 +1,35 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/lib/db";
+import { callBackend } from "@/lib/career-ops";
 
-// GET /api/find-jobs?search=&location=&page=1&limit=20
 export async function GET(req: NextRequest) {
-    try {
-        const { searchParams } = new URL(req.url);
-        const search = searchParams.get("search")?.trim() || "";
-        const location = searchParams.get("location")?.trim() || "";
-        const page = Math.max(1, parseInt(searchParams.get("page") || "1"));
-        const limit = Math.min(50, Math.max(1, parseInt(searchParams.get("limit") || "20")));
-        const skip = (page - 1) * limit;
+    const { searchParams } = new URL(req.url);
 
-        // Build where clause
-        const where: any = {};
+    const title = searchParams.get("title")?.trim() || searchParams.get("search")?.trim() || "";
+    const location = searchParams.get("location")?.trim() || "";
+    const experience = searchParams.get("experience")?.trim() || "";
+    const days = searchParams.get("days")?.trim() || "";
+    const page = searchParams.get("page")?.trim() || "1";
+    const limit = searchParams.get("limit")?.trim() || "20";
 
-        if (search) {
-            where.OR = [
-                { title: { contains: search, mode: "insensitive" } },
-                { company: { contains: search, mode: "insensitive" } },
-            ];
-        }
-
-        if (location) {
-            where.location = { contains: location, mode: "insensitive" };
-        }
-
-        // Query jobs + total in parallel
-        const [jobs, total] = await Promise.all([
-            db.jobs.findMany({
-                where,
-                select: {
-                    id: true,
-                    title: true,
-                    company: true,
-                    location: true,
-                    description: true,
-                    apply_url: true,
-                    source: true,
-                    date_posted: true,
-                },
-                orderBy: { date_posted: "desc" },
-                skip,
-                take: limit,
-            }),
-            db.jobs.count({ where }),
-        ]);
-
-        return NextResponse.json({
-            jobs,
-            total,
+    const result = await callBackend("/jobs", {
+        method: "GET",
+        query: {
+            title,
+            location,
+            experience,
+            days,
             page,
             limit,
-            totalPages: Math.ceil(total / limit),
-        });
-    } catch (error) {
-        console.error("[FIND_JOBS_GET]", error);
+        },
+        timeoutMs: 15000,
+    });
+
+    if (!result.ok || !result.data) {
         return NextResponse.json(
-            { error: "Failed to fetch jobs" },
-            { status: 500 }
+            { error: result.error || "Failed to fetch jobs" },
+            { status: result.status || 500 }
         );
     }
+
+    return NextResponse.json(result.data);
 }

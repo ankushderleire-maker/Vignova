@@ -1,41 +1,25 @@
-"use client";
-
-import React from "react";
-import { useSession } from "next-auth/react";
-import { useRouter } from "next/navigation";
+import { redirect } from "next/navigation";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { db } from "@/lib/db";
 import { AdminSidebar } from "@/components/admin/AdminSidebar";
 import { AdminHeader } from "@/components/admin/AdminHeader";
-import { Loader2, ShieldAlert } from "lucide-react";
 
-export default function AdminLayout({ children }: { children: React.ReactNode }) {
-    const { data: session, status } = useSession();
-    const router = useRouter();
+export default async function AdminLayout({ children }: { children: React.ReactNode }) {
+    const session = await getServerSession(authOptions);
 
-    if (status === "loading") {
-        return (
-            <div className="flex items-center justify-center min-h-screen bg-black">
-                <Loader2 className="w-8 h-8 animate-spin text-red-500" />
-            </div>
-        );
+    if (!session?.user?.email) {
+        redirect("/login");
     }
 
-    // @ts-ignore - role is added via custom NextAuth callbacks
-    const role = session?.user?.role;
+    // DB-authoritative role check — not trusting client-visible session
+    const user = await db.users.findUnique({
+        where: { email: session.user.email },
+        select: { role: true },
+    });
 
-    if (role !== "ADMIN") {
-        return (
-            <div className="flex flex-col items-center justify-center min-h-screen bg-black gap-4">
-                <ShieldAlert className="w-16 h-16 text-red-500" />
-                <h1 className="text-2xl font-bold text-white">Access Denied</h1>
-                <p className="text-gray-400">You do not have admin privileges.</p>
-                <button
-                    onClick={() => router.push("/dashboard")}
-                    className="mt-4 px-6 py-2 bg-white/10 border border-white/10 rounded-lg text-white hover:bg-white/20 transition-all"
-                >
-                    Go to Dashboard
-                </button>
-            </div>
-        );
+    if (user?.role !== "ADMIN") {
+        redirect("/dashboard");
     }
 
     return (

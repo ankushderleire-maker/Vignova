@@ -1,9 +1,59 @@
+# ---------- Virtualenvs / deps ----------
 venv/
-**/*/venv/
 **/venv/
+.venv/
+**/.venv/
 node_modules/
 **/node_modules/
+
+# ---------- Build output ----------
 .next/
 **/.next/
+dist/
+**/dist/
+build/
+**/build/
+tsconfig.tsbuildinfo
+**/tsconfig.tsbuildinfo
+
+# ---------- Secrets ----------
+# Real env files — NEVER commit. The *.example files ARE committed.
 .env
+.env.*
+!.env.example
 **/.env
+**/.env.*
+!**/.env.example
+
+# ---------- Python ----------
+__pycache__/
+**/__pycache__/
+*.py[cod]
+*.class
+*.egg-info/
+
+# ---------- Logs / OS ----------
+*.log
+**/*.log
+.DS_Store
+Thumbs.db
+
+# ---------- App data ----------
+Backend/Full_Backend/data/*.json
+
+# ---------- Per-session / local artefacts ----------
+check_db.*
+db_output.json
+lint_*.txt
+lint_check.*
+test-*.js
+test-*.txt
+output.html
+*.out
+
+# ---------- Not shipped in this repo ----------
+Browser_Extension/
+
+# ---------- Let's Encrypt / certbot ----------
+letsencrypt/
+certbot-webroot/

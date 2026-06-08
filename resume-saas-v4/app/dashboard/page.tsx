@@ -65,7 +65,7 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="space-y-4 max-w-7xl mx-auto p-4 animate-slide-down">
+    <div id="tour-dashboard" className="space-y-4 max-w-7xl mx-auto p-4 animate-slide-down">
       {/* Stats Graph */}
       {stats && (
         <StatsGraph
@@ -76,7 +76,7 @@ export default function DashboardPage() {
       )}
 
       {/* Stat Cards Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div id="tour-dashboard-stats" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatCard
           title="Total Resumes Created"
           count={stats?.totalResumes || 0}

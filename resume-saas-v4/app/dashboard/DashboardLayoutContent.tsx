@@ -4,6 +4,7 @@ import React from "react";
 import { usePathname } from "next/navigation";
 import { Sidebar } from "@/components/Sidebar";
 import { Header } from "@/components/Header";
+import { OnboardingTour } from "@/components/OnboardingTour";
 
 export default function DashboardLayoutContent({
     children,
@@ -16,6 +17,7 @@ export default function DashboardLayoutContent({
     // Matches: /dashboard/jobs/[jobId]
     // Excludes: /dashboard/jobs (the list page)
     const isStudio = pathname.startsWith("/dashboard/jobs/") && pathname.split("/").length > 3;
+    const isInterview = pathname === "/dashboard/interview-prep";
 
     if (isStudio) {
         return (
@@ -57,6 +59,9 @@ export default function DashboardLayoutContent({
                     </div>
                 </main>
             </div>
+
+            {/* Onboarding Tour (first-time users only) */}
+            <OnboardingTour />
         </div>
     );
 }

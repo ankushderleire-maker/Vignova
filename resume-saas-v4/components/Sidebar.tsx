@@ -15,7 +15,9 @@ import {
   Sparkles,
   Chrome,
   FileText,
-  ScanLine
+  ScanLine,
+  Mic,
+  Linkedin
 } from "lucide-react";
 
 const navigationGroups = [
@@ -29,6 +31,7 @@ const navigationGroups = [
     label: "Resumes & Profiles",
     items: [
       { name: "Master Profile", href: "/dashboard/profile", icon: UserCircle },
+      { name: "LinkedIn Optimizer", href: "/dashboard/linkedin-optimizer", icon: Linkedin, isNew: true },
       { name: "Resume Generator", href: "/dashboard/generator", icon: Zap, isPro: true },
       { name: "Saved Resumes", href: "/dashboard/resumes", icon: History },
       { name: "Cover Letter", href: "/dashboard/cover-letter", icon: FileText },
@@ -40,6 +43,13 @@ const navigationGroups = [
       { name: "Job Tracker", href: "/dashboard/jobs", icon: Briefcase },
       { name: "ATS Score", href: "/dashboard/ats-score", icon: ScanLine, isNew: true },
       { name: "Find Jobs", href: "/dashboard/find-jobs", icon: Search, isNew: true },
+      { name: "Job Scrapper", href: "/dashboard/job-scrapper", icon: Sparkles, isNew: true },
+    ],
+  },
+  {
+    label: "Interview",
+    items: [
+      { name: "Interview Prep", href: "/dashboard/interview-prep", icon: Mic, isPro: true },
     ],
   },
   {
@@ -59,10 +69,10 @@ export function Sidebar() {
       <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-[var(--primary)]/10 to-transparent pointer-events-none" />
 
       {/* Logo Area */}
-      <div className="flex h-16 items-center px-6 bg-[var(--sidebar-bg)]/50 backdrop-blur-md z-10">
+      <div className="flex h-16 items-center px-6 bg-[#000000] border-b border-white/10 z-10">
         <div className="flex items-end">
           <img src="/logo.png" alt="Vignova Logo" width={40} height={40} className="w-10 h-10 object-contain" />
-          <span className="text-lg font-bold text-[var(--foreground)] tracking-tight -ml-1.5 mb-0.5">VIGNOVA</span>
+          <span className="text-lg font-bold text-white tracking-tight -ml-1.5 mb-0.5">VIGNOVA</span>
         </div>
       </div>
 

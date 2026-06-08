@@ -15,6 +15,10 @@ model users {
   role          String   @default("USER") // USER | ADMIN
   created_at    DateTime @default(now())
 
+  // Password Reset
+  resetToken       String?
+  resetTokenExpiry DateTime?
+
   // Relations
   subscriptions   subscriptions[]
   master_profiles master_profiles[]
@@ -23,9 +27,18 @@ model users {
   job_applications  JobApplication[]
   generated_resumes GeneratedResume[]
   payments          Payment[]
+  linkedin_analyses LinkedInAnalysis[]
+  saved_interviews  SavedInterview[]
+
+  // Job Scanner history
+  scan_jobs            ScanJob[]
+  created_jobs         jobs[] @relation("JobCreatedBy")
 
   // Extension Settings
   extensionSettings Json?    @default("{}") // Stores template preferences: { mode: "specific"|"random" | "curated", templateId: string, templateIds: string[] }
+
+  // Onboarding
+  onboarding_done Boolean @default(false)
 }
 
 model Payment {
@@ -107,17 +120,18 @@ model JobApplication {
   updatedAt   DateTime @updatedAt
 
   // Chrome Extension Support
-  source      String   @default("manual") // "manual" | "extension"
+  source      String   @default("manual") // "manual" | "extension" | "scan"
   sourceUrl   String?  // Original job posting URL from extension
 
   // FIXED: Changed 'User' to 'users' to match your model name
   user users @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   // Relation to generated resumes for this job
-  generatedResumes GeneratedResume[]
+  generatedResumes    GeneratedResume[]
 
   @@index([userId])
   @@index([source])
+  @@index([status])
 }
 
 model GeneratedResume {
@@ -173,20 +187,113 @@ model plan_configs {
   updated_at           DateTime @updatedAt
 }
 
-// --- PUBLIC JOB LISTINGS (populated by Python cron worker) ---
+// --- PUBLIC JOB LISTINGS (populated by Python scan worker) ---
 model jobs {
-  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  title       String
-  company     String
-  location    String?
-  description String?   @db.Text
-  apply_url   String?
-  source      String?
-  date_posted DateTime?
-  created_at  DateTime  @default(now())
+  id                  String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  title               String
+  company             String
+  location            String?
+  location_normalized String?
+  description         String?   @db.Text
+  apply_url           String?
+  source              String?
+  source_type         String?   @db.VarChar(64)
+  experience_level    String?   @db.VarChar(32)
+  job_hash            String?   @unique
+  created_by_user_id  String?   @db.Uuid
+  scraped_at          DateTime?
+  date_posted         DateTime?
+  // Fields written by the Python /api/scan ingest path. Keep these in sync
+  // with Backend/Full_Backend/app/routes/scan.py insert_jobs_batch().
+  remote              Boolean   @default(false)
+  salary_min          Int?
+  salary_max          Int?
+  employment_type     String?   @db.VarChar(50)
+  created_at          DateTime  @default(now())
+
+  created_by_user users? @relation("JobCreatedBy", fields: [created_by_user_id], references: [id], onDelete: SetNull)
 
   @@unique([title, company, location])
   @@index([title])
   @@index([location])
+  @@index([location_normalized])
   @@index([company])
+  @@index([experience_level])
+  @@index([source])
+  @@index([date_posted])
+  @@index([created_by_user_id])
+}
+
+// ---------------------------------------------------------------
+// Scan: per-user scan history (what was triggered, with what filters, and outcome)
+// ---------------------------------------------------------------
+model ScanJob {
+  id             String    @id @default(cuid())
+  userId         String    @map("user_id") @db.Uuid
+  sources        String[]  @default([])  // ["lever","greenhouse","ashby","workable","wellfound","indeed","linkedin","naukri","shine","irishjobs"]
+  companies      String[]  @default([])  // optional user-provided companies
+  keywords       String[]  @default([])
+  locations      String[]  @default([])
+  status         String    @default("PENDING")  // PENDING | RUNNING | DONE | FAILED
+  jobsFetched    Int       @default(0)  @map("jobs_fetched")
+  jobsInserted   Int       @default(0)  @map("jobs_inserted")
+  duplicates     Int       @default(0)
+  errors         Int       @default(0)
+  errorMessage   String?   @db.Text     @map("error_message")
+  startedAt      DateTime?              @map("started_at")
+  completedAt    DateTime?              @map("completed_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+
+  user users @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Python backend reads/writes this table directly via raw SQL, so we
+  // pin the table name to the snake_case form its /api/scan endpoint uses.
+  @@map("scan_jobs")
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model SourceRegistry {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  company_name String
+  ats_type     String    @db.VarChar(64)
+  endpoint_url String    @unique
+  priority     Int       @default(100)
+  last_scraped DateTime?
+  active       Boolean   @default(true)
+
+  @@map("sources")
+  @@index([ats_type])
+  @@index([active, priority])
+}
+
+model LinkedInAnalysis {
+  id               String   @id @default(cuid())
+  userId           String   @db.Uuid
+  linkedinUrl      String
+  overallScore     Float?
+  sectionScores    Json?
+  recommendations  Json?
+  optimizedContent Json?
+  rawProfileData   Json?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  user users @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model SavedInterview {
+  id        String   @id @default(cuid())
+  userId    String   @db.Uuid
+  jobId     String?
+  source    String   // "profile" | "job"
+  questions Json     // Stores the generated questions and hints
+  createdAt DateTime @default(now())
+
+  user users @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }

@@ -90,35 +90,11 @@ export default function ExtensionPage() {
 
     const hasAccess = subscription?.has_extension_access || subscription?.plan_type === "PRO" || subscription?.plan_type === "PREMIUM";
 
-    if (!hasAccess) {
-        return (
-            <div className="max-w-4xl mx-auto p-6">
-                <div className="bg-[var(--sidebar-bg)] border border-[var(--border-color)] rounded-xl p-8 text-center space-y-4">
-                    <div className="w-16 h-16 bg-[var(--primary)]/10 rounded-full flex items-center justify-center mx-auto">
-                        <Chrome className="w-8 h-8 text-[var(--primary)]" />
-                    </div>
-                    <h2 className="text-2xl font-bold">Extension Access Required</h2>
-                    <p className="text-[var(--foreground)]/70 max-w-lg mx-auto">
-                        Upgrade to Pro or Premium to unlock the browser extension and tailor resumes directly from LinkedIn and Indeed.
-                    </p>
-                    <Link href="/dashboard/billing" className="inline-block bg-[var(--primary)] text-white px-6 py-2 rounded-lg font-medium hover:opacity-90 transition-opacity">
-                        Upgrade Plan
-                    </Link>
-                </div>
-            </div>
-        );
-    }
+    // Removed early block - we overlay the settings instead so they can download the extension
 
     return (
         <div className="max-w-5xl mx-auto p-6 space-y-8 animate-fade-in">
-            <header>
-                <h1 className="text-3xl font-bold mb-2 flex items-center gap-3">
-                    <Chrome className="text-[var(--primary)]" /> Browser Extension
-                </h1>
-                <p className="text-[var(--foreground)]/70">
-                    Manage your extension settings and resume generation preferences.
-                </p>
-            </header>
+
 
             {/* Download Section */}
             <section className="bg-[var(--sidebar-bg)] border border-[var(--border-color)] rounded-xl p-6 flex flex-col md:flex-row items-center justify-between gap-6">
@@ -129,14 +105,30 @@ export default function ExtensionPage() {
                         <br /><span className="text-xs opacity-70">Currently available for Chrome, Brave, and Edge.</span>
                     </p>
                 </div>
-                <button className="flex items-center gap-2 bg-[var(--primary)] text-white px-6 py-3 rounded-lg font-bold hover:opacity-90 transition-all shadow-lg hover:shadow-[var(--primary)]/20 active:scale-95">
+                <button id="tour-download-ext" className="flex items-center gap-2 bg-[var(--primary)] text-white px-6 py-3 rounded-lg font-bold hover:opacity-90 transition-all shadow-lg hover:shadow-[var(--primary)]/20 active:scale-95">
                     <Download className="w-5 h-5" />
                     Download Extension
                 </button>
             </section>
 
             {/* Settings Section */}
-            <section className="space-y-6">
+            <section className="space-y-6 relative">
+                {!hasAccess && (
+                    <div className="absolute inset-0 z-10 backdrop-blur-[3px] bg-[var(--background)]/40 rounded-xl flex items-center justify-center border border-[var(--border-color)]">
+                        <div className="bg-[var(--sidebar-bg)] border border-[var(--primary)]/30 rounded-xl p-8 text-center shadow-2xl max-w-sm mx-auto">
+                            <div className="w-16 h-16 bg-[var(--primary)]/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                                <Chrome className="w-8 h-8 text-[var(--primary)]" />
+                            </div>
+                            <h2 className="text-xl font-bold mb-3">Upgrade Plan to Unlock More</h2>
+                            <p className="text-[var(--foreground)]/70 mb-6 text-sm">
+                                Auto-tailoring resumes directly from LinkedIn and Indeed requires a Pro or Premium plan.
+                            </p>
+                            <Link href="/dashboard/billing" className="inline-block w-full bg-[var(--primary)] text-white px-6 py-2.5 rounded-lg font-medium hover:opacity-90 transition-opacity">
+                                Upgrade Plan
+                            </Link>
+                        </div>
+                    </div>
+                )}
                 <div className="flex items-center justify-between">
                     <h3 className="text-xl font-semibold flex items-center gap-2">
                         <LayoutTemplate className="w-5 h-5 text-[var(--primary)]" />

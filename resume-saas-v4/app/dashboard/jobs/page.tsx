@@ -183,6 +183,7 @@ export default function JobTrackerPage() {
       {/* --- ADD JOB BUTTON --- */}
       <div className="flex justify-end shrink-0">
         <button
+          id="tour-add-job"
           onClick={openAddModal}
           className="flex items-center gap-2 bg-[var(--primary)] hover:bg-[var(--primary)]/90 text-white px-5 py-2.5 rounded-lg transition shadow-lg shadow-[var(--primary)]/20 font-medium text-sm"
         >
@@ -205,7 +206,7 @@ export default function JobTrackerPage() {
         </div>
 
         {/* View Toggle */}
-        <div className="flex bg-[var(--sidebar-bg)] border border-[var(--border-color)] rounded-lg p-1 shrink-0">
+        <div id="tour-job-views" className="flex bg-[var(--sidebar-bg)] border border-[var(--border-color)] rounded-lg p-1 shrink-0">
           <button
             onClick={() => handleViewModeChange('board')}
             className={`px-3 py-1.5 rounded-md flex items-center gap-2 text-xs font-medium transition ${viewMode === 'board' ? 'bg-[var(--primary)] text-white shadow' : 'text-[var(--text-secondary)] hover:text-[var(--foreground)]'}`}

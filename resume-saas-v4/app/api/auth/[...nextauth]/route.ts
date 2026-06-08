@@ -1,11 +1,21 @@
 import NextAuth, { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
+import GoogleProvider from "next-auth/providers/google";
+import LinkedInProvider from "next-auth/providers/linkedin";
 import { db } from "@/lib/db"; // CHANGED: Importing 'db' instead of 'prisma'
 import bcrypt from "bcryptjs";
 
 export const authOptions: NextAuthOptions = {
   // Configure one or more authentication providers
   providers: [
+    GoogleProvider({
+      clientId: process.env.GOOGLE_CLIENT_ID || "",
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET || "",
+    }),
+    LinkedInProvider({
+      clientId: process.env.LINKEDIN_CLIENT_ID || "",
+      clientSecret: process.env.LINKEDIN_CLIENT_SECRET || "",
+    }),
     CredentialsProvider({
       name: "Credentials",
       credentials: {
@@ -57,11 +67,44 @@ export const authOptions: NextAuthOptions = {
     signIn: "/login",
   },
   callbacks: {
-    async jwt({ token, user }) {
+    async signIn({ user, account, profile }) {
+      if (account?.provider === "google" || account?.provider === "linkedin") {
+        if (!user.email) return false;
+        
+        let dbUser = await db.users.findUnique({
+          where: { email: user.email },
+        });
+
+        if (!dbUser) {
+          const randomPassword = Math.random().toString(36).slice(-8) + Math.random().toString(36).slice(-8);
+          const hashedPassword = await bcrypt.hash(randomPassword, 10);
+          
+          dbUser = await db.users.create({
+            data: {
+              email: user.email,
+              full_name: user.name || "User",
+              password_hash: hashedPassword,
+              role: "USER"
+            }
+          });
+        }
+      }
+      return true;
+    },
+    async jwt({ token, user, account }) {
       if (user) {
-        token.id = user.id;
-        // @ts-ignore
-        token.role = user.role;
+        if (account?.provider === "google" || account?.provider === "linkedin") {
+           const dbUser = await db.users.findUnique({ where: { email: user.email! } });
+           if (dbUser) {
+             token.id = dbUser.id;
+             // @ts-ignore
+             token.role = dbUser.role;
+           }
+        } else {
+          token.id = user.id;
+          // @ts-ignore
+          token.role = user.role;
+        }
       }
       return token;
     },
@@ -69,8 +112,7 @@ export const authOptions: NextAuthOptions = {
       if (session.user) {
         // @ts-ignore
         session.user.id = token.id as string;
-        // @ts-ignore
-        session.user.role = token.role as string;
+        // role intentionally omitted — admin checks query the DB server-side
       }
       return session;
     },

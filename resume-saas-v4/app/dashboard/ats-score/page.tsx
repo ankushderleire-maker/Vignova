@@ -352,7 +352,7 @@ function AtsScoreContent() {
             setLastResumeText(usedResumeText);
             setLastJdText(selectedJob.description);
 
-            const response = await fetch("http://localhost:8000/api/calculate-ats", { method: "POST", body: formData });
+            const response = await fetch("/api/python/calculate-ats", { method: "POST", body: formData });
             if (!response.ok) throw new Error(await response.text());
             const data = await response.json();
             setResult(data);
@@ -381,7 +381,7 @@ function AtsScoreContent() {
             formData.append("resume_text", lastResumeText);
             formData.append("ats_scores", JSON.stringify(atsResult));
 
-            const res = await fetch("http://localhost:8000/api/enhance-ats-report", { method: "POST", body: formData });
+            const res = await fetch("/api/python/enhance-ats-report", { method: "POST", body: formData });
             if (!res.ok) throw new Error(await res.text());
             setAiReport(await res.json());
             fetchSubscription();
@@ -468,16 +468,7 @@ function AtsScoreContent() {
         <div className="w-full max-w-7xl mx-auto min-h-[calc(100vh-120px)] flex flex-col space-y-6 animate-slide-down">
 
             {/* Page Header */}
-            <div className="flex items-center justify-between shrink-0">
-                <div className="flex items-center gap-3">
-                    <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-blue-500/10 border border-blue-500/20">
-                        <ScanLine className="w-5 h-5 text-blue-500" />
-                    </div>
-                    <div>
-                        <h1 className="text-xl font-bold text-[var(--foreground)] tracking-tight">ATS Score Analysis</h1>
-                        <p className="text-xs text-[var(--text-secondary)]">Deep resume analysis powered by local AI models</p>
-                    </div>
-                </div>
+            <div className="flex items-center justify-end shrink-0">
 
                 <div className="flex items-center gap-3">
                     {step === "result" && (
@@ -501,7 +492,7 @@ function AtsScoreContent() {
             {/* ─── SETUP STEP ─── */}
             {
                 step === "setup" && (
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div id="tour-ats-setup" className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                         {/* LEFT: JD Selection */}
                         <div className="bg-[var(--sidebar-bg)]/50 border border-[var(--border-color)] rounded-xl p-6 shadow-xl space-y-5">
                             <div>
@@ -588,7 +579,7 @@ function AtsScoreContent() {
                             )}
 
                             <div className="mt-auto pt-4">
-                                <button onClick={handleRunAnalysis} disabled={!selectedJobId || (resumeSource === "saved" && !selectedResumeId) || (resumeSource === "upload" && !uploadFile)} className="w-full flex items-center justify-center gap-2 bg-[var(--primary)] hover:bg-[var(--primary)]/90 text-white px-5 py-3 rounded-xl transition shadow-lg shadow-[var(--primary)]/20 font-medium text-sm disabled:opacity-40 disabled:cursor-not-allowed">
+                                <button id="tour-run-ats" onClick={handleRunAnalysis} disabled={!selectedJobId || (resumeSource === "saved" && !selectedResumeId) || (resumeSource === "upload" && !uploadFile)} className="w-full flex items-center justify-center gap-2 bg-[var(--primary)] hover:bg-[var(--primary)]/90 text-white px-5 py-3 rounded-xl transition shadow-lg shadow-[var(--primary)]/20 font-medium text-sm disabled:opacity-40 disabled:cursor-not-allowed">
                                     <ScanLine className="h-4 w-4" /> Run ATS Analysis
                                 </button>
                             </div>

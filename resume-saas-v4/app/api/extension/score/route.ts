@@ -115,11 +115,9 @@ export async function POST(req: Request) {
         console.log(`[EXTENSION_SCORE] Sending to Python: Profile Len=${userProfile.length}, JD Len=${jobDescription.length}, Skills=${userSkillsArray.length}`);
 
         // Call Python Backend
-        // Assuming backend runs on port 8000 locally
-        // In production, this would be an ENV variable
-        const PYTHON_API_URL = process.env.PYTHON_API_URL || "http://localhost:8000";
+        const AI_BACKEND_URL = process.env.AI_BACKEND_URL || "http://localhost:8000";
 
-        const scoreRes = await fetch(`${PYTHON_API_URL}/api/score-job`, {
+        const scoreRes = await fetch(`${AI_BACKEND_URL}/api/score-job`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -144,6 +142,6 @@ export async function POST(req: Request) {
 
     } catch (error) {
         console.error("[EXTENSION_SCORE]", error);
-        return withCors(NextResponse.json({ error: "Failed to connect to AI scoring service. Ensure Python backend is running." }, { status: 500 }));
+        return withCors(NextResponse.json({ error: "Failed to connect to AI scoring service. " }, { status: 500 }));
     }
 }

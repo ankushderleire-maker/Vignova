@@ -58,7 +58,7 @@ export function AtsScoreModal({ isOpen, onClose, siteResumeText }: AtsScoreModal
     const fetchJds = async () => {
         setIsFetchingJds(true);
         try {
-            const res = await fetch("http://localhost:8000/api/saved-jds");
+            const res = await fetch("/api/python/saved-jds");
             if (res.ok) {
                 const data = await res.json();
                 setJds(data.data || []);
@@ -99,7 +99,7 @@ export function AtsScoreModal({ isOpen, onClose, siteResumeText }: AtsScoreModal
                 formData.append("resume_file", uploadFile);
             }
 
-            const response = await fetch("http://localhost:8000/api/calculate-ats", {
+            const response = await fetch("/api/python/calculate-ats", {
                 method: "POST",
                 body: formData,
             });

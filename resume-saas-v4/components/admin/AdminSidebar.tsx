@@ -10,14 +10,16 @@ import {
     ArrowLeft,
     Shield,
     Package,
+    Gauge,
 } from "lucide-react";
 
 const adminNav = [
-    { name: "Overview", href: "/admin", icon: LayoutDashboard },
-    { name: "Users", href: "/admin/users", icon: Users },
-    { name: "Plans", href: "/admin/plans", icon: Package },
-    { name: "Payments", href: "/admin/payments", icon: CreditCard },
-    { name: "Analytics", href: "/admin/analytics", icon: BarChart3 },
+    { name: "Overview",      href: "/admin",               icon: LayoutDashboard },
+    { name: "Users",         href: "/admin/users",         icon: Users },
+    { name: "Plans",         href: "/admin/plans",         icon: Package },
+    { name: "Payments",      href: "/admin/payments",      icon: CreditCard },
+    { name: "Analytics",     href: "/admin/analytics",     icon: BarChart3 },
+    { name: "Scan Controls", href: "/admin/scan-controls", icon: Gauge },
 ];
 
 export function AdminSidebar() {

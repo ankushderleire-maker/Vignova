@@ -1,0 +1,56 @@
+# ---------- SCM / metadata ----------
+.git
+.gitignore
+.github
+
+# ---------- Secrets (never copy into build context) ----------
+.env
+.env.*
+!.env.example
+**/.env
+**/.env.*
+!**/.env.example
+
+# ---------- Deps / build outputs ----------
+node_modules
+**/node_modules
+.next
+**/.next
+dist
+**/dist
+build
+**/build
+venv
+**/venv
+.venv
+**/.venv
+__pycache__
+**/__pycache__
+*.py[cod]
+
+# ---------- TS build cache ----------
+tsconfig.tsbuildinfo
+**/tsconfig.tsbuildinfo
+
+# ---------- Logs / local artefacts ----------
+*.log
+*.out
+check_db.*
+db_output.json
+lint_*.txt
+lint_check.*
+test-*.js
+test-*.txt
+output.html
+
+# ---------- IDE / OS ----------
+.idea
+.vscode
+.DS_Store
+Thumbs.db
+
+# ---------- Not shipped in build context ----------
+Browser_Extension
+letsencrypt
+certbot-webroot
+DEPLOY_READINESS.md

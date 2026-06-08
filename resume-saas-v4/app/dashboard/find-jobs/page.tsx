@@ -1,22 +1,23 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useDeferredValue, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
-    Search,
-    MapPin,
-    Briefcase,
-    ExternalLink,
-    Loader2,
-    ChevronLeft,
-    ChevronRight,
-    Building2,
-    Calendar,
-    SearchX,
     Bookmark,
     BookmarkCheck,
-    Zap,
-    Check,
+    Briefcase,
+    Building2,
+    Calendar,
+    ChevronLeft,
+    ChevronRight,
+    Database,
+    ExternalLink,
+    Loader2,
+    MapPin,
+    RefreshCw,
+    Search,
+    SearchX,
+    Sparkles,
 } from "lucide-react";
 
 type Job = {
@@ -27,7 +28,11 @@ type Job = {
     description: string | null;
     apply_url: string | null;
     source: string | null;
+    source_type: string | null;
+    source_label: string | null;
     date_posted: string | null;
+    experience_level: string | null;
+    scraped_at: string | null;
 };
 
 type ApiResponse = {
@@ -38,68 +43,140 @@ type ApiResponse = {
     totalPages: number;
 };
 
+const EXPERIENCE_OPTIONS = [
+    { value: "", label: "All experience" },
+    { value: "fresher", label: "Fresher" },
+    { value: "low", label: "Low" },
+    { value: "medium", label: "Medium" },
+    { value: "high", label: "High" },
+];
+
+const DATE_OPTIONS = [
+    { value: "0", label: "Any time" },
+    { value: "1", label: "Last 24h" },
+    { value: "7", label: "Last 7 days" },
+    { value: "30", label: "Last 30 days" },
+];
+
+const SOURCE_BADGES: Record<string, string> = {
+    greenhouse: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
+    lever: "bg-fuchsia-500/10 text-fuchsia-400 border-fuchsia-500/20",
+    ashby: "bg-pink-500/10 text-pink-400 border-pink-500/20",
+    workable: "bg-sky-500/10 text-sky-400 border-sky-500/20",
+    recruitee: "bg-cyan-500/10 text-cyan-400 border-cyan-500/20",
+    smartrecruiters: "bg-violet-500/10 text-violet-400 border-violet-500/20",
+    teamtailor: "bg-amber-500/10 text-amber-400 border-amber-500/20",
+    bamboohr: "bg-lime-500/10 text-lime-400 border-lime-500/20",
+    zoho_recruit: "bg-orange-500/10 text-orange-400 border-orange-500/20",
+    freshteam: "bg-teal-500/10 text-teal-400 border-teal-500/20",
+    darwinbox: "bg-indigo-500/10 text-indigo-400 border-indigo-500/20",
+    keka_hr: "bg-rose-500/10 text-rose-400 border-rose-500/20",
+    linkedin: "bg-blue-500/10 text-blue-400 border-blue-500/20",
+    indeed: "bg-blue-600/10 text-blue-500 border-blue-500/20",
+};
+
+function formatRelativeDate(dateStr: string | null, fallback: string | null) {
+    const source = dateStr || fallback;
+    if (!source) return "Recently";
+
+    const date = new Date(source);
+    if (Number.isNaN(date.getTime())) return "Recently";
+
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    if (diffDays <= 0) return "Today";
+    if (diffDays === 1) return "Yesterday";
+    if (diffDays < 7) return `${diffDays}d ago`;
+    if (diffDays < 30) return `${Math.floor(diffDays / 7)}w ago`;
+    return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
+
+function prettyToken(value: string | null | undefined) {
+    if (!value) return "Unknown";
+    return value.replace(/_/g, " ");
+}
+
 export default function FindJobsPage() {
     const router = useRouter();
     const [jobs, setJobs] = useState<Job[]>([]);
     const [loading, setLoading] = useState(true);
-    const [search, setSearch] = useState("");
-    const [location, setLocation] = useState("");
+    const [error, setError] = useState<string | null>(null);
+    const [titleFilter, setTitleFilter] = useState("");
+    const [locationFilter, setLocationFilter] = useState("");
+    const [experienceFilter, setExperienceFilter] = useState("");
+    const [daysFilter, setDaysFilter] = useState("0");
     const [page, setPage] = useState(1);
-    const [totalPages, setTotalPages] = useState(0);
     const [total, setTotal] = useState(0);
-    const LIMIT = 20;
-
-    // Track saved/saving state per job
+    const [totalPages, setTotalPages] = useState(0);
     const [savedJobs, setSavedJobs] = useState<Set<string>>(new Set());
     const [savingJobs, setSavingJobs] = useState<Set<string>>(new Set());
     const [tailoringJob, setTailoringJob] = useState<string | null>(null);
 
-    // Debounce search
-    const [debouncedSearch, setDebouncedSearch] = useState("");
-    const [debouncedLocation, setDebouncedLocation] = useState("");
+    const deferredTitle = useDeferredValue(titleFilter);
+    const deferredLocation = useDeferredValue(locationFilter);
+    const limit = 18;
 
     useEffect(() => {
-        const timer = setTimeout(() => {
-            setDebouncedSearch(search);
-            setDebouncedLocation(location);
-            setPage(1);
-        }, 400);
-        return () => clearTimeout(timer);
-    }, [search, location]);
+        setPage(1);
+    }, [deferredTitle, deferredLocation, experienceFilter, daysFilter]);
 
-    const fetchJobs = useCallback(async () => {
+    async function fetchJobs() {
         setLoading(true);
-        try {
-            const params = new URLSearchParams();
-            if (debouncedSearch) params.set("search", debouncedSearch);
-            if (debouncedLocation) params.set("location", debouncedLocation);
-            params.set("page", String(page));
-            params.set("limit", String(LIMIT));
+        setError(null);
 
-            const res = await fetch(`/api/find-jobs?${params.toString()}`);
-            const data: ApiResponse = await res.json();
+        try {
+            const params = new URLSearchParams({
+                page: String(page),
+                limit: String(limit),
+                days: daysFilter,
+            });
+
+            if (deferredTitle.trim()) params.set("title", deferredTitle.trim());
+            if (deferredLocation.trim()) params.set("location", deferredLocation.trim());
+            if (experienceFilter) params.set("experience", experienceFilter);
+
+            const response = await fetch(`/api/find-jobs?${params.toString()}`, {
+                cache: "no-store",
+            });
+            const data = (await response.json()) as ApiResponse & { error?: string };
+
+            if (!response.ok) {
+                throw new Error(data.error || "Failed to fetch jobs");
+            }
 
             setJobs(data.jobs || []);
             setTotal(data.total || 0);
             setTotalPages(data.totalPages || 0);
-        } catch (err) {
-            console.error("Failed to fetch jobs:", err);
+        } catch (fetchError) {
+            console.error(fetchError);
+            setJobs([]);
+            setTotal(0);
+            setTotalPages(0);
+            setError(fetchError instanceof Error ? fetchError.message : "Failed to fetch jobs");
         } finally {
             setLoading(false);
         }
-    }, [debouncedSearch, debouncedLocation, page]);
+    }
 
     useEffect(() => {
         fetchJobs();
-    }, [fetchJobs]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [page, deferredTitle, deferredLocation, experienceFilter, daysFilter]);
 
-    // ── Save job to Job Tracker ──────────────────────────────────────
-    const saveToTracker = async (job: Job) => {
+    let atsOnPage = 0;
+    let communityOnPage = 0;
+    for (const job of jobs) {
+        if ((job.source || "").toUpperCase() === "ATS") atsOnPage += 1;
+        if (job.source === "linkedin" || job.source === "indeed") communityOnPage += 1;
+    }
+
+    async function saveToTracker(job: Job) {
         if (savedJobs.has(job.id) || savingJobs.has(job.id)) return;
 
-        setSavingJobs((prev) => new Set(prev).add(job.id));
+        setSavingJobs((previous) => new Set(previous).add(job.id));
         try {
-            const res = await fetch("/api/jobs", {
+            const response = await fetch("/api/jobs", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
@@ -111,297 +188,283 @@ export default function FindJobsPage() {
                 }),
             });
 
-            if (res.ok) {
-                setSavedJobs((prev) => new Set(prev).add(job.id));
+            if (response.ok) {
+                setSavedJobs((previous) => new Set(previous).add(job.id));
             }
-        } catch (err) {
-            console.error("Failed to save job:", err);
+        } catch (saveError) {
+            console.error("Failed to save job", saveError);
         } finally {
-            setSavingJobs((prev) => {
-                const next = new Set(prev);
+            setSavingJobs((previous) => {
+                const next = new Set(previous);
                 next.delete(job.id);
                 return next;
             });
         }
-    };
+    }
 
-    // ── Tailor Resume: save then navigate to generator ───────────────
-    const tailorResume = async (job: Job) => {
+    async function tailorResume(job: Job) {
         setTailoringJob(job.id);
         try {
-            // Save the job first (if not already saved)
             if (!savedJobs.has(job.id)) {
-                const res = await fetch("/api/jobs", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        company: job.company,
-                        jobTitle: job.title,
-                        description: job.description || "",
-                        jobUrl: job.apply_url || "",
-                        location: job.location || "",
-                    }),
-                });
-
-                if (res.ok) {
-                    setSavedJobs((prev) => new Set(prev).add(job.id));
-                }
+                await saveToTracker(job);
             }
-
-            // Navigate to generator page
             router.push("/dashboard/generator");
-        } catch (err) {
-            console.error("Failed to tailor resume:", err);
         } finally {
             setTailoringJob(null);
         }
-    };
-
-    const formatDate = (dateStr: string | null) => {
-        if (!dateStr) return "Recently";
-        const d = new Date(dateStr);
-        const now = new Date();
-        const diffMs = now.getTime() - d.getTime();
-        const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-        if (diffDays === 0) return "Today";
-        if (diffDays === 1) return "Yesterday";
-        if (diffDays < 7) return `${diffDays}d ago`;
-        if (diffDays < 30) return `${Math.floor(diffDays / 7)}w ago`;
-        return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-    };
-
-    const getSourceBadge = (source: string | null) => {
-        if (!source) return null;
-        const colors: Record<string, string> = {
-            lever: "bg-purple-500/10 text-purple-400 border-purple-500/20",
-            greenhouse: "bg-green-500/10 text-green-400 border-green-500/20",
-        };
-        return colors[source] || "bg-gray-500/10 text-gray-400 border-gray-500/20";
-    };
+    }
 
     return (
-        <div className="max-w-7xl mx-auto p-4 space-y-6 animate-slide-down">
+        <div className="max-w-7xl mx-auto space-y-6 animate-slide-down">
+            <section className="rounded-3xl border border-[var(--border-color)] bg-[linear-gradient(135deg,rgba(34,197,94,0.08),rgba(59,130,246,0.06),transparent_70%)] p-6">
+                <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+                    <div className="space-y-3">
+                        <div className="inline-flex items-center gap-2 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.22em] text-emerald-400">
+                            <Database className="h-3.5 w-3.5" />
+                            Global Job Board
+                        </div>
+                        <div>
+                            <h2 className="text-2xl font-bold text-[var(--foreground)]">
+                                Your job board to apply globally
+                            </h2>
+                            <p className="mt-2 max-w-3xl text-sm text-[var(--text-secondary)]">
+                                Browse fresh openings from top companies and LinkedIn and Indeed in one place.
+                                Filter by role, location, and experience to find the job that fits you best.
+                            </p>
+                        </div>
+                    </div>
 
-            {/* Header */}
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                <div>
-                    <h1 className="text-xl font-bold text-[var(--foreground)] flex items-center gap-2">
-                        <Briefcase className="w-5 h-5 text-[var(--primary)]" />
-                        Find Jobs
-                    </h1>
-                    <p className="text-sm text-[var(--text-secondary)] mt-0.5">
-                        {total > 0 ? `${total.toLocaleString()} jobs available` : "Browse open positions"}
-                    </p>
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:min-w-[300px]">
+                        <div className="rounded-2xl border border-[var(--border-color)] bg-[var(--sidebar-bg)]/80 p-4">
+                            <div className="text-[11px] font-bold uppercase tracking-[0.2em] text-[var(--text-secondary)]">
+                                Total jobs
+                            </div>
+                            <div className="mt-2 text-2xl font-bold text-[var(--foreground)]">
+                                {total.toLocaleString()}
+                            </div>
+                        </div>
+                        <div className="rounded-2xl border border-[var(--border-color)] bg-[var(--sidebar-bg)]/80 p-4">
+                            <div className="text-[11px] font-bold uppercase tracking-[0.2em] text-[var(--text-secondary)]">
+                                Showing on page
+                            </div>
+                            <div className="mt-2 text-2xl font-bold text-[var(--foreground)]">
+                                {(atsOnPage + communityOnPage).toLocaleString()}
+                            </div>
+                        </div>
+                    </div>
                 </div>
-            </div>
+            </section>
 
-            {/* Search + Filters */}
-            <div className="flex flex-col sm:flex-row gap-3">
-                <div className="relative flex-1">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-secondary)]" />
-                    <input
-                        type="text"
-                        placeholder="Search by title or company..."
-                        value={search}
-                        onChange={(e) => setSearch(e.target.value)}
-                        className="w-full pl-10 pr-4 py-2.5 bg-[var(--sidebar-bg)] border border-[var(--border-color)] rounded-lg text-sm text-[var(--foreground)] placeholder:text-[var(--text-secondary)]/50 focus:outline-none focus:border-[var(--primary)] focus:ring-1 focus:ring-[var(--primary)]/20 transition-all"
-                    />
+            <section className="rounded-2xl border border-[var(--border-color)] bg-[var(--sidebar-bg)]/70 p-4">
+                <div className="flex flex-col gap-3 xl:flex-row">
+                    <div className="relative flex-1">
+                        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-secondary)]" />
+                        <input
+                            type="text"
+                            value={titleFilter}
+                            onChange={(event) => setTitleFilter(event.target.value)}
+                            placeholder="Filter by title or company..."
+                            className="w-full rounded-xl border border-[var(--border-color)] bg-[var(--background)] pl-10 pr-4 py-3 text-sm text-[var(--foreground)] placeholder:text-[var(--text-secondary)]/60 focus:outline-none focus:border-[var(--primary)] focus:ring-1 focus:ring-[var(--primary)]/20"
+                        />
+                    </div>
+                    <div className="relative xl:w-72">
+                        <MapPin className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-secondary)]" />
+                        <input
+                            type="text"
+                            value={locationFilter}
+                            onChange={(event) => setLocationFilter(event.target.value)}
+                            placeholder="Filter by location..."
+                            className="w-full rounded-xl border border-[var(--border-color)] bg-[var(--background)] pl-10 pr-4 py-3 text-sm text-[var(--foreground)] placeholder:text-[var(--text-secondary)]/60 focus:outline-none focus:border-[var(--primary)] focus:ring-1 focus:ring-[var(--primary)]/20"
+                        />
+                    </div>
+                    <select
+                        value={experienceFilter}
+                        onChange={(event) => setExperienceFilter(event.target.value)}
+                        className="rounded-xl border border-[var(--border-color)] bg-[var(--background)] px-4 py-3 text-sm text-[var(--foreground)] focus:outline-none focus:border-[var(--primary)] focus:ring-1 focus:ring-[var(--primary)]/20 xl:w-52"
+                    >
+                        {EXPERIENCE_OPTIONS.map((option) => (
+                            <option key={option.value || "all"} value={option.value}>
+                                {option.label}
+                            </option>
+                        ))}
+                    </select>
+                    <select
+                        value={daysFilter}
+                        onChange={(event) => setDaysFilter(event.target.value)}
+                        className="rounded-xl border border-[var(--border-color)] bg-[var(--background)] px-4 py-3 text-sm text-[var(--foreground)] focus:outline-none focus:border-[var(--primary)] focus:ring-1 focus:ring-[var(--primary)]/20 xl:w-48"
+                    >
+                        {DATE_OPTIONS.map((option) => (
+                            <option key={option.value} value={option.value}>
+                                {option.label}
+                            </option>
+                        ))}
+                    </select>
+                    <button
+                        onClick={() => fetchJobs()}
+                        className="inline-flex items-center justify-center gap-2 rounded-xl border border-[var(--border-color)] bg-[var(--background)] px-4 py-3 text-sm font-semibold text-[var(--foreground)] hover:border-[var(--primary)]/30 transition"
+                    >
+                        <RefreshCw className="h-4 w-4" />
+                        Refresh
+                    </button>
                 </div>
-                <div className="relative sm:w-64">
-                    <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-secondary)]" />
-                    <input
-                        type="text"
-                        placeholder="Filter by location..."
-                        value={location}
-                        onChange={(e) => setLocation(e.target.value)}
-                        className="w-full pl-10 pr-4 py-2.5 bg-[var(--sidebar-bg)] border border-[var(--border-color)] rounded-lg text-sm text-[var(--foreground)] placeholder:text-[var(--text-secondary)]/50 focus:outline-none focus:border-[var(--primary)] focus:ring-1 focus:ring-[var(--primary)]/20 transition-all"
-                    />
-                </div>
-            </div>
+            </section>
 
-            {/* Loading State */}
-            {loading && (
-                <div className="flex flex-col items-center justify-center py-20 gap-3">
-                    <Loader2 className="w-7 h-7 animate-spin text-[var(--primary)]" />
-                    <span className="text-sm text-[var(--text-secondary)]">Searching jobs...</span>
+            {error && (
+                <div className="rounded-2xl border border-amber-500/20 bg-amber-500/5 px-4 py-3 text-sm text-amber-400">
+                    {error}
                 </div>
             )}
 
-            {/* Empty State */}
+            {loading && (
+                <div className="flex flex-col items-center justify-center gap-3 py-24">
+                    <Loader2 className="h-8 w-8 animate-spin text-[var(--primary)]" />
+                    <span className="text-sm text-[var(--text-secondary)]">Loading jobs from the database...</span>
+                </div>
+            )}
+
             {!loading && jobs.length === 0 && (
-                <div className="flex flex-col items-center justify-center py-20 gap-4">
-                    <div className="p-4 rounded-2xl bg-[var(--sidebar-bg)] border border-[var(--border-color)]">
-                        <SearchX className="w-10 h-10 text-[var(--text-secondary)]/40" />
+                <div className="flex flex-col items-center justify-center gap-4 rounded-3xl border border-[var(--border-color)] bg-[var(--sidebar-bg)]/60 py-20">
+                    <div className="rounded-2xl border border-[var(--border-color)] bg-[var(--background)] p-4">
+                        <SearchX className="h-10 w-10 text-[var(--text-secondary)]/50" />
                     </div>
                     <div className="text-center">
-                        <p className="text-[var(--foreground)] font-semibold mb-1">No jobs found</p>
-                        <p className="text-sm text-[var(--text-secondary)]">
-                            {debouncedSearch || debouncedLocation
-                                ? "Try adjusting your search or filters"
-                                : "Jobs will appear here once the data pipeline runs"}
+                        <p className="text-lg font-semibold text-[var(--foreground)]">No jobs matched these filters</p>
+                        <p className="mt-2 text-sm text-[var(--text-secondary)]">
+                            Try widening the title, location, experience, or date filters.
                         </p>
                     </div>
                 </div>
             )}
 
-            {/* Job Cards */}
             {!loading && jobs.length > 0 && (
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
                     {jobs.map((job) => {
+                        const label = prettyToken(job.source_label || job.source_type || job.source);
+                        const badgeClass = SOURCE_BADGES[(job.source_label || job.source_type || job.source || "").toLowerCase()] ||
+                            "bg-gray-500/10 text-gray-400 border-gray-500/20";
                         const isSaved = savedJobs.has(job.id);
                         const isSaving = savingJobs.has(job.id);
                         const isTailoring = tailoringJob === job.id;
 
                         return (
-                            <div
+                            <article
                                 key={job.id}
-                                className="group bg-[var(--sidebar-bg)] border border-[var(--border-color)] rounded-xl p-5 hover:border-[var(--primary)]/30 hover:shadow-lg hover:shadow-[var(--primary)]/5 transition-all duration-300 flex flex-col"
+                                className="group flex flex-col rounded-2xl border border-[var(--border-color)] bg-[var(--sidebar-bg)]/80 p-5 transition hover:border-[var(--primary)]/30 hover:shadow-lg hover:shadow-[var(--primary)]/5"
                             >
-                                {/* Top row: Source badge + Date */}
-                                <div className="flex items-center justify-between mb-3">
-                                    {job.source && (
-                                        <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md border ${getSourceBadge(job.source)}`}>
-                                            {job.source}
-                                        </span>
-                                    )}
-                                    <span className="text-[11px] text-[var(--text-secondary)] flex items-center gap-1 ml-auto">
-                                        <Calendar className="w-3 h-3" />
-                                        {formatDate(job.date_posted)}
+                                <div className="flex items-center justify-between gap-3">
+                                    <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.16em] ${badgeClass}`}>
+                                        {label}
+                                    </span>
+                                    <span className="inline-flex items-center gap-1 text-[11px] text-[var(--text-secondary)]">
+                                        <Calendar className="h-3 w-3" />
+                                        {formatRelativeDate(job.date_posted, job.scraped_at)}
                                     </span>
                                 </div>
 
-                                {/* Title */}
-                                <h3 className="font-semibold text-[var(--foreground)] text-sm leading-snug mb-2 line-clamp-2 group-hover:text-[var(--primary)] transition-colors">
+                                <h3 className="mt-4 text-base font-semibold leading-snug text-[var(--foreground)] transition group-hover:text-[var(--primary)]">
                                     {job.title}
                                 </h3>
 
-                                {/* Company + Location */}
-                                <div className="flex flex-col gap-1.5 mb-4">
-                                    <div className="flex items-center gap-1.5 text-[var(--text-secondary)] text-xs">
-                                        <Building2 className="w-3.5 h-3.5 shrink-0" />
+                                <div className="mt-3 space-y-2 text-xs text-[var(--text-secondary)]">
+                                    <div className="flex items-center gap-2">
+                                        <Building2 className="h-3.5 w-3.5 shrink-0" />
                                         <span className="truncate">{job.company}</span>
                                     </div>
                                     {job.location && (
-                                        <div className="flex items-center gap-1.5 text-[var(--text-secondary)] text-xs">
-                                            <MapPin className="w-3.5 h-3.5 shrink-0" />
+                                        <div className="flex items-center gap-2">
+                                            <MapPin className="h-3.5 w-3.5 shrink-0" />
                                             <span className="truncate">{job.location}</span>
+                                        </div>
+                                    )}
+                                    {job.experience_level && (
+                                        <div className="flex items-center gap-2">
+                                            <Briefcase className="h-3.5 w-3.5 shrink-0" />
+                                            <span className="capitalize">{job.experience_level}</span>
                                         </div>
                                     )}
                                 </div>
 
-                                {/* Action Buttons */}
-                                <div className="mt-auto flex flex-col gap-2">
-                                    {/* Apply Button */}
+                                <div className="mt-6 flex flex-col gap-2">
                                     {job.apply_url ? (
                                         <a
                                             href={job.apply_url}
                                             target="_blank"
                                             rel="noopener noreferrer"
-                                            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[var(--primary)] text-[var(--background)] text-xs font-bold uppercase tracking-wider hover:opacity-90 transition-opacity w-full justify-center"
+                                            className="inline-flex items-center justify-center gap-2 rounded-xl bg-[var(--primary)] px-4 py-2.5 text-xs font-bold uppercase tracking-[0.18em] text-[var(--background)] hover:opacity-90 transition"
                                         >
-                                            <ExternalLink className="w-3.5 h-3.5" />
+                                            <ExternalLink className="h-3.5 w-3.5" />
                                             Apply Now
                                         </a>
                                     ) : (
                                         <button
                                             disabled
-                                            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[var(--border-color)] text-[var(--text-secondary)] text-xs font-bold uppercase tracking-wider w-full justify-center cursor-not-allowed opacity-50"
+                                            className="inline-flex items-center justify-center rounded-xl border border-[var(--border-color)] px-4 py-2.5 text-xs font-bold uppercase tracking-[0.18em] text-[var(--text-secondary)] opacity-60"
                                         >
                                             No Link Available
                                         </button>
                                     )}
 
-                                    {/* Save + Tailor Row */}
-                                    <div className="flex gap-2">
-                                        {/* Save to Tracker */}
+                                    <div className="grid grid-cols-2 gap-2">
                                         <button
                                             onClick={() => saveToTracker(job)}
                                             disabled={isSaved || isSaving}
-                                            className={`flex-1 inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all justify-center border ${isSaved
-                                                ? "bg-[var(--primary)]/10 text-[var(--primary)] border-[var(--primary)]/20 cursor-default"
-                                                : "bg-[var(--sidebar-bg)] text-[var(--text-secondary)] border-[var(--border-color)] hover:border-[var(--primary)]/40 hover:text-[var(--primary)]"
-                                                } disabled:opacity-70`}
+                                            className={`inline-flex items-center justify-center gap-2 rounded-xl border px-4 py-2.5 text-xs font-semibold transition ${
+                                                isSaved
+                                                    ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-400"
+                                                    : "border-[var(--border-color)] bg-[var(--background)] text-[var(--foreground)] hover:border-[var(--primary)]/30"
+                                            } disabled:cursor-not-allowed disabled:opacity-70`}
                                         >
                                             {isSaving ? (
-                                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
                                             ) : isSaved ? (
-                                                <Check className="w-3.5 h-3.5" />
+                                                <BookmarkCheck className="h-3.5 w-3.5" />
                                             ) : (
-                                                <Bookmark className="w-3.5 h-3.5" />
+                                                <Bookmark className="h-3.5 w-3.5" />
                                             )}
-                                            {isSaved ? "Saved" : isSaving ? "Saving..." : "Save"}
+                                            {isSaved ? "Saved" : "Save"}
                                         </button>
 
-                                        {/* Tailor Resume */}
                                         <button
                                             onClick={() => tailorResume(job)}
                                             disabled={isTailoring}
-                                            className="flex-1 inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all justify-center border bg-[var(--sidebar-bg)] text-[var(--text-secondary)] border-[var(--border-color)] hover:border-purple-500/40 hover:text-purple-400 disabled:opacity-70"
+                                            className="inline-flex items-center justify-center gap-2 rounded-xl border border-[var(--primary)]/20 bg-[var(--primary)]/10 px-4 py-2.5 text-xs font-semibold text-[var(--primary)] transition hover:bg-[var(--primary)]/15 disabled:cursor-not-allowed disabled:opacity-70"
                                         >
                                             {isTailoring ? (
-                                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
                                             ) : (
-                                                <Zap className="w-3.5 h-3.5" />
+                                                <Sparkles className="h-3.5 w-3.5" />
                                             )}
-                                            {isTailoring ? "Saving..." : "Tailor CV"}
+                                            Tailor
                                         </button>
                                     </div>
                                 </div>
-                            </div>
+                            </article>
                         );
                     })}
                 </div>
             )}
 
-            {/* Pagination */}
             {!loading && totalPages > 1 && (
-                <div className="flex items-center justify-between pt-2 pb-4">
-                    <p className="text-xs text-[var(--text-secondary)]">
+                <div className="flex flex-col gap-3 rounded-2xl border border-[var(--border-color)] bg-[var(--sidebar-bg)]/70 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+                    <p className="text-sm text-[var(--text-secondary)]">
                         Page {page} of {totalPages} · {total.toLocaleString()} results
                     </p>
                     <div className="flex items-center gap-2">
                         <button
-                            onClick={() => setPage((p) => Math.max(1, p - 1))}
+                            onClick={() => setPage((current) => Math.max(1, current - 1))}
                             disabled={page <= 1}
-                            className="p-2 rounded-lg border border-[var(--border-color)] bg-[var(--sidebar-bg)] text-[var(--foreground)] hover:border-[var(--primary)]/30 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                            className="inline-flex items-center gap-2 rounded-xl border border-[var(--border-color)] bg-[var(--background)] px-3 py-2 text-sm text-[var(--foreground)] transition hover:border-[var(--primary)]/30 disabled:opacity-40"
                         >
-                            <ChevronLeft className="w-4 h-4" />
+                            <ChevronLeft className="h-4 w-4" />
+                            Prev
                         </button>
-
-                        {/* Page numbers */}
-                        <div className="flex items-center gap-1">
-                            {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                                let pageNum: number;
-                                if (totalPages <= 5) {
-                                    pageNum = i + 1;
-                                } else if (page <= 3) {
-                                    pageNum = i + 1;
-                                } else if (page >= totalPages - 2) {
-                                    pageNum = totalPages - 4 + i;
-                                } else {
-                                    pageNum = page - 2 + i;
-                                }
-                                return (
-                                    <button
-                                        key={pageNum}
-                                        onClick={() => setPage(pageNum)}
-                                        className={`w-8 h-8 rounded-lg text-xs font-bold transition-all ${page === pageNum
-                                            ? "bg-[var(--primary)] text-[var(--background)]"
-                                            : "bg-[var(--sidebar-bg)] border border-[var(--border-color)] text-[var(--text-secondary)] hover:border-[var(--primary)]/30"
-                                            }`}
-                                    >
-                                        {pageNum}
-                                    </button>
-                                );
-                            })}
-                        </div>
-
                         <button
-                            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                            onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
                             disabled={page >= totalPages}
-                            className="p-2 rounded-lg border border-[var(--border-color)] bg-[var(--sidebar-bg)] text-[var(--foreground)] hover:border-[var(--primary)]/30 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                            className="inline-flex items-center gap-2 rounded-xl border border-[var(--border-color)] bg-[var(--background)] px-3 py-2 text-sm text-[var(--foreground)] transition hover:border-[var(--primary)]/30 disabled:opacity-40"
                         >
-                            <ChevronRight className="w-4 h-4" />
+                            Next
+                            <ChevronRight className="h-4 w-4" />
                         </button>
                     </div>
                 </div>
