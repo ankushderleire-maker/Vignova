@@ -69,16 +69,21 @@ jobs:
               docker compose up -d --build backend
             fi
 
-            echo "Running health check..."
+            echo "Running health check (waiting up to 120s for dashboard to be ready)..."
 
-            sleep 15
-
-            if ! curl -sf http://127.0.0.1:3000 > /dev/null 2>&1; then
-              echo "❌ Dashboard health check failed! Rolling back..."
-              git reset --hard $PREV_COMMIT
-              docker compose up -d --build dashboard
-              exit 1
-            fi
+            ATTEMPTS=0
+            MAX_ATTEMPTS=24
+            until curl -sf http://127.0.0.1:3000 > /dev/null 2>&1; do
+              ATTEMPTS=$((ATTEMPTS + 1))
+              if [ "$ATTEMPTS" -ge "$MAX_ATTEMPTS" ]; then
+                echo "❌ Dashboard health check failed after ${MAX_ATTEMPTS} attempts! Rolling back..."
+                git reset --hard $PREV_COMMIT
+                docker compose up -d --build dashboard
+                exit 1
+              fi
+              echo "  Waiting... (attempt $ATTEMPTS/$MAX_ATTEMPTS)"
+              sleep 5
+            done
 
             echo "✅ Deployment successful!"
 
