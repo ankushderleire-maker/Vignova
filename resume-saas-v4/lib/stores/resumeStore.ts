@@ -69,7 +69,7 @@ export const PLACEHOLDER_RESUME_DATA: ResumeData = {
     languages: ["English", "Hindi", "Marathi"]
 };
 
-export type TemplateId = 'modern' | 'classic' | 'creative' | 'professional' | 'minimal' | 'executive' | 'elegant' | 'tech' | 'corporate' | 'luxe' | 'nordic' | 'bold' | 'compact' | 'accent' | 'diamond' | 'cascade' | 'horizon' | 'atlas' | 'prism' | 'chronicle';
+export type TemplateId = 'modern' | 'classic' | 'creative' | 'professional' | 'minimal' | 'executive' | 'elegant' | 'tech' | 'corporate' | 'luxe' | 'nordic' | 'bold' | 'compact' | 'accent' | 'diamond' | 'cascade' | 'horizon' | 'atlas' | 'prism' | 'chronicle' | 'europass' | 'cambridge' | 'berlin' | 'geneva' | 'milano';
 
 export interface TemplateMetadata {
     id: TemplateId;
@@ -207,6 +207,37 @@ export const TEMPLATES: TemplateMetadata[] = [
         name: 'Chronicle',
         description: 'Timeline layout with amber accents',
         thumbnail: '/templates/chronicle-thumb.png',
+    },
+    {
+        id: 'europass',
+        name: 'Europass',
+        description: 'Official EU Europass CV format',
+        thumbnail: '/templates/europass-thumb.png',
+    },
+    {
+        id: 'cambridge',
+        name: 'Cambridge',
+        description: 'Classic British serif CV, no colour',
+        thumbnail: '/templates/cambridge-thumb.png',
+    },
+    {
+        id: 'berlin',
+        name: 'Berlin',
+        description: 'German Lebenslauf — structured & formal',
+        thumbnail: '/templates/berlin-thumb.png',
+    },
+    {
+        id: 'geneva',
+        name: 'Geneva',
+        description: 'Swiss minimal label-column layout',
+        thumbnail: '/templates/geneva-thumb.png',
+    },
+    {
+        id: 'milano',
+        name: 'Milano',
+        description: 'Italian elegant serif with gold accents',
+        thumbnail: '/templates/milano-thumb.png',
+        isPremium: true,
     }
 ];
 

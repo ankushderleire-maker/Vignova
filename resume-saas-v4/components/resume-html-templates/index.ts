@@ -16,12 +16,18 @@ export { BoldTemplate, BOLD_STYLES, generateBoldHtml } from './BoldTemplate';
 export { CompactTemplate, COMPACT_STYLES, generateCompactHtml } from './CompactTemplate';
 export { AccentTemplate, ACCENT_STYLES, generateAccentHtml } from './AccentTemplate';
 export { DiamondTemplate, DIAMOND_STYLES, generateDiamondHtml } from './DiamondTemplate';
-// New templates
+// New templates — batch 1
 export { CascadeTemplate, CASCADE_STYLES, generateCascadeHtml } from './CascadeTemplate';
 export { HorizonTemplate, HORIZON_STYLES, generateHorizonHtml } from './HorizonTemplate';
 export { AtlasTemplate, ATLAS_STYLES, generateAtlasHtml } from './AtlasTemplate';
 export { PrismTemplate, PRISM_STYLES, generatePrismHtml } from './PrismTemplate';
 export { ChronicleTemplate, CHRONICLE_STYLES, generateChronicleHtml } from './ChronicleTemplate';
+// New templates — batch 2 (European professional)
+export { EuropassTemplate, EUROPASS_STYLES, generateEuropassHtml } from './EuropassTemplate';
+export { CambridgeTemplate, CAMBRIDGE_STYLES, generateCambridgeHtml } from './CambridgeTemplate';
+export { BerlinTemplate, BERLIN_STYLES, generateBerlinHtml } from './BerlinTemplate';
+export { GenevaTemplate, GENEVA_STYLES, generateGenevaHtml } from './GenevaTemplate';
+export { MilanoTemplate, MILANO_STYLES, generateMilanoHtml } from './MilanoTemplate';
 
 export type { HtmlTemplateProps } from './BaseTemplate';
 export { getSettings, getCssVariables, BaseWrapper, BASE_STYLES } from './BaseTemplate';
@@ -47,6 +53,11 @@ import { generateHorizonHtml } from './HorizonTemplate';
 import { generateAtlasHtml } from './AtlasTemplate';
 import { generatePrismHtml } from './PrismTemplate';
 import { generateChronicleHtml } from './ChronicleTemplate';
+import { generateEuropassHtml } from './EuropassTemplate';
+import { generateCambridgeHtml } from './CambridgeTemplate';
+import { generateBerlinHtml } from './BerlinTemplate';
+import { generateGenevaHtml } from './GenevaTemplate';
+import { generateMilanoHtml } from './MilanoTemplate';
 
 export type TemplateId =
     | 'classic'
@@ -68,7 +79,12 @@ export type TemplateId =
     | 'horizon'
     | 'atlas'
     | 'prism'
-    | 'chronicle';
+    | 'chronicle'
+    | 'europass'
+    | 'cambridge'
+    | 'berlin'
+    | 'geneva'
+    | 'milano';
 
 /**
  * Map of template IDs to their HTML generator functions
@@ -94,6 +110,11 @@ export const HTML_TEMPLATE_GENERATORS: Record<TemplateId, (data: any, designSett
     atlas: generateAtlasHtml,
     prism: generatePrismHtml,
     chronicle: generateChronicleHtml,
+    europass: generateEuropassHtml,
+    cambridge: generateCambridgeHtml,
+    berlin: generateBerlinHtml,
+    geneva: generateGenevaHtml,
+    milano: generateMilanoHtml,
 };
 
 /**
