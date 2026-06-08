@@ -52,16 +52,41 @@ export default function LinkedInOptimizerPage() {
     );
 }
 
+type ExtensionStatus = "detecting" | "not_installed" | "outdated" | "id_mismatch" | "ok";
+
+type ExtensionConfig = {
+    extensionId: string;
+    extensionVersion: string;
+    extensionName: string;
+    installUrl: string;
+};
+
+function compareVersions(installed: string, required: string): number {
+    const parse = (v: string) => v.split(".").map((n) => parseInt(n, 10) || 0);
+    const a = parse(installed);
+    const b = parse(required);
+    for (let i = 0; i < Math.max(a.length, b.length); i++) {
+        const diff = (a[i] || 0) - (b[i] || 0);
+        if (diff !== 0) return diff;
+    }
+    return 0;
+}
+
 function LinkedInOptimizerContent() {
     const router = useRouter();
     const { data: session } = useSession();
     const [step, setStep] = useState<"setup" | "loading" | "result">("setup");
-    const [isExtensionInstalled, setIsExtensionInstalled] = useState<boolean | null>(null);
+    const [extensionStatus, setExtensionStatus] = useState<ExtensionStatus>("detecting");
+    const [installedVersion, setInstalledVersion] = useState<string | null>(null);
+    const [extensionConfig, setExtensionConfig] = useState<ExtensionConfig | null>(null);
     const [linkedinUrl, setLinkedinUrl] = useState("");
     const [result, setResult] = useState<LinkedInAnalysisResult | null>(null);
     const [error, setError] = useState("");
     const [activeSection, setActiveSection] = useState("overview");
     const [viewMode, setViewMode] = useState<"current" | "optimized">("current");
+
+    // Convenience derived booleans
+    const isExtensionInstalled = extensionStatus === "ok" || extensionStatus === "outdated" || extensionStatus === "id_mismatch";
     
     const [copiedText, setCopiedText] = useState("");
     const handleCopy = (text: string) => {
@@ -99,8 +124,8 @@ function LinkedInOptimizerContent() {
                     if (data.result) {
                         setResult(data.result);
                         if (data.result.optimizedContent) {
-                            const parsedOptimized = typeof data.result.optimizedContent === 'string' 
-                                ? JSON.parse(data.result.optimizedContent) 
+                            const parsedOptimized = typeof data.result.optimizedContent === 'string'
+                                ? JSON.parse(data.result.optimizedContent)
                                 : data.result.optimizedContent;
                             setAiReport(parsedOptimized);
                         }
@@ -111,10 +136,44 @@ function LinkedInOptimizerContent() {
         };
         fetchHistory();
 
+        // Fetch extension config from admin settings
+        let config: ExtensionConfig | null = null;
+        const fetchConfig = async () => {
+            try {
+                const res = await fetch("/api/extension-config");
+                if (res.ok) config = await res.json();
+            } catch (e) {}
+        };
+
         // Detect Extension
         const handleMessage = (event: MessageEvent) => {
             if (event.data && event.data.type === "VIGNOVA_EXTENSION_PONG") {
-                setIsExtensionInstalled(true);
+                const pongId: string      = event.data.extensionId      || "";
+                const pongVer: string     = event.data.extensionVersion || "";
+                setInstalledVersion(pongVer || null);
+
+                if (!config) {
+                    // Config not loaded yet — accept as ok
+                    setExtensionStatus("ok");
+                    return;
+                }
+
+                // ID check (only if admin configured an ID)
+                if (config.extensionId && pongId && pongId !== config.extensionId) {
+                    setExtensionStatus("id_mismatch");
+                    return;
+                }
+
+                // Version check
+                if (pongVer && config.extensionVersion) {
+                    const cmp = compareVersions(pongVer, config.extensionVersion);
+                    if (cmp < 0) {
+                        setExtensionStatus("outdated");
+                        return;
+                    }
+                }
+
+                setExtensionStatus("ok");
             }
             if (event.data && event.data.type === "VIGNOVA_LINKEDIN_DATA") {
                 handleIngestData(event.data.payload);
@@ -125,19 +184,25 @@ function LinkedInOptimizerContent() {
             }
         };
         window.addEventListener("message", handleMessage);
-        
-        // Ping extension
-        setTimeout(() => {
+
+        // Ping after config loads
+        const init = async () => {
+            await fetchConfig();
+            if (config) setExtensionConfig(config);
             window.postMessage({ type: "VIGNOVA_EXTENSION_PING" }, "*");
-            // If no pong after 1 second, assume not installed
+            // If no pong within 1.5 s, assume not installed
             setTimeout(() => {
-                setIsExtensionInstalled(prev => prev === null ? false : prev);
-            }, 1000);
-        }, 500);
-        
+                setExtensionStatus((prev) => prev === "detecting" ? "not_installed" : prev);
+            }, 1500);
+        };
+        const t = setTimeout(init, 300);
+
         fetchMasterProfiles();
 
-        return () => window.removeEventListener("message", handleMessage);
+        return () => {
+            clearTimeout(t);
+            window.removeEventListener("message", handleMessage);
+        };
     }, []);
 
     const fetchMasterProfiles = async () => {
@@ -155,6 +220,10 @@ function LinkedInOptimizerContent() {
 
     const handleConnect = () => {
         setError("");
+        if (extensionStatus !== "ok" && extensionStatus !== "outdated") {
+            setError("Please install the Vignova extension before connecting.");
+            return;
+        }
         if (!linkedinUrl.includes("linkedin.com/in/")) {
             setError("Please enter a valid LinkedIn profile URL.");
             return;
@@ -169,11 +238,14 @@ function LinkedInOptimizerContent() {
         
         // Fallback timeout in case extension fails silently
         setTimeout(() => {
-            if (step === "loading") {
-                // setError("Extension timed out while scraping. Please try again.");
-                // setStep("setup");
-            }
-        }, 15000); // 15 seconds max
+            setStep(prev => {
+                if (prev === "loading") {
+                    setError("The LinkedIn scraping window did not respond. Please make sure the Vignova extension is installed and active, then try again.");
+                    return "setup";
+                }
+                return prev;
+            });
+        }, 30000); // 30 seconds max
     };
 
     const handleIngestData = async (rawProfileData: any) => {
@@ -269,26 +341,71 @@ function LinkedInOptimizerContent() {
                         </div>
                         {error && (<div className="p-3 rounded-md bg-red-500/10 border border-red-500/20 text-red-500 text-sm">{error}</div>)}
                         
-                        {isExtensionInstalled === false && (
-                            <div className="p-4 rounded-xl bg-blue-500/10 border border-blue-500/30 flex flex-col items-center text-center space-y-3">
-                                <Chrome className="w-10 h-10 text-blue-500" />
-                                <h3 className="font-bold text-blue-600 dark:text-blue-400">Extension Required</h3>
-                                <p className="text-xs text-blue-600/80 dark:text-blue-400/80">
-                                    To securely analyze your LinkedIn profile without sharing your password, you need our Chrome Extension.
-                                </p>
-                                <a href="/dashboard/extension" className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-bold transition">
-                                    Install Extension
+                        {/* ── Extension status banners ── */}
+                        {extensionStatus === "detecting" && (
+                            <div className="p-4 rounded-xl bg-[var(--border-color)]/30 border border-[var(--border-color)] flex items-center gap-3">
+                                <Loader2 className="w-5 h-5 animate-spin text-[var(--text-secondary)] shrink-0" />
+                                <p className="text-xs text-[var(--text-secondary)]">Detecting Vignova Extension...</p>
+                            </div>
+                        )}
+
+                        {extensionStatus === "not_installed" && (
+                            <div className="p-5 rounded-xl bg-blue-500/10 border border-blue-500/30 flex flex-col items-center text-center space-y-4">
+                                <div className="w-14 h-14 rounded-full bg-blue-500/20 flex items-center justify-center">
+                                    <Chrome className="w-8 h-8 text-blue-500" />
+                                </div>
+                                <div>
+                                    <h3 className="font-bold text-blue-600 dark:text-blue-400 text-base">Extension Required</h3>
+                                    <p className="text-xs text-blue-600/80 dark:text-blue-400/80 mt-1">
+                                        To securely analyze your LinkedIn profile without sharing your password, install the free {extensionConfig?.extensionName || "Vignova"} Chrome Extension.
+                                    </p>
+                                </div>
+                                <a href={extensionConfig?.installUrl || "/dashboard/extension"} target="_blank" rel="noreferrer" className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg text-sm font-bold transition flex items-center gap-2">
+                                    <Chrome className="w-4 h-4" /> Install Extension
+                                </a>
+                                <p className="text-xs text-blue-500/70">After installing, refresh this page.</p>
+                            </div>
+                        )}
+
+                        {extensionStatus === "id_mismatch" && (
+                            <div className="p-5 rounded-xl bg-amber-500/10 border border-amber-500/30 flex flex-col items-center text-center space-y-4">
+                                <div className="w-14 h-14 rounded-full bg-amber-500/20 flex items-center justify-center">
+                                    <AlertTriangle className="w-8 h-8 text-amber-500" />
+                                </div>
+                                <div>
+                                    <h3 className="font-bold text-amber-600 dark:text-amber-400 text-base">Wrong Extension Detected</h3>
+                                    <p className="text-xs text-amber-600/80 dark:text-amber-400/80 mt-1">
+                                        The extension installed in your browser doesn't match the official {extensionConfig?.extensionName || "Vignova"} extension. Please install the correct one.
+                                    </p>
+                                </div>
+                                <a href={extensionConfig?.installUrl || "/dashboard/extension"} target="_blank" rel="noreferrer" className="bg-amber-500 hover:bg-amber-600 text-white px-5 py-2.5 rounded-lg text-sm font-bold transition flex items-center gap-2">
+                                    <Chrome className="w-4 h-4" /> Install Official Extension
                                 </a>
                             </div>
                         )}
-                        
-                        {isExtensionInstalled !== false && (
+
+                        {extensionStatus === "outdated" && (
+                            <div className="p-4 rounded-xl bg-yellow-500/10 border border-yellow-500/30 flex items-start gap-3">
+                                <AlertTriangle className="w-5 h-5 text-yellow-500 shrink-0 mt-0.5" />
+                                <div className="flex-1 min-w-0">
+                                    <p className="text-sm font-bold text-yellow-600 dark:text-yellow-400">Extension update available</p>
+                                    <p className="text-xs text-yellow-600/80 dark:text-yellow-400/80 mt-0.5">
+                                        You have v{installedVersion} installed. Version {extensionConfig?.extensionVersion} is now available with improvements and bug fixes.
+                                    </p>
+                                    <a href={extensionConfig?.installUrl || "/dashboard/extension"} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 mt-2 text-xs font-bold text-yellow-600 dark:text-yellow-400 hover:underline">
+                                        <Chrome className="w-3.5 h-3.5" /> Update now
+                                    </a>
+                                </div>
+                            </div>
+                        )}
+
+                        {(extensionStatus === "ok" || extensionStatus === "outdated") && (
                             <div className="space-y-4">
                                 <div>
                                     <label className="text-xs font-semibold text-[var(--foreground)] block mb-1">LinkedIn Profile URL</label>
-                                    <input 
-                                        type="text" 
-                                        placeholder="https://www.linkedin.com/in/username" 
+                                    <input
+                                        type="text"
+                                        placeholder="https://www.linkedin.com/in/username"
                                         value={linkedinUrl}
                                         onChange={(e) => setLinkedinUrl(e.target.value)}
                                         className="w-full bg-black/5 dark:bg-white/5 border border-[var(--border-color)] text-[var(--foreground)] text-sm rounded-lg px-4 py-2.5 focus:border-[var(--primary)] focus:ring-1 focus:ring-[var(--primary)] transition-all outline-none"
@@ -301,6 +418,7 @@ function LinkedInOptimizerContent() {
                                 </div>
                             </div>
                         )}
+
                     </div>
                 </div>
             )}
@@ -317,7 +435,8 @@ function LinkedInOptimizerContent() {
                     <div className="text-center space-y-2">
                         <h3 className="text-lg font-semibold text-[var(--foreground)]">Connecting to LinkedIn...</h3>
                         <p className="text-sm text-[var(--text-secondary)]">Please wait while we securely extract your profile data.</p>
-                        <p className="text-xs text-[var(--primary)] animate-pulse">Do not close the new LinkedIn tab that just opened.</p>
+                        <p className="text-xs text-[var(--primary)] animate-pulse">Do not close any new LinkedIn tab or window that opened.</p>
+                        <p className="text-xs text-[var(--text-secondary)] opacity-60">This may take up to 30 seconds.</p>
                     </div>
                 </div>
             )}
