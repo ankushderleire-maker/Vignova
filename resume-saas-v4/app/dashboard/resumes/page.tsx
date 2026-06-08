@@ -265,17 +265,19 @@ export default function SavedResumesPage() {
                 by making them relative to the transformed box instead of viewport.
             ─────────────────────────────────────────────────────────────────── */}
             {openJobId && activeGroup && (
-                <div
-                    className="fixed inset-0 z-[200] flex items-center justify-center p-4"
-                    onClick={() => setOpenJobId(null)}
-                >
-                    {/* Backdrop */}
-                    <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
-
-                    {/* Panel */}
+                <>
+                    {/* Backdrop — separate from panel so layout overflow can't affect centering */}
                     <div
-                        className="relative z-10 w-full max-w-md bg-[var(--sidebar-bg)] border border-[var(--border-color)] rounded-2xl shadow-2xl flex flex-col animate-scale-in"
-                        style={{ maxHeight: "min(90vh, 640px)" }}
+                        className="fixed inset-0 z-[200] bg-black/60 backdrop-blur-sm"
+                        onClick={() => setOpenJobId(null)}
+                    />
+
+                    {/* Panel — true viewport center via transform, unaffected by sidebar/overflow */}
+                    <div
+                        className="fixed z-[201] top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2
+                                   bg-[var(--sidebar-bg)] border border-[var(--border-color)]
+                                   rounded-2xl shadow-2xl flex flex-col animate-scale-in"
+                        style={{ width: "min(92vw, 620px)", maxHeight: "min(80vh, 580px)" }}
                         onClick={(e) => e.stopPropagation()}
                     >
                         {/* Header */}
@@ -361,7 +363,7 @@ export default function SavedResumesPage() {
                             </button>
                         </div>
                     </div>
-                </div>
+                </>
             )}
 
             <CustomDialog
