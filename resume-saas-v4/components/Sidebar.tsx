@@ -17,7 +17,8 @@ import {
   FileText,
   ScanLine,
   Mic,
-  Linkedin
+  Linkedin,
+  X,
 } from "lucide-react";
 
 const navigationGroups = [
@@ -60,27 +61,40 @@ const navigationGroups = [
   },
 ];
 
-export function Sidebar() {
+interface SidebarProps {
+  onClose?: () => void;
+}
+
+export function Sidebar({ onClose }: SidebarProps) {
   const pathname = usePathname();
 
   return (
-    <div className="flex h-full w-64 flex-col bg-[var(--sidebar-bg)] border-r border-[var(--border-color)] relative overflow-hidden transition-colors duration-300">
-      {/* Subtle Green Glow for Sidebar bottom */}
+    <div className="flex h-full w-full flex-col bg-[var(--sidebar-bg)] border-r border-[var(--border-color)] relative overflow-hidden transition-colors duration-300">
+      {/* Subtle glow */}
       <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-[var(--primary)]/10 to-transparent pointer-events-none" />
 
       {/* Logo Area */}
-      <div className="flex h-16 items-center px-6 bg-[#000000] border-b border-white/10 z-10">
+      <div className="flex h-16 items-center justify-between px-6 bg-[#000000] border-b border-white/10 z-10">
         <div className="flex items-end">
           <img src="/logo.png" alt="Vignova Logo" width={40} height={40} className="w-10 h-10 object-contain" />
           <span className="text-lg font-bold text-white tracking-tight -ml-1.5 mb-0.5">VIGNOVA</span>
         </div>
+        {/* Close button — only visible in mobile drawer */}
+        {onClose && (
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 transition-colors"
+            aria-label="Close menu"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        )}
       </div>
 
       {/* Navigation Links */}
       <nav className="flex-1 px-3 py-4 z-10 overflow-y-auto flex flex-col gap-4">
         {navigationGroups.map((group, groupIndex) => (
           <div key={group.label}>
-            {/* Section Header */}
             {group.label && (
               <div className="px-3 mb-2 flex items-center">
                 <span className="text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider opacity-60">
@@ -89,7 +103,6 @@ export function Sidebar() {
               </div>
             )}
 
-            {/* Nav Items */}
             <div className="space-y-1">
               {group.items.map((item) => {
                 const isActive = pathname === item.href;
@@ -101,6 +114,7 @@ export function Sidebar() {
                   <Link
                     key={item.name}
                     href={item.href}
+                    onClick={onClose}
                     className={`group flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-all duration-200 ${isActive
                       ? "bg-[var(--primary)]/10 text-[var(--primary)] border border-[var(--primary)]/20 shadow-[0_0_15px_rgba(var(--primary),0.05)]"
                       : "text-[var(--text-secondary)] hover:bg-[var(--foreground)]/5 hover:text-[var(--foreground)] border border-transparent"
@@ -117,21 +131,18 @@ export function Sidebar() {
 
                     <span>{item.name}</span>
 
-                    {/* PRO BADGE */}
                     {isProItem && (
                       <span className="ml-auto text-[9px] font-bold bg-[var(--primary)] text-white px-1.5 py-0.5 rounded border border-[var(--primary)]/50 shadow-[0_0_10px_rgba(var(--primary),0.2)]">
                         PRO
                       </span>
                     )}
 
-                    {/* NEW BADGE */}
                     {isNew && (
                       <span className="ml-auto text-[9px] font-bold bg-blue-500/10 text-blue-500 px-1.5 py-0.5 rounded border border-blue-500/20">
                         NEW
                       </span>
                     )}
 
-                    {/* UPCOMING BADGE */}
                     {isUpcoming && (
                       <span className="ml-auto text-[9px] font-bold bg-amber-500/10 text-amber-500 px-1.5 py-0.5 rounded border border-amber-500/20">
                         Soon
@@ -142,16 +153,12 @@ export function Sidebar() {
               })}
             </div>
 
-            {/* Separator */}
             {groupIndex < navigationGroups.length - 1 && (
               <hr className="mt-4 border-[var(--border-color)]/30" />
             )}
           </div>
         ))}
       </nav>
-
-      {/* Logout Section */}
-
     </div>
   );
 }
