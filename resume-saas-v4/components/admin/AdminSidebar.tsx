@@ -11,6 +11,7 @@ import {
     Shield,
     Package,
     Gauge,
+    Chrome,
 } from "lucide-react";
 
 const adminNav = [
@@ -20,6 +21,7 @@ const adminNav = [
     { name: "Payments",      href: "/admin/payments",      icon: CreditCard },
     { name: "Analytics",     href: "/admin/analytics",     icon: BarChart3 },
     { name: "Scan Controls", href: "/admin/scan-controls", icon: Gauge },
+    { name: "Extension",     href: "/admin/extension",     icon: Chrome },
 ];
 
 export function AdminSidebar() {
