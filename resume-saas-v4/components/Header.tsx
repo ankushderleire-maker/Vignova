@@ -23,6 +23,7 @@ import {
   Chrome,
   Linkedin,
   MessageSquare,
+  Menu,
   type LucideIcon
 } from "lucide-react";
 import { useTheme } from "@/components/providers/ThemeContext";
@@ -91,7 +92,11 @@ const pageInfo: Record<string, { title: string; description: string; icon: Lucid
   },
 };
 
-export function Header() {
+interface HeaderProps {
+  onMenuClick?: () => void;
+}
+
+export function Header({ onMenuClick }: HeaderProps) {
   const { data: session } = useSession();
   const pathname = usePathname();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -149,14 +154,23 @@ export function Header() {
   const Icon = currentPage.icon;
 
   return (
-    <header className="flex h-16 items-center justify-between border-b border-white/10 bg-[#000000] px-8 relative z-20">
-      {/* Left side: Icon + Page Title + Description */}
-      <div className="flex items-center gap-4 min-w-0 pr-4">
-        <div className="p-2.5 bg-blue-500/10 rounded-xl shrink-0 border border-blue-500/20">
-          <Icon className="h-6 w-6 text-blue-400" />
+    <header className="flex h-16 items-center justify-between border-b border-white/10 bg-[#000000] px-4 md:px-8 relative z-20">
+      {/* Left side: Hamburger (mobile) + Icon + Page Title + Description */}
+      <div className="flex items-center gap-2 md:gap-4 min-w-0 pr-2 md:pr-4">
+        {/* Hamburger — mobile only */}
+        <button
+          onClick={onMenuClick}
+          className="md:hidden p-2 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 transition-colors shrink-0"
+          aria-label="Open menu"
+        >
+          <Menu className="h-5 w-5" />
+        </button>
+
+        <div className="p-2 md:p-2.5 bg-blue-500/10 rounded-xl shrink-0 border border-blue-500/20">
+          <Icon className="h-5 w-5 md:h-6 md:w-6 text-blue-400" />
         </div>
         <div className="min-w-0 flex flex-col justify-center">
-          <h1 className="text-xl font-bold text-white leading-tight tracking-tight truncate">{currentPage.title}</h1>
+          <h1 className="text-base md:text-xl font-bold text-white leading-tight tracking-tight truncate">{currentPage.title}</h1>
           <p className="text-xs text-gray-400 hidden md:block truncate mt-0.5">
             {currentPage.description.includes("1 Credit") ? (
               <>
@@ -172,13 +186,14 @@ export function Header() {
       </div>
 
       {/* Right side: Credits & Profile */}
-      <div className="flex items-center gap-4 sm:gap-6 shrink-0">
+      <div className="flex items-center gap-2 sm:gap-4 md:gap-6 shrink-0">
 
-        {/* Credits Counter (Monetization Visibility) */}
-        <div id="tour-credits" className={`flex items-center gap-2 rounded-full px-4 py-1.5 border ${badgeBg}`}>
-          <Zap className={`h-4 w-4 ${badgeText} fill-current`} />
-          <span className={`text-sm font-semibold ${badgeText}`}>
-            {isUnlimited ? "∞" : credits} Credits
+        {/* Credits Counter */}
+        <div id="tour-credits" className={`flex items-center gap-1.5 rounded-full px-2.5 md:px-4 py-1.5 border ${badgeBg}`}>
+          <Zap className={`h-3.5 w-3.5 md:h-4 md:w-4 ${badgeText} fill-current`} />
+          <span className={`text-xs md:text-sm font-semibold ${badgeText}`}>
+            {isUnlimited ? "∞" : credits}
+            <span className="hidden sm:inline"> Credits</span>
           </span>
         </div>
 
@@ -186,10 +201,10 @@ export function Header() {
         <div className="relative" ref={dropdownRef}>
           <button
             onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-            className="flex items-center gap-3 pl-6 border-l border-white/10 outline-none group"
+            className="flex items-center gap-2 md:gap-3 pl-3 md:pl-6 border-l border-white/10 outline-none group"
           >
             <div className="text-right hidden sm:block group-hover:opacity-80 transition-opacity">
-              <p className="text-sm font-medium text-white">
+              <p className="text-sm font-medium text-white truncate max-w-[100px] md:max-w-none">
                 {session?.user?.name || "User"}
               </p>
               <p className={`text-xs font-medium ${planLabelColor}`}>{planName} Plan</p>
@@ -214,7 +229,7 @@ export function Header() {
 
           {/* Dropdown Menu */}
           {isDropdownOpen && (
-            <div className="absolute right-0 top-full mt-2 w-64 origin-top-right rounded-xl bg-[var(--sidebar-bg)] border border-[var(--border-color)] shadow-2xl ring-1 ring-black ring-opacity-5 focus:outline-none animate-in fade-in zoom-in-95 duration-200">
+            <div className="absolute right-0 top-full mt-2 w-56 sm:w-64 origin-top-right rounded-xl bg-[var(--sidebar-bg)] border border-[var(--border-color)] shadow-2xl ring-1 ring-black ring-opacity-5 focus:outline-none animate-in fade-in zoom-in-95 duration-200">
               {/* Header */}
               <div className="p-4 border-b border-[var(--border-color)]">
                 <p className="text-sm font-semibold text-[var(--foreground)] truncate">{session?.user?.name}</p>

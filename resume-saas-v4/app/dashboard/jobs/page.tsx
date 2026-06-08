@@ -244,13 +244,19 @@ export default function JobTrackerPage() {
       {/* --- CONTENT AREA --- */}
       {viewMode === 'list' ? (
         <div className="flex-1 bg-[var(--sidebar-bg)]/50 border border-[var(--border-color)] rounded-xl overflow-hidden flex flex-col shadow-2xl">
-          <div className="grid grid-cols-12 gap-4 p-4 border-b border-[var(--border-color)] bg-[var(--sidebar-bg)] text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider shrink-0">
+          {/* Desktop table header */}
+          <div className="hidden md:grid grid-cols-12 gap-4 p-4 border-b border-[var(--border-color)] bg-[var(--sidebar-bg)] text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider shrink-0">
             <div className="col-span-4">Company & Role</div>
             <div className="col-span-3">Status</div>
             <div className="col-span-2">Location</div>
             <div className="col-span-1 text-center">Job Post</div>
             <div className="col-span-1 text-right">Added</div>
             <div className="col-span-1 text-center">Actions</div>
+          </div>
+          {/* Mobile header */}
+          <div className="flex md:hidden items-center justify-between px-3 py-2 border-b border-[var(--border-color)] bg-[var(--sidebar-bg)] text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider shrink-0">
+            <span>Company & Role</span>
+            <span>Status / Actions</span>
           </div>
 
           <div className="overflow-y-auto flex-1 custom-scrollbar">
@@ -263,90 +269,103 @@ export default function JobTrackerPage() {
               </div>
             ) : (
               filteredJobs.map((job) => (
-                <div key={job.id} className="grid grid-cols-12 gap-4 p-4 items-center border-b border-[var(--border-color)] hover:bg-black/5 dark:hover:bg-white/5 transition group relative">
+                <div key={job.id} className="border-b border-[var(--border-color)] hover:bg-black/5 dark:hover:bg-white/5 transition group relative">
 
-                  {/* Column 1: Info */}
-                  <div className="col-span-4 cursor-pointer min-w-0 pr-4" onClick={() => router.push(`/dashboard/jobs/${job.id}`)}>
-                    <h3 className="font-bold text-[var(--foreground)] text-sm group-hover:text-[var(--primary)] transition-colors truncate" title={job.jobTitle}>{job.jobTitle}</h3>
-                    <p className="text-xs text-[var(--text-secondary)] mt-0.5 truncate">{job.company}</p>
-                  </div>
-
-                  {/* Column 2: Status */}
-                  <div className="col-span-3">
-                    <div className="relative inline-block">
+                  {/* Mobile card row */}
+                  <div className="flex md:hidden items-center gap-3 p-3">
+                    <div className="flex-1 min-w-0 cursor-pointer" onClick={() => router.push(`/dashboard/jobs/${job.id}`)}>
+                      <h3 className="font-bold text-[var(--foreground)] text-sm group-hover:text-[var(--primary)] transition-colors truncate">{job.jobTitle}</h3>
+                      <p className="text-xs text-[var(--text-secondary)] truncate">{job.company}</p>
+                      {job.location && <p className="text-[10px] text-[var(--text-secondary)]/70 truncate mt-0.5 flex items-center gap-1"><MapPin className="h-2.5 w-2.5 shrink-0" />{job.location}</p>}
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0 relative" onClick={(e) => e.stopPropagation()}>
                       <select
                         value={job.status}
                         onChange={(e) => handleStatusChange(job.id, e.target.value)}
-                        className={`appearance-none pl-3 pr-8 py-1.5 rounded-md text-xs font-medium border bg-transparent cursor-pointer focus:outline-none focus:ring-1 focus:ring-[var(--primary)]/50 transition ${STATUSES[job.status as keyof typeof STATUSES]?.color || "text-[var(--foreground)] border-[var(--border-color)]"}`}
+                        className={`appearance-none pl-2 pr-6 py-1 rounded-md text-xs font-medium border bg-transparent cursor-pointer focus:outline-none ${STATUSES[job.status as keyof typeof STATUSES]?.color || "text-[var(--foreground)] border-[var(--border-color)]"}`}
                       >
                         {Object.entries(STATUSES).map(([key, config]) => (
                           <option key={key} value={key} className="bg-[var(--sidebar-bg)] text-[var(--foreground)]">{config.label}</option>
                         ))}
                       </select>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setActiveMenuId(activeMenuId === job.id ? null : job.id); }}
+                        className="p-1.5 rounded-md hover:bg-black/10 dark:hover:bg-white/10 text-[var(--text-secondary)] hover:text-[var(--foreground)] transition"
+                      >
+                        <MoreHorizontal className="h-4 w-4" />
+                      </button>
+                      {activeMenuId === job.id && (
+                        <>
+                          <div className="fixed inset-0 z-40" onClick={() => setActiveMenuId(null)} />
+                          <div className="absolute right-0 top-full mt-2 w-40 bg-[var(--sidebar-bg)] border border-[var(--border-color)] rounded-xl shadow-2xl z-50 overflow-hidden" onClick={(e) => e.stopPropagation()}>
+                            <button onClick={() => openEditModal(job)} className="w-full text-left px-3 py-2 text-xs text-[var(--text-secondary)] hover:bg-black/5 dark:hover:bg-white/5 hover:text-[var(--foreground)] flex items-center gap-2"><Pencil className="h-3 w-3" /> Edit</button>
+                            <button onClick={() => handleDelete(job.id)} className="w-full text-left px-3 py-2 text-xs text-red-500 hover:bg-red-500/10 flex items-center gap-2 border-t border-[var(--border-color)]"><Trash2 className="h-3 w-3" /> Delete</button>
+                          </div>
+                        </>
+                      )}
                     </div>
                   </div>
 
-                  {/* Column 3: Location */}
-                  <div className="col-span-2 flex items-center gap-2 text-xs text-[var(--text-secondary)]">
-                    <MapPin className="h-3.5 w-3.5 opacity-50" />
-                    <span className="truncate">{job.location || "Remote"}</span>
-                  </div>
-
-                  {/* Column 4: Link */}
-                  <div className="col-span-1 flex justify-center">
-                    {job.jobUrl ? (
-                      <a
-                        href={job.jobUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-[var(--text-secondary)] hover:text-[var(--primary)] transition p-1.5 rounded-md hover:bg-black/5 dark:hover:bg-white/5"
-                        title="Open Job Posting"
-                        onClick={(e) => e.stopPropagation()}
+                  {/* Desktop table row */}
+                  <div className="hidden md:grid grid-cols-12 gap-4 p-4 items-center">
+                    {/* Column 1: Info */}
+                    <div className="col-span-4 cursor-pointer min-w-0 pr-4" onClick={() => router.push(`/dashboard/jobs/${job.id}`)}>
+                      <h3 className="font-bold text-[var(--foreground)] text-sm group-hover:text-[var(--primary)] transition-colors truncate" title={job.jobTitle}>{job.jobTitle}</h3>
+                      <p className="text-xs text-[var(--text-secondary)] mt-0.5 truncate">{job.company}</p>
+                    </div>
+                    {/* Column 2: Status */}
+                    <div className="col-span-3">
+                      <div className="relative inline-block">
+                        <select
+                          value={job.status}
+                          onChange={(e) => handleStatusChange(job.id, e.target.value)}
+                          className={`appearance-none pl-3 pr-8 py-1.5 rounded-md text-xs font-medium border bg-transparent cursor-pointer focus:outline-none focus:ring-1 focus:ring-[var(--primary)]/50 transition ${STATUSES[job.status as keyof typeof STATUSES]?.color || "text-[var(--foreground)] border-[var(--border-color)]"}`}
+                        >
+                          {Object.entries(STATUSES).map(([key, config]) => (
+                            <option key={key} value={key} className="bg-[var(--sidebar-bg)] text-[var(--foreground)]">{config.label}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                    {/* Column 3: Location */}
+                    <div className="col-span-2 flex items-center gap-2 text-xs text-[var(--text-secondary)]">
+                      <MapPin className="h-3.5 w-3.5 opacity-50" />
+                      <span className="truncate">{job.location || "Remote"}</span>
+                    </div>
+                    {/* Column 4: Link */}
+                    <div className="col-span-1 flex justify-center">
+                      {job.jobUrl ? (
+                        <a href={job.jobUrl} target="_blank" rel="noopener noreferrer"
+                          className="text-[var(--text-secondary)] hover:text-[var(--primary)] transition p-1.5 rounded-md hover:bg-black/5 dark:hover:bg-white/5"
+                          title="Open Job Posting" onClick={(e) => e.stopPropagation()}>
+                          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 3h6v6" /><path d="M10 14 21 3" /><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /></svg>
+                        </a>
+                      ) : (
+                        <span className="text-[var(--text-secondary)]/50">-</span>
+                      )}
+                    </div>
+                    {/* Column 5: Date */}
+                    <div className="col-span-1 text-right text-xs text-[var(--text-secondary)] font-mono">
+                      {new Date(job.createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+                    </div>
+                    {/* Column 6: Actions */}
+                    <div className="col-span-1 flex justify-center relative" onClick={(e) => e.stopPropagation()}>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setActiveMenuId(activeMenuId === job.id ? null : job.id); }}
+                        className="p-1.5 rounded-md hover:bg-black/10 dark:hover:bg-white/10 text-[var(--text-secondary)] hover:text-[var(--foreground)] transition"
                       >
-                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-external-link"><path d="M15 3h6v6" /><path d="M10 14 21 3" /><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /></svg>
-                      </a>
-                    ) : (
-                      <span className="text-[var(--text-secondary)]/50">-</span>
-                    )}
-                  </div>
-
-                  {/* Column 5: Date */}
-                  <div className="col-span-1 text-right text-xs text-[var(--text-secondary)] font-mono">
-                    {new Date(job.createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
-                  </div>
-
-                  {/* Column 5: Actions (Kebab Menu) */}
-                  <div className="col-span-1 flex justify-center relative" onClick={(e) => e.stopPropagation()}>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setActiveMenuId(activeMenuId === job.id ? null : job.id);
-                      }}
-                      className="p-1.5 rounded-md hover:bg-black/10 dark:hover:bg-white/10 text-[var(--text-secondary)] hover:text-[var(--foreground)] transition"
-                    >
-                      <MoreHorizontal className="h-4 w-4" />
-                    </button>
-
-                    {/* Dropdown Menu */}
-                    {activeMenuId === job.id && (
-                      <>
-                        <div className="fixed inset-0 z-40" onClick={() => setActiveMenuId(null)}></div>
-                        <div className="absolute right-0 top-full mt-2 w-48 bg-[var(--sidebar-bg)] border border-[var(--border-color)] rounded-xl shadow-2xl z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-100" onClick={(e) => e.stopPropagation()}>
-                          <button
-                            onClick={() => openEditModal(job)}
-                            className="w-full text-left px-3 py-2 text-xs text-[var(--text-secondary)] hover:bg-black/5 dark:hover:bg-white/5 hover:text-[var(--foreground)] flex items-center gap-2"
-                          >
-                            <Pencil className="h-3 w-3" /> Edit
-                          </button>
-                          <button
-                            onClick={() => handleDelete(job.id)}
-                            className="w-full text-left px-3 py-2 text-xs text-red-500 hover:bg-red-500/10 flex items-center gap-2 border-t border-[var(--border-color)]"
-                          >
-                            <Trash2 className="h-3 w-3" /> Delete
-                          </button>
-                        </div>
-                      </>
-                    )}
+                        <MoreHorizontal className="h-4 w-4" />
+                      </button>
+                      {activeMenuId === job.id && (
+                        <>
+                          <div className="fixed inset-0 z-40" onClick={() => setActiveMenuId(null)} />
+                          <div className="absolute right-0 top-full mt-2 w-48 bg-[var(--sidebar-bg)] border border-[var(--border-color)] rounded-xl shadow-2xl z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-100" onClick={(e) => e.stopPropagation()}>
+                            <button onClick={() => openEditModal(job)} className="w-full text-left px-3 py-2 text-xs text-[var(--text-secondary)] hover:bg-black/5 dark:hover:bg-white/5 hover:text-[var(--foreground)] flex items-center gap-2"><Pencil className="h-3 w-3" /> Edit</button>
+                            <button onClick={() => handleDelete(job.id)} className="w-full text-left px-3 py-2 text-xs text-red-500 hover:bg-red-500/10 flex items-center gap-2 border-t border-[var(--border-color)]"><Trash2 className="h-3 w-3" /> Delete</button>
+                          </div>
+                        </>
+                      )}
+                    </div>
                   </div>
 
                 </div>
@@ -558,7 +577,7 @@ function JobModal({ jobToEdit, onClose, onSuccess }: { jobToEdit: Job | null; on
         {/* Scrollable Form Body */}
         <div className="overflow-y-auto custom-scrollbar p-6">
           <form id="jobForm" onSubmit={submit} className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1.5 uppercase">Job Title <span className="text-red-500">*</span></label>
                 <input required className="w-full p-3 bg-black/5 dark:bg-white/5 border border-[var(--border-color)] rounded-lg text-[var(--foreground)] focus:border-[var(--primary)]/50 outline-none transition text-sm" placeholder="e.g. Frontend Engineer" value={form.jobTitle} onChange={(e) => setForm({ ...form, jobTitle: e.target.value })} />

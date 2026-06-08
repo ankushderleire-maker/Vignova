@@ -191,3 +191,12 @@ body {
 .delay-300 {
   animation-delay: 300ms;
 }
+
+@keyframes drawerSlideIn {
+  from { transform: translateX(-100%); }
+  to   { transform: translateX(0); }
+}
+
+.animate-drawer-slide-in {
+  animation: drawerSlideIn 0.25s ease-out forwards;
+}
