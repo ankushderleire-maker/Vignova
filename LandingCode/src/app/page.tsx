@@ -5,6 +5,7 @@ import FeaturesGrid from '@/components/FeaturesGrid';
 import MasterProfile from '@/components/MasterProfile';
 import ExtensionFeature from '@/components/ExtensionFeature';
 import ResumeAnalysis from '@/components/ResumeAnalysis';
+import LinkedInOptimizer from '@/components/LinkedInOptimizer';
 import JobTracker from '@/components/JobTracker';
 import CareerRoadmap from '@/components/CareerRoadmap';
 import Testimonials from '@/components/Testimonials';
@@ -22,6 +23,7 @@ export default function Home() {
       <MasterProfile />
       <ResumeAnalysis />
       <ExtensionFeature />
+      <LinkedInOptimizer />
       <JobTracker />
       <CareerRoadmap />
       <Testimonials />
