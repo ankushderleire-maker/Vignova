@@ -15,7 +15,7 @@ const item: Variants = {
 
 // Simulated typing for the URL field
 function TypedUrl() {
-  const full = 'linkedin.com/in/ankush-derle';
+  const full = 'linkedin.com/in/captain-jack-sparrow';
   const [shown, setShown] = useState(0);
   useEffect(() => {
     if (shown >= full.length) return;
@@ -66,8 +66,8 @@ export default function LinkedInFlow() {
                   <div className="flex gap-3 items-center">
                     <div className="w-4 h-4 rounded-full border-[5px] border-blue-500 bg-white shrink-0" />
                     <div>
-                      <p className="text-sm font-bold text-gray-900">Ankush Derle</p>
-                      <p className="text-xs text-gray-500">AI Engineer · Updated 2d ago</p>
+                      <p className="text-sm font-bold text-gray-900">Captain Jack Sparrow</p>
+                      <p className="text-xs text-gray-500">Pirate Lord · Updated 2d ago</p>
                     </div>
                   </div>
                 </div>
@@ -173,7 +173,7 @@ export default function LinkedInFlow() {
                 <div className="flex items-start justify-between mb-1">
                   <div className="min-w-0">
                     <div className="flex items-center gap-1.5 mb-0.5">
-                      <span className="text-sm font-bold text-gray-900">Ankush Derle</span>
+                      <span className="text-sm font-bold text-gray-900">Captain Jack Sparrow</span>
                       <CheckCircle2 className="w-3.5 h-3.5 text-blue-600 fill-blue-100 shrink-0" />
                     </div>
                     <motion.p
@@ -182,7 +182,7 @@ export default function LinkedInFlow() {
                       transition={{ delay: 0.4 }}
                       className="text-[10px] text-gray-700 leading-snug max-w-[320px]"
                     >
-                      Generative AI &amp; Machine Learning Engineer | LLM &amp; MLOps Specialist | Python, FastAPI, Docker | Driving AI Innovation &amp; Automation
+                      Pirate Lord of the Caribbean | Expert Negotiator &amp; Naval Commander | Escapology, Sword Fighting &amp; Treasure Acquisition Specialist
                     </motion.p>
                   </div>
                   <div className="shrink-0 text-right ml-2">
@@ -193,7 +193,7 @@ export default function LinkedInFlow() {
 
                 <div className="flex items-center gap-3 mt-2">
                   <div className="flex items-center gap-1 text-[10px] text-gray-500">
-                    <MapPin className="w-3 h-3 shrink-0" /> Dublin, Ireland
+                    <MapPin className="w-3 h-3 shrink-0" /> Tortuga, Caribbean
                   </div>
                   <div className="flex items-center gap-1 text-[10px] text-blue-600 font-semibold cursor-pointer">
                     <Link2 className="w-3 h-3" /> Contact info
