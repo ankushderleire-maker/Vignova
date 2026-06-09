@@ -1,0 +1,131 @@
+{
+    "manifest_version": 3,
+    "name": "Vignova - Your Career AI Assistant",
+    "short_name": "Vignova",
+    "version": "1.2.0",
+    "description": "AI-powered career copilot: tailor resumes for any job, auto-fill applications on LinkedIn & Indeed, track jobs with a Kanban board, and optimize your LinkedIn profile.",
+
+    "minimum_chrome_version": "116",
+
+    "icons": {
+        "16":  "icons/icon16.png",
+        "48":  "icons/icon48.png",
+        "128": "icons/icon128.png"
+    },
+
+    "action": {
+        "default_title": "Vignova – Career AI",
+        "default_icon": {
+            "16": "icons/icon16.png",
+            "48": "icons/icon48.png"
+        }
+    },
+
+    "background": {
+        "service_worker": "background/service-worker.js",
+        "type": "module"
+    },
+
+    "content_scripts": [
+        {
+            "matches": [
+                "*://*.linkedin.com/jobs/*",
+                "*://linkedin.com/jobs/*"
+            ],
+            "js": [
+                "utils/api.js",
+                "utils/localScorer.js",
+                "content/overlay.js",
+                "content/linkedin.js"
+            ],
+            "css": [
+                "styles/button.css",
+                "content/overlay.css"
+            ],
+            "run_at": "document_idle"
+        },
+        {
+            "matches": [
+                "*://*.linkedin.com/in/*",
+                "*://linkedin.com/in/*",
+                "*://*.linkedin.com/details/skills/*",
+                "*://linkedin.com/details/skills/*",
+                "*://*.linkedin.com/dashboard/*",
+                "*://linkedin.com/dashboard/*"
+            ],
+            "js": [
+                "content/linkedin_scraper.js"
+            ],
+            "run_at": "document_idle"
+        },
+        {
+            "matches": [
+                "*://*.indeed.com/*",
+                "*://indeed.com/*"
+            ],
+            "js": [
+                "utils/api.js",
+                "utils/localScorer.js",
+                "content/overlay.js",
+                "content/indeed.js"
+            ],
+            "css": [
+                "styles/button.css",
+                "content/overlay.css"
+            ],
+            "run_at": "document_idle"
+        },
+        {
+            "matches": [
+                "<all_urls>"
+            ],
+            "js": [
+                "agent/observer.js",
+                "agent/ruleEngine.js",
+                "agent/atsDetector.js",
+                "agent/planner.js",
+                "agent/executor.js",
+                "agent/agentLoop.js",
+                "content/fileInterceptor.js",
+                "content/autoapply.js",
+                "content/dashboard_bridge.js"
+            ],
+            "run_at": "document_idle",
+            "all_frames": false
+        }
+    ],
+
+    "permissions": [
+        "storage",
+        "activeTab",
+        "tabs",
+        "scripting"
+    ],
+
+    "host_permissions": [
+        "https://app.vignova.io/*",
+        "https://api.vignova.io/*",
+        "https://*.linkedin.com/*",
+        "https://*.indeed.com/*",
+        "https://*.workday.com/*",
+        "https://*.greenhouse.io/*",
+        "https://*.lever.co/*",
+        "https://*.ashbyhq.com/*"
+    ],
+
+    "web_accessible_resources": [
+        {
+            "resources": [
+                "assets/*",
+                "popup/*",
+                "icons/*",
+                "utils/dotlottie-player.js"
+            ],
+            "matches": [
+                "https://app.vignova.io/*",
+                "https://*.linkedin.com/*",
+                "https://*.indeed.com/*"
+            ]
+        }
+    ]
+}
