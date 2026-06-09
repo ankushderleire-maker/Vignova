@@ -8,9 +8,10 @@ import JobsFlow from './hero/JobsFlow';
 import SavedFlow from './hero/SavedFlow';
 import ProfileFlow from './hero/ProfileFlow';
 import AtsFlow from './hero/AtsFlow';
+import LinkedInFlow from './hero/LinkedInFlow';
 
-type Feature = 'profile' | 'resume' | 'ats' | 'saved' | 'tracker' | 'jobs';
-const featureOrder: Feature[] = ['profile', 'resume', 'ats', 'saved', 'tracker', 'jobs'];
+type Feature = 'profile' | 'resume' | 'ats' | 'saved' | 'tracker' | 'jobs' | 'linkedin';
+const featureOrder: Feature[] = ['profile', 'resume', 'ats', 'saved', 'tracker', 'jobs', 'linkedin'];
 
 export default function Hero() {
   const [active, setActive] = useState<Feature>('resume');
@@ -19,7 +20,7 @@ export default function Hero() {
   // Smooth, fast continuous cycle matching the UI animation durations
   useEffect(() => {
     let tid: NodeJS.Timeout;
-    const duration = (active === 'resume' || active === 'ats') ? 4500 : (active === 'profile') ? 2500 : 3500;
+    const duration = (active === 'resume' || active === 'ats') ? 4500 : (active === 'profile') ? 2500 : (active === 'linkedin') ? 5000 : 3500;
     tid = setTimeout(() => {
       const next = featureOrder[(featureOrder.indexOf(active) + 1) % featureOrder.length];
       setActive(next);
@@ -104,6 +105,17 @@ export default function Hero() {
                     <p className="text-lg lg:text-xl text-gray-500 font-light tracking-tight leading-relaxed max-w-md mx-auto">Search and discover high-matching positions based on your exact skillset and preferences.</p>
                   </motion.div>
                 )}
+                {active === 'linkedin' && (
+                  <motion.div key="text-linkedin" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="absolute inset-0 flex flex-col justify-center items-center w-full">
+                    <h1 className="text-5xl md:text-6xl font-extrabold text-[#0A192F] tracking-tight leading-tight mb-6">
+                      LinkedIn Score,<br />
+                      <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#0A66C2] to-[#7C3AED]">100 out of 100.</span>
+                    </h1>
+                    <p className="text-lg text-slate-500 font-light leading-relaxed max-w-lg mx-auto">
+                      AI analyzes your LinkedIn profile, matches it against your Master Resume, and rewrites it to maximize recruiter visibility and keyword ranking.
+                    </p>
+                  </motion.div>
+                )}
               </AnimatePresence>
             </div>
 
@@ -172,6 +184,7 @@ export default function Hero() {
                       {active === 'saved' && 'Resume Vault'}
                       {active === 'tracker' && 'Application Tracker'}
                       {active === 'jobs' && 'AI Job Matching'}
+                      {active === 'linkedin' && 'LinkedIn Optimizer'}
                     </motion.span>
                   </AnimatePresence>
                 </div>
@@ -191,6 +204,7 @@ export default function Hero() {
                   {active === 'saved' && <SavedFlow key={`sf-${cycleKey}`} />}
                   {active === 'tracker' && <TrackerFlow key={`tf-${cycleKey}`} />}
                   {active === 'jobs' && <JobsFlow key={`jf-${cycleKey}`} />}
+                  {active === 'linkedin' && <LinkedInFlow key={`lf-${cycleKey}`} />}
                 </AnimatePresence>
               </div>
               </div>
@@ -204,6 +218,7 @@ export default function Hero() {
               <div onClick={() => { setActive('saved'); setCycleKey(k => k + 1); }} className={`h-1.5 rounded-full cursor-pointer transition-all duration-300 ${active === 'saved' ? 'w-8 bg-blue-600' : 'w-2 bg-gray-300 hover:bg-gray-400'}`} />
               <div onClick={() => { setActive('tracker'); setCycleKey(k => k + 1); }} className={`h-1.5 rounded-full cursor-pointer transition-all duration-300 ${active === 'tracker' ? 'w-8 bg-blue-600' : 'w-2 bg-gray-300 hover:bg-gray-400'}`} />
               <div onClick={() => { setActive('jobs'); setCycleKey(k => k + 1); }} className={`h-1.5 rounded-full cursor-pointer transition-all duration-300 ${active === 'jobs' ? 'w-8 bg-blue-600' : 'w-2 bg-gray-300 hover:bg-gray-400'}`} />
+              <div onClick={() => { setActive('linkedin'); setCycleKey(k => k + 1); }} className={`h-1.5 rounded-full cursor-pointer transition-all duration-300 ${active === 'linkedin' ? 'w-8 bg-[#0A66C2]' : 'w-2 bg-gray-300 hover:bg-gray-400'}`} />
             </div>
           </div>
 
