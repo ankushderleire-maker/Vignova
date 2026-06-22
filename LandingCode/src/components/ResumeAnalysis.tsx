@@ -196,7 +196,7 @@ export default function ResumeAnalysis() {
               viewport={{ once: true }}
               transition={{ type: "spring", damping: 20 }}
             >
-              <div className="inline-flex items-center px-3 py-1 rounded-full bg-brand-50 text-brand-600 text-xs font-bold uppercase tracking-widest mb-6 mx-auto lg:mx-0">
+              <div className="inline-flex items-center px-3 py-1 rounded-full bg-blue-50 border border-blue-100 text-blue-600 text-xs font-bold uppercase tracking-widest mb-6 mx-auto lg:mx-0">
                 Parse Engine
               </div>
               <h2 className="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tighter text-[#0A192F] mb-6 leading-tight">

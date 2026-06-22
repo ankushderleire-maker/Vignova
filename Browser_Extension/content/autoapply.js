@@ -12,6 +12,26 @@
 
     let agentStarted = false;
     const isInIframe = (window !== window.top);
+    const hostname = window.location.hostname;
+    const hasDedicatedScript = hostname.includes("linkedin.com") || hostname.includes("indeed.com");
+
+    function hasValidExtensionContext() {
+        try {
+            return Boolean(chrome?.runtime?.id);
+        } catch (_) {
+            return false;
+        }
+    }
+
+    // Heartbeat: remove stale dashboard/minimized UI when extension is reloaded/invalidated
+    if (!isInIframe) {
+        const _ctxHeartbeat = setInterval(() => {
+            if (hasValidExtensionContext()) return;
+            clearInterval(_ctxHeartbeat);
+            document.getElementById("vignova-minimized-btn")?.remove();
+            document.getElementById("vignova-dashboard-container")?.remove();
+        }, 3000);
+    }
 
     // Listen for cross-frame messages via background script
     chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -177,59 +197,15 @@
         console.log("[Vignova] Auto-Apply agent loaded in parent page.");
     }
 
-    // Cross-Frame Dashboard Drag Logic
-    let isDragging = false;
-    let dragStartX = 0;
-    let dragStartY = 0;
-    let startLeft = 0;
-    let startTop = 0;
-
+    // Cross-Frame Dashboard Message Logic
     window.addEventListener("message", (e) => {
         // Must come from our own extension URL
         if (!e.origin.startsWith("chrome-extension://")) return;
-
-        if (e.data.type === "Vignova_DRAG_START") {
-            const container = document.getElementById("vignova-dashboard-container");
-            const iframe = document.getElementById("vignova-dashboard-iframe");
-            if (!container || !iframe) return;
-
-            isDragging = true;
-            dragStartX = e.data.clientX;
-            dragStartY = e.data.clientY;
-
-            const rect = container.getBoundingClientRect();
-            startLeft = rect.left;
-            startTop = rect.top;
-
-            // Important: disable pointer events on iframe so mousemove fires on parent document
-            iframe.style.pointerEvents = "none";
-        }
 
         if (e.data.type === "Vignova_CLOSE_DASHBOARD") {
             toggleDashboard(false);
             chrome.storage.local.set({ vignova_ui_state: "minimized" });
         }
-    });
-
-    document.addEventListener("mousemove", (e) => {
-        if (!isDragging) return;
-        const container = document.getElementById("vignova-dashboard-container");
-        if (!container) return;
-
-        const dx = e.clientX - dragStartX;
-        const dy = e.clientY - dragStartY;
-
-        container.style.left = `${startLeft + dx}px`;
-        container.style.top = `${startTop + dy}px`;
-        container.style.right = "auto";
-        container.style.bottom = "auto";
-    });
-
-    document.addEventListener("mouseup", () => {
-        if (!isDragging) return;
-        isDragging = false;
-        const iframe = document.getElementById("vignova-dashboard-iframe");
-        if (iframe) iframe.style.pointerEvents = "auto"; // Restore interaction
     });
 
     // Helper to get or create minimize pill
@@ -268,12 +244,18 @@
                 }
             });
 
-            btn.title = "Open Vignova (Drag to move)";
+            btn.title = "Open Vignova (Drag vertically to move)";
 
-            // Vignova logo on black background
-            btn.innerHTML = `<div style="background:#0f0f0f;border-radius:8px;padding:8px;display:flex;align-items:center;justify-content:center;"><img src="${chrome.runtime.getURL('icons/logo.png')}" style="width:32px;height:32px;object-fit:contain;"></div>`;
+            btn.textContent = "";
+            const div = document.createElement("div");
+            div.style.cssText = "background:#0f0f0f;border-radius:8px;padding:8px;display:flex;align-items:center;justify-content:center;";
+            const img = document.createElement("img");
+            img.src = chrome.runtime.getURL('icons/logo.png');
+            img.style.cssText = "width:32px;height:32px;object-fit:contain;";
+            div.appendChild(img);
+            btn.appendChild(div);
 
-            // Drag logic
+            // Vertical Drag logic
             let isDraggingBtn = false;
             let startY = 0;
             let startTopBtn = 0;
@@ -287,8 +269,7 @@
 
                 // Get current top in px
                 const rect = btn.getBoundingClientRect();
-                // Because transform: translateY(-50%) is active, rect.top is the visual top.
-                // We want to track the center of the button (which corresponds to 'top' CSS prop with translateY(-50%))
+                // Because transform: translateY(-50%) is active, we track the center
                 startTopBtn = rect.top + (rect.height / 2);
 
                 btn.style.transition = "none"; // Disable CSS transition while dragging
@@ -299,10 +280,10 @@
                 if (!isDraggingBtn) return;
 
                 const dy = e.clientY - startY;
-                if (Math.abs(dy) > 3) hasMoved = true; // Threshold to differenciate click vs drag
+                if (Math.abs(dy) > 3) hasMoved = true; // Threshold to differentiate click vs drag
 
                 let newTop = startTopBtn + dy;
-                // Constrain to viewport
+                // Constrain to viewport vertically
                 newTop = Math.max(20, Math.min(window.innerHeight - 20, newTop));
 
                 btn.style.top = `${newTop}px`;
@@ -312,10 +293,10 @@
                 if (!isDraggingBtn) return;
                 isDraggingBtn = false;
                 btn.isDragging = false;
-                btn.style.transition = "transform 0.2s, background 0.2s"; // Restore
+                btn.style.transition = "transform 0.2s, box-shadow 0.2s"; // Restore transition
 
                 if (hasMoved) {
-                    // Save position
+                    // Save vertical position
                     chrome.storage.local.set({ vignova_ui_y: btn.style.top });
                 } else {
                     // It was a click
@@ -342,6 +323,11 @@
      */
     function toggleDashboard(forceShow = undefined) {
         if (isInIframe) return; // Only top window mounts dashboard
+        if (!hasValidExtensionContext()) {
+            document.getElementById("vignova-minimized-btn")?.remove();
+            document.getElementById("vignova-dashboard-container")?.remove();
+            return;
+        }
 
         let container = document.getElementById("vignova-dashboard-container");
         const minBtn = getMinimizeButton();
@@ -416,10 +402,7 @@
     }
 
     // Auto-inject UI if ATS is detected (skip on sites with dedicated content scripts)
-    const _hostname = window.location.hostname;
-    const _hasDedicatedScript = _hostname.includes("linkedin.com") || _hostname.includes("indeed.com");
-
-    if (!_hasDedicatedScript) {
+    if (!hasDedicatedScript) {
         setTimeout(() => {
             const ats = window.Vignova_ATSDetector ? window.Vignova_ATSDetector.detect() : null;
             const hasFields = document.querySelectorAll("input, textarea, select").length > 3;
@@ -436,5 +419,28 @@
                 }
             }
         }, 1500);
+    }
+
+    // On LinkedIn/Indeed: always show the minimized logo so the user can open the dashboard
+    if (hasDedicatedScript && !isInIframe) {
+        setTimeout(() => {
+            if (!hasValidExtensionContext()) return;
+            chrome.storage.local.get(["vignova_ui_state"], (result) => {
+                if (result.vignova_ui_state === "maximized") {
+                    toggleDashboard(true);
+                } else {
+                    const btn = getMinimizeButton();
+                    btn.style.display = "flex";
+                }
+            });
+        }, 1500);
+    }
+
+    // Allow linkedin.js / indeed.js to open the dashboard via a DOM event
+    if (!isInIframe) {
+        window.addEventListener("vignova:open-dashboard", () => {
+            toggleDashboard(true);
+            chrome.storage.local.set({ vignova_ui_state: "maximized" });
+        });
     }
 })();

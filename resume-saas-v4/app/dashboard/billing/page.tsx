@@ -41,6 +41,8 @@ interface PlanConfig {
     ai_optimization_label: string;
     templates_label: string;
     support_label: string;
+    has_linkedin_optimization: boolean;
+    has_interview_prep: boolean;
     is_popular: boolean;
 }
 
@@ -209,6 +211,8 @@ export default function BillingPage() {
                             multiProfile: pc.has_multi_profile,
                             unlimitedResumes: pc.has_unlimited_resumes,
                             aiOptimization: pc.ai_optimization_label,
+                            linkedinOptimization: pc.has_linkedin_optimization,
+                            interviewPrep: pc.has_interview_prep,
                             templates: pc.templates_label,
                             support: pc.support_label,
                         },

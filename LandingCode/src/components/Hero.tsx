@@ -33,9 +33,9 @@ export default function Hero() {
     <section className="relative bg-[#F5F8FA] overflow-hidden min-h-[95vh] flex items-center pt-32 pb-12 lg:pt-40 lg:pb-20">
       {/* Abstract Ambient Background Glows */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
-        <div className="absolute -top-[20%] -left-[10%] w-[70%] h-[70%] rounded-full bg-gradient-to-br from-blue-500/40 to-transparent blur-[100px] animate-orb"></div>
-        <div className="absolute top-[20%] -right-[20%] w-[80%] h-[80%] rounded-full bg-gradient-to-tl from-indigo-500/30 to-transparent blur-[120px] animate-orb-slow"></div>
-        <div className="absolute -bottom-[30%] left-[10%] w-[60%] h-[60%] rounded-full bg-gradient-to-tr from-violet-500/30 to-transparent blur-[120px] animate-orb"></div>
+        <div className="absolute -top-[20%] -left-[10%] w-[70%] h-[70%] rounded-full bg-gradient-to-br from-blue-500/25 to-transparent blur-[100px] animate-orb"></div>
+        <div className="absolute top-[20%] -right-[20%] w-[80%] h-[80%] rounded-full bg-gradient-to-tl from-indigo-500/20 to-transparent blur-[120px] animate-orb-slow"></div>
+        <div className="absolute -bottom-[30%] left-[10%] w-[60%] h-[60%] rounded-full bg-gradient-to-tr from-violet-500/20 to-transparent blur-[120px] animate-orb"></div>
       </div>
       <div className="w-full px-4 md:px-8 xl:px-12 2xl:px-20 max-w-[1700px] mx-auto relative z-10 pointer-events-none">
         <div className="flex flex-col lg:flex-row items-center justify-center gap-8 lg:gap-12 xl:gap-16">
@@ -48,9 +48,13 @@ export default function Hero() {
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.1 }}
-              className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 border border-blue-100 text-blue-600 text-xs font-bold tracking-widest uppercase mb-4 shadow-sm"
+              className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/70 backdrop-blur-sm border border-blue-200/60 text-blue-700 text-[11px] font-bold tracking-[0.18em] uppercase mb-4 shadow-sm"
             >
-               ✨ The #1 AI Career Copilot
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-500 opacity-60"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-600"></span>
+              </span>
+              The #1 AI Career Copilot
             </motion.div>
 
             {/* Dynamic Text synced with animations */}
@@ -151,10 +155,10 @@ export default function Hero() {
               </div>
 
               <div className="flex items-center gap-3">
-                <button onClick={() => window.location.href = 'https://app.vignova.io/login'} className="h-13 px-8 rounded-xl bg-[#0A192F] text-white font-semibold text-sm hover:bg-[#0d2240] transition-all shadow-lg shadow-black/10 flex items-center gap-2">
-                  Get started free <ArrowRight className="w-4 h-4" />
+                <button onClick={() => window.location.href = 'https://app.vignova.io/login'} className="group h-13 px-8 rounded-xl bg-[#0A192F] text-white font-semibold text-sm hover:bg-[#0d2240] transition-all duration-300 shadow-lg shadow-blue-900/20 hover:shadow-xl hover:shadow-blue-900/25 hover:-translate-y-0.5 active:translate-y-0 flex items-center gap-2">
+                  Get started free <ArrowRight className="w-4 h-4 transition-transform duration-300 group-hover:translate-x-1" />
                 </button>
-                <button onClick={() => window.location.href = 'https://app.vignova.io/login'} className="h-13 px-6 rounded-xl bg-white border border-gray-200 text-[#0A192F] font-semibold text-sm hover:bg-gray-50 transition-all shadow-sm flex items-center gap-2">
+                <button onClick={() => window.location.href = 'https://app.vignova.io/login'} className="h-13 px-6 rounded-xl bg-white/80 backdrop-blur-sm border border-gray-200 text-[#0A192F] font-semibold text-sm hover:bg-white hover:border-gray-300 transition-all duration-300 shadow-sm hover:-translate-y-0.5 active:translate-y-0 flex items-center gap-2">
                   <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="5 3 19 12 5 21 5 3" /></svg>
                   Watch demo
                 </button>
@@ -210,15 +214,41 @@ export default function Hero() {
               </div>
             </div>
 
-            {/* Pagination / Feature Indicators Below Animation */}
-            <div className="flex items-center justify-center gap-3 mt-8 max-w-[1200px] w-full pointer-events-auto">
-              <div onClick={() => { setActive('profile'); setCycleKey(k => k + 1); }} className={`h-1.5 rounded-full cursor-pointer transition-all duration-300 ${active === 'profile' ? 'w-8 bg-blue-600' : 'w-2 bg-gray-300 hover:bg-gray-400'}`} />
-              <div onClick={() => { setActive('resume'); setCycleKey(k => k + 1); }} className={`h-1.5 rounded-full cursor-pointer transition-all duration-300 ${active === 'resume' ? 'w-8 bg-blue-600' : 'w-2 bg-gray-300 hover:bg-gray-400'}`} />
-              <div onClick={() => { setActive('ats'); setCycleKey(k => k + 1); }} className={`h-1.5 rounded-full cursor-pointer transition-all duration-300 ${active === 'ats' ? 'w-8 bg-blue-600' : 'w-2 bg-gray-300 hover:bg-gray-400'}`} />
-              <div onClick={() => { setActive('saved'); setCycleKey(k => k + 1); }} className={`h-1.5 rounded-full cursor-pointer transition-all duration-300 ${active === 'saved' ? 'w-8 bg-blue-600' : 'w-2 bg-gray-300 hover:bg-gray-400'}`} />
-              <div onClick={() => { setActive('tracker'); setCycleKey(k => k + 1); }} className={`h-1.5 rounded-full cursor-pointer transition-all duration-300 ${active === 'tracker' ? 'w-8 bg-blue-600' : 'w-2 bg-gray-300 hover:bg-gray-400'}`} />
-              <div onClick={() => { setActive('jobs'); setCycleKey(k => k + 1); }} className={`h-1.5 rounded-full cursor-pointer transition-all duration-300 ${active === 'jobs' ? 'w-8 bg-blue-600' : 'w-2 bg-gray-300 hover:bg-gray-400'}`} />
-              <div onClick={() => { setActive('linkedin'); setCycleKey(k => k + 1); }} className={`h-1.5 rounded-full cursor-pointer transition-all duration-300 ${active === 'linkedin' ? 'w-8 bg-[#0A66C2]' : 'w-2 bg-gray-300 hover:bg-gray-400'}`} />
+            {/* Feature Indicators Below Animation */}
+            {/* Labeled chips on md+ screens */}
+            <div className="hidden md:flex items-center justify-center flex-wrap gap-2 mt-8 max-w-[1200px] w-full pointer-events-auto">
+              {([
+                { id: 'profile', label: 'Master Profile' },
+                { id: 'resume', label: 'AI Resume' },
+                { id: 'ats', label: 'ATS Score' },
+                { id: 'saved', label: 'Resume Vault' },
+                { id: 'tracker', label: 'Job Tracker' },
+                { id: 'jobs', label: 'Job Matching' },
+                { id: 'linkedin', label: 'LinkedIn' },
+              ] as { id: Feature; label: string }[]).map((f) => (
+                <button
+                  key={f.id}
+                  onClick={() => { setActive(f.id); setCycleKey(k => k + 1); }}
+                  className={`px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all duration-300 border ${
+                    active === f.id
+                      ? 'bg-[#0A192F] text-white border-[#0A192F] shadow-md shadow-blue-900/15'
+                      : 'bg-white/70 text-slate-500 border-gray-200 hover:text-[#0A192F] hover:border-gray-300'
+                  }`}
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
+            {/* Compact dots on small screens */}
+            <div className="flex md:hidden items-center justify-center gap-2.5 mt-6 w-full pointer-events-auto">
+              {featureOrder.map((f) => (
+                <button
+                  key={f}
+                  onClick={() => { setActive(f); setCycleKey(k => k + 1); }}
+                  aria-label={f}
+                  className={`h-1.5 rounded-full transition-all duration-300 ${active === f ? 'w-7 bg-blue-600' : 'w-2 bg-gray-300'}`}
+                />
+              ))}
             </div>
           </div>
 

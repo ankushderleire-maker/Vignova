@@ -9,15 +9,15 @@ export default function Footer() {
       <div className="container mx-auto px-4 md:px-6 max-w-6xl">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-12 mb-20">
           <div className="col-span-1 md:col-span-1">
-            <Link href="/" className="flex items-center gap-1 mb-6 group w-fit">
-              <img 
-                src="/logo.png" 
-                alt="Vignova Logo" 
-                width={56} 
-                height={56} 
-                className="object-contain group-hover:scale-105 transition-transform"
+            <Link href="/" className="flex items-center gap-1.5 mb-6 group w-fit">
+              <img
+                src="/logo.png"
+                alt="Vignova Logo"
+                width={40}
+                height={40}
+                className="object-contain group-hover:scale-105 transition-transform duration-300"
               />
-              <span className="text-[32px] font-extrabold tracking-normal text-white uppercase" style={{ fontFamily: "'Inter', 'Helvetica Neue', sans-serif" }}>VIGNOVA</span>
+              <span className="text-xl font-extrabold tracking-[0.08em] text-white uppercase">Vignova</span>
             </Link>
             <p className="text-sm font-light leading-relaxed mb-6 max-w-[280px]">
               AI-powered career platform. Create tailored resumes, optimize for ATS systems, and apply to jobs faster.
@@ -31,7 +31,9 @@ export default function Footer() {
           <div className="md:ml-auto">
             <h4 className="font-semibold text-white tracking-tight mb-6">Product</h4>
             <ul className="space-y-4 text-sm font-light">
+              <li><Link href="/#features" className="hover:text-white transition-colors">Features</Link></li>
               <li><Link href="/how-it-works" className="hover:text-white transition-colors">How It Works</Link></li>
+              <li><a href="https://app.vignova.io/login" className="hover:text-white transition-colors">Get Started</a></li>
             </ul>
           </div>
           

@@ -12,6 +12,34 @@
 (function () {
     "use strict";
 
+    // ─── Overlay manager (defensive) ───
+    // If overlay.js failed to load (partial injection after an extension
+    // update / reload), fall back to a no-op stub instead of crashing the
+    // whole content script with "Vignova_Overlay is not defined".
+    const Vignova_Overlay = window.Vignova_Overlay || {
+        showLoading() {},
+        showError(msg) { console.warn("[Vignova] Overlay unavailable:", msg); },
+        showAllResults() {},
+        remove() {},
+    };
+
+    // ─── Extension Context Validation ───
+    function hasValidExtensionContext() {
+        return typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.id;
+    }
+
+
+    function setBtnContent(btn, iconClass, iconStr, text) {
+        btn.textContent = "";
+        if (iconClass) {
+            const span = document.createElement("span");
+            span.className = iconClass;
+            span.textContent = iconStr;
+            btn.appendChild(span);
+        }
+        if (text) btn.appendChild(document.createTextNode(" " + text.trim()));
+    }
+
     const BUTTON_ID = "vignova-linkedin-tailor-btn";
     const SAVE_BUTTON_ID = "vignova-linkedin-save-btn";
     const CONTAINER_ID = "vignova-linkedin-container";
@@ -85,6 +113,10 @@
     // ─── Observe DOM Changes (LinkedIn is SPA) ───
     let _mutationTimer = null;
     const observer = new MutationObserver(() => {
+        if (!hasValidExtensionContext()) {
+            observer.disconnect();
+            return;
+        }
         // Debounce: coalesce rapid DOM mutations into a single callback
         if (_mutationTimer) clearTimeout(_mutationTimer);
         _mutationTimer = setTimeout(() => {
@@ -125,28 +157,43 @@
 
         // Injection Point: Below Title (User Request)
         // We look for the title container or the primary description container
-        const titleSection =
-            document.querySelector(".job-details-jobs-unified-top-card__primary-description-container") || // Best bet based on user HTML
-            document.querySelector(".job-details-jobs-unified-top-card__title-container") ||
-            document.querySelector(".t-24.job-details-jobs-unified-top-card__job-title");
+        let target = document.querySelector(".job-details-jobs-unified-top-card__primary-description-container") || 
+                     document.querySelector(".job-details-jobs-unified-top-card__title-container") ||
+                     document.querySelector(".t-24.job-details-jobs-unified-top-card__job-title");
 
+        let insertMethod = 'after';
 
-        const fallbackArea =
-            document.querySelector(".jobs-apply-button--top-card")?.parentElement ||
-            document.querySelector(".jobs-s-apply")?.parentElement;
-
-        let target = titleSection;
-        let insertMethod = 'append'; // or 'after'
-
-        if (titleSection) {
-            target = titleSection;
-            insertMethod = 'after';
-        } else if (fallbackArea) {
-            target = fallbackArea;
-            insertMethod = 'append';
-        } else {
-            return;
+        if (!target) {
+            // Fallback 1: Look for standard apply button area
+            const applyBtn = document.querySelector(".jobs-apply-button--top-card") || 
+                             document.querySelector(".jobs-s-apply");
+            if (applyBtn && applyBtn.parentElement) {
+                target = applyBtn.parentElement;
+                insertMethod = 'append';
+            }
         }
+
+        if (!target) {
+            // Fallback 2: Look for the new obfuscated DOM (Search Results View)
+            // It has buttons like aria-label="Save the job" or "Apply" or "Apply on company website"
+            const actionBtn = document.querySelector('button[aria-label="Save the job"]') ||
+                              document.querySelector('button[aria-label="Save"]') ||
+                              document.querySelector('a[aria-label*="Apply"]') ||
+                              document.querySelector('button[aria-label*="Apply"]');
+            
+            if (actionBtn) {
+                // Find a common container. Usually they are flex containers.
+                target = actionBtn.closest("div");
+                insertMethod = 'append';
+                
+                // If it's a wrapper with just the button, go up one level to be alongside other buttons
+                if (target && target.parentElement && target.children.length === 1) {
+                    target = target.parentElement;
+                }
+            }
+        }
+
+        if (!target) return;
 
         // Don't inject if already exists
         if (document.getElementById(CONTAINER_ID)) return;
@@ -173,6 +220,7 @@
 
     async function renderExtensionUI() {
         if (isRenderingUI) return;
+        if (!hasValidExtensionContext()) return;
         isRenderingUI = true;
 
         // Check Auth
@@ -187,13 +235,13 @@
         }
 
         // Clear container AFTER await
-        container.innerHTML = "";
+        container.textContent = "";
 
         if (!authStatus?.isLoggedIn) {
             // Render Login Button
             const loginBtn = document.createElement("button");
             loginBtn.className = "vignova-tailor-btn vignova-btn-login";
-            loginBtn.innerHTML = `<span class="vignova-btn-icon">🔑</span> Login to Vignova to View Options`;
+            setBtnContent(loginBtn, "vignova-btn-icon", "🔑", "Login to Vignova to View Options");
             loginBtn.style.backgroundColor = "#333";
             loginBtn.onclick = () => {
                 chrome.runtime.sendMessage({ type: "OPEN_POPUP" });
@@ -212,14 +260,14 @@
         const tailorBtn = document.createElement("button");
         tailorBtn.id = BUTTON_ID;
         tailorBtn.className = "vignova-tailor-btn";
-        tailorBtn.innerHTML = `<span class="vignova-btn-icon">⚡</span> Tailor Resume`;
+        setBtnContent(tailorBtn, "vignova-btn-icon", "⚡", "Tailor Resume");
         tailorBtn.addEventListener("click", handleTailorClick);
 
         // 2. Save Button
         const saveBtn = document.createElement("button");
         saveBtn.id = SAVE_BUTTON_ID;
         saveBtn.className = "vignova-save-btn";
-        saveBtn.innerHTML = `<span class="vignova-btn-icon">💾</span> Save to Dashboard`;
+        setBtnContent(saveBtn, "vignova-btn-icon", "💾", "Save to Dashboard");
         saveBtn.style.marginLeft = "8px";
         saveBtn.addEventListener("click", handleSaveClick);
 
@@ -241,7 +289,10 @@
         // 0. Match Score Badge
         const scoreBadge = document.createElement("div");
         scoreBadge.className = "vignova-score-badge";
-        scoreBadge.innerHTML = `<div class="vignova-score-loading"></div>`; // Loading spinner
+        scoreBadge.textContent = "";
+        const spinner = document.createElement("div");
+        spinner.className = "vignova-score-loading";
+        scoreBadge.appendChild(spinner); // Loading spinner
         scoreBadge.title = "Calculating Match Score...";
 
         container.appendChild(scoreBadge);
@@ -278,7 +329,7 @@
 
     // ─── Fetch & Display Score ───
     async function fetchAndDisplayScore(badge, retries = 3) {
-        let jobData = scrapeLinkedInJob();
+        let jobData = await scrapeLinkedInJob();
 
         // Single Page Apps often inject the container before the text finishes loading.
         // If the description is suspiciously short (e.g. just whitespace or "Loading..."), wait and retry.
@@ -287,7 +338,7 @@
                 setTimeout(() => fetchAndDisplayScore(badge, retries - 1), 1000);
                 return;
             }
-            badge.innerHTML = "?";
+            badge.textContent = "?";
             badge.title = "Could not parse job description text";
             return;
         }
@@ -301,20 +352,20 @@
             if (response && response.success) {
                 const score = response.score;
 
-                // Categorical Mapping User Request
+                // Categorical Mapping — realistic thresholds
                 let categoryText = "";
                 badge.classList.remove("high", "medium", "low", "very-high", "very-low");
 
-                if (score > 40) {
+                if (score >= 75) {
                     categoryText = "Very High";
                     badge.classList.add("very-high");
-                } else if (score >= 31) {
+                } else if (score >= 55) {
                     categoryText = "High";
                     badge.classList.add("high");
-                } else if (score >= 21) {
+                } else if (score >= 35) {
                     categoryText = "Medium";
                     badge.classList.add("medium");
-                } else if (score >= 11) {
+                } else if (score >= 20) {
                     categoryText = "Low";
                     badge.classList.add("low");
                 } else {
@@ -322,8 +373,7 @@
                     badge.classList.add("very-low");
                 }
 
-                // Remove the word "Match" as requested
-                badge.innerHTML = categoryText;
+                badge.textContent = categoryText;
 
                 // Add Matched Keywords
                 let matchedKeywordsHtml = "";
@@ -354,6 +404,7 @@
                 // Create Advanced HTML Tooltip String
                 const sem = response.breakdown.semantic;
                 const kw = response.breakdown.keyword;
+                const domainRel = response.breakdown.domain_relevance || 100;
                 const metaHtml = (jobMeta.salary || jobMeta.deadline) ? `
                     <div class="vignova-tt-row" style="margin-top:10px; border-top:1px solid #3f3f46; padding-top:10px; gap:8px; flex-wrap:wrap;">
                         ${jobMeta.salary ? `<span style="background:rgba(16,185,129,0.15);border:1px solid rgba(16,185,129,0.3);color:#6ee7b7;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:600;">💰 ${jobMeta.salary}</span>` : ""}
@@ -373,6 +424,11 @@
                         <div class="vignova-tt-bar-bg"><div class="vignova-tt-bar-fill" style="width: ${kw}%; background: #10b981;"></div></div>
                         <span class="vignova-tt-val">${kw}%</span>
                     </div>
+                    <div class="vignova-tt-row">
+                        <span class="vignova-tt-label">Domain Fit</span>
+                        <div class="vignova-tt-bar-bg"><div class="vignova-tt-bar-fill" style="width: ${domainRel}%; background: ${domainRel >= 80 ? '#10b981' : domainRel >= 50 ? '#f59e0b' : '#ef4444'};"></div></div>
+                        <span class="vignova-tt-val">${domainRel}%</span>
+                    </div>
                     ${matchedKeywordsHtml}
                     ${missingKeywordsHtml}
                 `;
@@ -387,12 +443,12 @@
                 badge.addEventListener("mouseleave", hideGlobalTooltip);
 
             } else {
-                badge.innerHTML = "!";
+                badge.textContent = "!";
                 badge.title = "Failed to calculate score";
             }
         } catch (e) {
             console.error(e);
-            badge.innerHTML = "!";
+            badge.textContent = "!";
         }
     }
 
@@ -410,7 +466,11 @@
             document.body.appendChild(globalTooltipEl);
         }
 
-        globalTooltipEl.innerHTML = html;
+        const doc = new DOMParser().parseFromString(html, "text/html");
+        globalTooltipEl.textContent = "";
+        while (doc.body.firstChild) {
+            globalTooltipEl.appendChild(doc.body.firstChild);
+        }
 
         // Show slightly to calculate dimensions
         globalTooltipEl.style.visibility = "hidden";
@@ -445,7 +505,7 @@
         chrome.storage.local.get([url], (result) => {
             const data = result[url];
             if (data?.tailored) {
-                tailorBtn.innerHTML = `<span class="vignova-btn-icon">✅</span> Resume Created`;
+                setBtnContent(tailorBtn, "vignova-btn-icon", "✅", "Resume Created");
                 tailorBtn.classList.add("success");
                 // Optional: Disable or change behavior? User wants "Resume Created button"
                 // Maybe clicking it opens dashboard?
@@ -453,7 +513,7 @@
             }
 
             if (data?.saved) {
-                saveBtn.innerHTML = `<span class="vignova-btn-icon">👁️</span> View in Dashboard`;
+                setBtnContent(saveBtn, "vignova-btn-icon", "👁️", "View in Dashboard");
                 saveBtn.classList.add("success");
                 saveBtn.onclick = () => {
                     window.open(`${Vignova_API_BASE}/dashboard`, "_blank");
@@ -468,11 +528,12 @@
         if (btn.classList.contains("success")) return; // Already saved/view mode
 
         btn.disabled = true;
-        btn.innerHTML = `<span class="vignova-btn-spinner"></span> Saving...`;
+        setBtnContent(btn, "vignova-btn-spinner", "", "Saving...");
 
-        const jobData = scrapeLinkedInJob();
+        const jobData = await scrapeLinkedInJob();
         // jobUrl might be complex, sanitize or use standard
-        const currentUrl = window.location.href.split('?')[0]; // Removing query params usually safer for ID
+        const jobId = getJobIdFromUrl();
+        const currentUrl = jobId ? `https://www.linkedin.com/jobs/view/${jobId}/` : window.location.href.split('?')[0]; // Removing query params usually safer for ID
 
         try {
             const result = await chrome.runtime.sendMessage({
@@ -499,7 +560,7 @@
                     }, () => stampJobListCards());
                 });
 
-                btn.innerHTML = `<span class="vignova-btn-icon">👁️</span> View in Dashboard`;
+                setBtnContent(btn, "vignova-btn-icon", "👁️", "View in Dashboard");
                 btn.classList.add("success");
                 btn.disabled = false;
                 btn.onclick = () => {
@@ -507,16 +568,16 @@
                     window.open("https://app.vignova.io/dashboard", "_blank");
                 };
             } else {
-                btn.innerHTML = "❌ Failed";
+                setBtnContent(btn, null, null, "❌ Failed");
                 setTimeout(() => {
-                    btn.innerHTML = `<span class="vignova-btn-icon">💾</span> Save to Vignova Dashboard`;
+                    setBtnContent(btn, "vignova-btn-icon", "💾", "Save to Vignova Dashboard");
                     btn.disabled = false;
                 }, 2000);
                 alert("Failed to save: " + result.error);
             }
         } catch (err) {
             console.error(err);
-            btn.innerHTML = "❌ Error";
+            setBtnContent(btn, null, null, "❌ Error");
             btn.disabled = false;
         }
     }
@@ -529,21 +590,22 @@
         const btn = document.getElementById(BUTTON_ID);
 
         btn.disabled = true;
-        btn.innerHTML = `<span class="vignova-btn-spinner"></span> Generating...`;
+        setBtnContent(btn, "vignova-btn-spinner", "", "Generating...");
         Vignova_Overlay.showLoading();
 
-        const jobData = scrapeLinkedInJob();
+        const jobData = await scrapeLinkedInJob();
         if (!jobData.jobDescription) {
             Vignova_Overlay.showError("Could not find the job description. Refresh page.");
             resetButton();
             return;
         }
 
-        const currentUrl = window.location.href.split('?')[0];
+        const jobId = getJobIdFromUrl();
+        const currentUrl = jobId ? `https://www.linkedin.com/jobs/view/${jobId}/` : window.location.href.split('?')[0];
 
         try {
             const result = await chrome.runtime.sendMessage({
-                type: "API_GENERATE_RESUME",
+                type: "API_GENERATE_ALL",
                 data: {
                     jobDescription: jobData.jobDescription,
                     jobTitle: jobData.jobTitle,
@@ -555,9 +617,15 @@
 
             if (result.success) {
                 const fileName = `${(jobData.company || "Resume").replace(/[^a-zA-Z0-9]/g, "_")}_Resume.pdf`;
-                Vignova_Overlay.showSuccess(result.pdfBase64, fileName, result.credits_remaining);
+                Vignova_Overlay.showAllResults(
+                    result.pdfBase64,
+                    result.coverLetter,
+                    result.draftEmail,
+                    fileName,
+                    result.credits_remaining
+                );
 
-                btn.innerHTML = `<span class="vignova-btn-icon">✅</span> Resume Created`;
+                setBtnContent(btn, "vignova-btn-icon", "✅", "Resume Created");
                 btn.classList.add("success");
 
                 chrome.storage.local.get([currentUrl], (current) => {
@@ -579,30 +647,93 @@
     }
 
     // ─── Scrape Job Data from LinkedIn DOM ───
-    function scrapeLinkedInJob() {
-        const jobTitle =
-            document.querySelector(".t-24.t-bold.inline")?.innerText?.trim() ||
-            document.querySelector(".job-details-jobs-unified-top-card__job-title")?.innerText?.trim() ||
-            document.querySelector("h1.t-24")?.innerText?.trim() ||
-            "Job Role";
+    async function scrapeLinkedInJob() {
+        const jobId = getJobIdFromUrl();
 
-        const company =
-            document.querySelector(".job-details-jobs-unified-top-card__company-name")?.innerText?.trim() ||
-            document.querySelector(".jobs-unified-top-card__company-name")?.innerText?.trim() ||
-            "Company";
+        let jobTitleEl =
+            document.querySelector(".t-24.t-bold.inline") ||
+            document.querySelector(".job-details-jobs-unified-top-card__job-title") ||
+            document.querySelector('.job-details-jobs-unified-top-card__job-title-link') ||
+            document.querySelector("h2.t-24") ||
+            document.querySelector("h1.t-24") ||
+            document.querySelector(".jobs-search__job-details--container h2") ||
+            document.querySelector(".job-details-jobs-unified-top-card__container--two-pane h2");
+
+        if (!jobTitleEl && jobId) {
+            // Fallback: Find links containing the /jobs/view/jobId in href to avoid matching "Hybrid" badges
+            const anchors = Array.from(document.querySelectorAll(`a[href*="/jobs/view/${jobId}"]`)).filter(a => a.innerText?.trim());
+            if (anchors.length > 0) {
+                jobTitleEl = anchors[0];
+            }
+        }
+        const jobTitle = jobTitleEl?.innerText?.trim() || "Job Role";
+
+        let companyEl = document.querySelector('.job-details-jobs-unified-top-card__company-name') ||
+                        document.querySelector('.jobs-unified-top-card__company-name') ||
+                        document.querySelector('.job-details-jobs-unified-top-card__primary-description a') ||
+                        document.querySelector('.job-details-jobs-unified-top-card__container--two-pane a[href*="/company/"]');
+        
+        if (!companyEl && jobTitleEl) {
+            // Traverse up from jobTitleEl to find a container that also has a company link
+            let container = jobTitleEl.parentElement;
+            while (container && container !== document.body) {
+                const compLinks = Array.from(container.querySelectorAll('a[href*="/company/"]')).filter(a => a.innerText?.trim());
+                if (compLinks.length > 0) {
+                    companyEl = compLinks[0];
+                    break;
+                }
+                container = container.parentElement;
+            }
+        }
+        
+        const company = companyEl?.innerText?.trim() || "Company";
 
         const location =
             document.querySelector(".job-details-jobs-unified-top-card__bullet")?.innerText?.trim() ||
             "";
 
-        const descriptionEl =
+        let descriptionEl =
             document.querySelector("#job-details") ||
             document.querySelector(".jobs-description__content") ||
-            document.querySelector(".jobs-box__html-content");
+            document.querySelector(".jobs-box__html-content") ||
+            document.querySelector("article.jobs-description__container") ||
+            document.querySelector("article") ||
+            document.querySelector('div[class*="description"]') ||
+            document.getElementById("job-details-content") ||
+            document.querySelector('div.job-details-module__content');
 
-        const jobDescription = descriptionEl?.innerText?.trim() || "";
+        // Fallback for extreme obfuscation: look for the "About the job" heading
+        if (!descriptionEl) {
+            const headings = Array.from(document.querySelectorAll("h2"));
+            const aboutHeading = headings.find(h => h.textContent.toLowerCase().includes("about the job"));
+            if (aboutHeading) {
+                // The description is usually the next sibling <p> or wrapped in the parent's parent
+                const nextSib = aboutHeading.parentElement.nextElementSibling;
+                if (nextSib && nextSib.textContent.length > 50) {
+                    descriptionEl = nextSib;
+                } else if (aboutHeading.parentElement.parentElement) {
+                    descriptionEl = aboutHeading.parentElement.parentElement;
+                }
+            }
+        }
 
-        // descriptionEl returned so the review panel can highlight it
+        if (descriptionEl) {
+            // Attempt to expand
+            const buttons = Array.from(document.querySelectorAll('button'));
+            const moreBtn = buttons.find(b => {
+                const text = b.innerText?.trim().toLowerCase() || b.textContent?.trim().toLowerCase();
+                return (text === "see more" || text === "show more" || text.includes("more")) &&
+                       (descriptionEl.contains(b) || (descriptionEl.parentElement && descriptionEl.parentElement.contains(b)));
+            });
+
+            if (moreBtn && (moreBtn.offsetHeight > 0 || moreBtn.getClientRects().length > 0)) {
+                moreBtn.click();
+                await new Promise(r => setTimeout(r, 300));
+            }
+        }
+
+        const jobDescription = descriptionEl?.textContent?.trim() || descriptionEl?.innerText?.trim() || "";
+
         return { jobTitle, company, jobDescription, location, descriptionEl };
     }
 
@@ -613,7 +744,7 @@
         if (btn && !btn.classList.contains("success")) {
             btn.disabled = false;
             btn.classList.remove("vignova-btn-login"); // This line is now redundant as login state is handled by renderExtensionUI
-            btn.innerHTML = `<span class="vignova-btn-icon">⚡</span> Tailor Resume`;
+            setBtnContent(btn, "vignova-btn-icon", "⚡", "Tailor Resume");
         }
     }
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Loader2, Briefcase, User, Lightbulb, AlertCircle, ArrowLeft, Download, History, Plus } from "lucide-react";
+import { Loader2, Briefcase, User, Lightbulb, AlertCircle, ArrowLeft, Download, History, Plus, Sparkles } from "lucide-react";
 import { useReactToPrint } from "react-to-print";
 
 interface Job { id: string; jobTitle: string; company: string; description?: string; }
@@ -20,6 +20,8 @@ export default function InterviewPrepPage() {
   const [source, setSource] = useState<GenerationSource>("profile");
   const [jobs, setJobs] = useState<Job[]>([]);
   const [selectedJobId, setSelectedJobId] = useState<string>("");
+  const [profiles, setProfiles] = useState<any[]>([]);
+  const [selectedProfileId, setSelectedProfileId] = useState<string>("");
   const [questions, setQuestions] = useState<Question[]>([]);
   const [error, setError] = useState("");
   const [activeCompany, setActiveCompany] = useState("");
@@ -28,6 +30,7 @@ export default function InterviewPrepPage() {
   // History States
   const [history, setHistory] = useState<SavedInterview[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
+  const [showCreditModal, setShowCreditModal] = useState(false);
 
   // Printing
   const printRef = useRef<HTMLDivElement>(null);
@@ -36,7 +39,7 @@ export default function InterviewPrepPage() {
     documentTitle: "Interview_Prep_Questions"
   });
 
-  // Fetch jobs for dropdown
+  // Fetch jobs and profiles for dropdowns
   useEffect(() => {
     fetch("/api/jobs").then(r => r.json()).then(data => {
       const ok = (j: Job) => j.jobTitle?.trim().length >= 3;
@@ -44,6 +47,14 @@ export default function InterviewPrepPage() {
       setJobs(list);
       if (list.length > 0) setSelectedJobId(list[0].id);
     }).catch(() => setJobs([]));
+
+    fetch("/api/profiles").then(r => r.json()).then(data => {
+      const pList = data.profiles || [];
+      setProfiles(pList);
+      const def = pList.find((p: any) => p.is_default);
+      if (def) setSelectedProfileId(def.id);
+      else if (pList.length > 0) setSelectedProfileId(pList[0].id);
+    }).catch(err => console.error(err));
   }, []);
 
   // Fetch history when tab changes
@@ -69,7 +80,13 @@ export default function InterviewPrepPage() {
     return () => clearInterval(interval);
   }, [phase]);
 
-  const generateQuestions = async () => {
+  const handleGenerateClick = () => {
+    setShowCreditModal(true);
+  };
+
+  const proceedWithGeneration = async () => {
+    setShowCreditModal(false);
+
     setError("");
     setPhase("generating");
     setWaitingStepIndex(0);
@@ -79,6 +96,7 @@ export default function InterviewPrepPage() {
       payload.job_title = "General Professional";
       payload.job_description = "General interview based on the candidate's master profile.";
       payload.company = "";
+      if (selectedProfileId) payload.profileId = selectedProfileId;
       setActiveCompany("");
     } else {
       const job = jobs.find(j => j.id === selectedJobId);
@@ -95,6 +113,12 @@ export default function InterviewPrepPage() {
     }
 
     try {
+      const creditRes = await fetch("/api/credits/deduct", { method: "POST" });
+      if (!creditRes.ok) {
+        if (creditRes.status === 403) throw new Error("Insufficient Credits to perform this action.");
+        throw new Error("Failed to deduct credit.");
+      }
+
       const res = await fetch("/api/interview/questions", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
@@ -175,6 +199,30 @@ export default function InterviewPrepPage() {
   );
 
   return (
+    <>
+      {showCreditModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-200" style={{ position: 'fixed' }}>
+          <div className="bg-[var(--sidebar-bg)] border border-[var(--border-color)] rounded-xl shadow-2xl w-full max-w-sm p-6 relative animate-in zoom-in-95 duration-200">
+            <div className="flex flex-col items-center text-center space-y-4">
+              <div className="w-12 h-12 rounded-full bg-[var(--primary)]/10 flex items-center justify-center text-[var(--primary)]">
+                <Sparkles className="w-6 h-6" />
+              </div>
+              <h3 className="text-xl font-bold text-[var(--foreground)]">Use 1 Credit?</h3>
+              <p className="text-sm text-[var(--text-secondary)]">
+                Generating interview questions requires 1 credit to proceed. Do you want to continue?
+              </p>
+              <div className="flex items-center gap-3 w-full pt-2">
+                <button onClick={() => setShowCreditModal(false)} className="flex-1 py-2.5 px-4 rounded-lg font-medium text-[var(--foreground)] bg-[var(--card-border-bg)] hover:bg-[var(--border-color)] transition">
+                  Cancel
+                </button>
+                <button onClick={proceedWithGeneration} className="flex-1 py-2.5 px-4 rounded-lg font-medium text-white bg-[var(--primary)] hover:opacity-90 transition">
+                  Continue
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     <div className="min-h-full">
       <div className="max-w-4xl mx-auto pb-10">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-8 gap-4">
@@ -223,6 +271,15 @@ export default function InterviewPrepPage() {
               </button>
             </div>
 
+            {source === "profile" && profiles.length > 1 && (
+              <div className="mb-8 animate-in fade-in slide-in-from-top-4 duration-300">
+                <label className="block text-sm font-medium text-[var(--foreground)] mb-2">Select Master Profile</label>
+                <select value={selectedProfileId} onChange={(e) => setSelectedProfileId(e.target.value)} className="w-full bg-[var(--background)] border border-[var(--border-color)] text-[var(--foreground)] text-sm rounded-xl px-4 py-3 focus:outline-none focus:border-[var(--primary)]">
+                  {profiles.map(p => <option key={p.id} value={p.id}>{p.name} {p.is_default ? '(Default)' : ''}</option>)}
+                </select>
+              </div>
+            )}
+
             {source === "job" && (
               <div className="mb-8 animate-in fade-in slide-in-from-top-4 duration-300">
                 <label className="block text-sm font-medium text-[var(--foreground)] mb-2">Select a Saved Job</label>
@@ -243,9 +300,11 @@ export default function InterviewPrepPage() {
               </div>
             )}
 
-            <button onClick={generateQuestions} disabled={source === "job" && jobs.length === 0} className="w-full py-3.5 px-6 bg-[var(--primary)] hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold rounded-xl transition-opacity">
-              Generate Questions
-            </button>
+            <div className="pt-4">
+              <button onClick={handleGenerateClick} disabled={source === "job" && jobs.length === 0} className="w-full py-3.5 px-6 bg-[var(--primary)] hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold rounded-xl transition-opacity">
+                Generate Interview Questions
+              </button>
+            </div>
           </div>
         )}
 
@@ -298,5 +357,6 @@ export default function InterviewPrepPage() {
         )}
       </div>
     </div>
+    </>
   );
 }

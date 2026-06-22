@@ -54,6 +54,9 @@ function ResumeStudioPageContent() {
 
     const [job, setJob] = useState<Job | null>(null);
     const [masterProfile, setMasterProfile] = useState<MasterProfile | null>(null);
+    const [masterProfilesList, setMasterProfilesList] = useState<any[]>([]);
+    const [selectedMasterProfileId, setSelectedMasterProfileId] = useState<string>("");
+    const [masterProfileName, setMasterProfileName] = useState<string>("");
 
     // STATE: The Resume Data
     const [resumeData, setResumeData] = useState<ResumeData | null>(null);
@@ -98,6 +101,10 @@ function ResumeStudioPageContent() {
     const [loading, setLoading] = useState(true);
     const [isGenerating, setIsGenerating] = useState(false);
     const [hasGenerated, setHasGenerated] = useState(false);
+    const [activeDocument, setActiveDocument] = useState<"resume" | "cover-letter" | "email">("resume");
+    const [coverLetter, setCoverLetter] = useState<string | null>(null);
+    const [draftEmail, setDraftEmail] = useState<string | null>(null);
+
     const [activeTab, setActiveTab] = useState<"jd" | "profile" | "saved">("jd");
     const [mobilePanelView, setMobilePanelView] = useState<"editor" | "preview">("editor");
 
@@ -110,12 +117,31 @@ function ResumeStudioPageContent() {
                 const jobJson = await jobRes.json();
                 const foundJob = jobJson.data?.find((j: Job) => j.id === params.jobId);
 
-                // 2. Fetch Profile
-                const profileRes = await fetch("/api/profile");
-                const profileJson = await profileRes.json();
-
+                // 2. Fetch Profiles List
+                const profilesRes = await fetch("/api/profiles");
+                const profilesJson = await profilesRes.json();
+                const pList = profilesJson.profiles || [];
+                setMasterProfilesList(pList);
                 setJob(foundJob);
-                setMasterProfile(profileJson.data);
+                
+                // Set default or first profile as selected
+                let defaultProfileId = pList.find((p: any) => p.is_default)?.id;
+                if (!defaultProfileId && pList.length > 0) defaultProfileId = pList[0].id;
+                
+                if (defaultProfileId) {
+                    setSelectedMasterProfileId(defaultProfileId);
+                    const selectedP = pList.find((p: any) => p.id === defaultProfileId);
+                    if (selectedP) setMasterProfileName(selectedP.name);
+                    
+                    const profileRes = await fetch(`/api/profiles/${defaultProfileId}`);
+                    const profileJson = await profileRes.json();
+                    setMasterProfile(profileJson.profile?.parsed_data || null);
+                } else {
+                    // Fallback to old route if somehow profiles array is empty
+                    const fallbackRes = await fetch("/api/profile");
+                    const fallbackJson = await fallbackRes.json();
+                    setMasterProfile(fallbackJson.data);
+                }
 
                 // 3. Fetch Saved Resumes for this Job
                 if (foundJob) {
@@ -173,14 +199,133 @@ function ResumeStudioPageContent() {
         if (params.jobId) fetchData();
     }, [params.jobId, searchParams]);
 
-    // --- GENERATION LOGIC ---
+        const handleGenerateCoverLetter = async () => {
+        if (!masterProfile || !job) return;
+        setIsGenerating(true);
+        try {
+            const response = await fetch("/api/cover-letter/generate", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ jobDescription: job.description, masterProfile: masterProfile })
+            });
+            if (response.status === 403) {
+                setDialogConfig({ isOpen: true, type: 'alert', title: 'Out of Credits', description: 'You have 0 credits remaining!', variant: 'destructive', confirmText: 'Got it' });
+                setIsGenerating(false);
+                return;
+            }
+            if (!response.ok) throw new Error("Failed to generate cover letter");
+            const result = await response.json();
+            if (result.coverLetter) setCoverLetter(result.coverLetter);
+            setHasGenerated(true);
+            setActiveDocument("cover-letter");
+            setMobilePanelView("preview");
+        } catch (error) {
+            console.error(error);
+        } finally {
+            setIsGenerating(false);
+        }
+    };
+
+    const handleGenerateEmail = async () => {
+        if (!masterProfile || !job) return;
+        setIsGenerating(true);
+        try {
+            const response = await fetch("/api/email/generate", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ jobDescription: job.description, masterProfile: masterProfile })
+            });
+            if (response.status === 403) {
+                setDialogConfig({ isOpen: true, type: 'alert', title: 'Out of Credits', description: 'You have 0 credits remaining!', variant: 'destructive', confirmText: 'Got it' });
+                setIsGenerating(false);
+                return;
+            }
+            if (!response.ok) throw new Error("Failed to generate email");
+            const result = await response.json();
+            if (result.draftEmail) setDraftEmail(result.draftEmail);
+            setHasGenerated(true);
+            setActiveDocument("email");
+            setMobilePanelView("preview");
+        } catch (error) {
+            console.error(error);
+        } finally {
+            setIsGenerating(false);
+        }
+    };
+
+    const handleGenerateResumeOnly = async () => {
+        if (!masterProfile || !job) return;
+        setIsGenerating(true);
+        try {
+            const response = await fetch("/api/resume/generate", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ jobDescription: job.description, masterProfile: masterProfile })
+            });
+            if (response.status === 403) {
+                setDialogConfig({ isOpen: true, type: 'alert', title: 'Out of Credits', description: 'You have 0 credits remaining!', variant: 'destructive', confirmText: 'Got it' });
+                setIsGenerating(false);
+                return;
+            }
+            if (!response.ok) throw new Error("Failed to generate resume");
+            const result = await response.json();
+            
+            const aiData = result.data;
+            const formattedData = {
+                fullName: aiData.fullName || masterProfile.fullName,
+                jobTitle: aiData.jobTitle || job.jobTitle,
+                contact: {
+                    email: aiData.email || masterProfile.email,
+                    phone: aiData.phone || masterProfile.phone,
+                    location: aiData.location || masterProfile.location || "",
+                    linkedin: aiData.linkedin || masterProfile.linkedin || "",
+                    website: aiData.website || ""
+                },
+                summary: aiData.summary,
+                skills: aiData.skills?.technical ? (Array.isArray(aiData.skills.technical) ? aiData.skills.technical : aiData.skills.technical.split(",").map(s => s.trim())) : [],
+                experience: aiData.experience?.map(exp => ({
+                    id: exp.id || Math.random().toString(),
+                    company: exp.company,
+                    role: exp.role,
+                    startDate: exp.startDate,
+                    endDate: exp.endDate,
+                    description: Array.isArray(exp.description) ? exp.description : [exp.description],
+                    location: exp.location || ""
+                })) || [],
+                projects: aiData.projects ? aiData.projects.map(proj => ({
+                    id: proj.id || Math.random().toString(),
+                    name: proj.name,
+                    techStack: proj.techStack,
+                    description: Array.isArray(proj.description) ? proj.description : [proj.description],
+                    link: proj.link || ""
+                })) : [],
+                education: aiData.education?.map(edu => ({
+                    id: edu.id || Math.random().toString(),
+                    school: edu.school,
+                    degree: edu.degree,
+                    field: edu.field,
+                    startDate: edu.startDate || "",
+                    endDate: edu.endDate || ""
+                })) || []
+            };
+            setResumeData(formattedData);
+            setHasGenerated(true);
+            setActiveDocument("resume");
+            setMobilePanelView("preview");
+        } catch (error) {
+            console.error(error);
+        } finally {
+            setIsGenerating(false);
+        }
+    };
+// --- GENERATION LOGIC ---
     const handleGenerateResume = async (currentJob = job, currentProfile = masterProfile, atsReport = null) => {
         if (!currentProfile || !currentJob) return;
         setIsGenerating(true);
 
         try {
             // Single atomic call: checks credits, calls backend, deducts only on success
-            const response = await fetch("/api/resume/generate", {
+            const response = await fetch("/api/resume/generate-all", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
@@ -207,6 +352,8 @@ function ResumeStudioPageContent() {
 
             const result = await response.json();
             const aiData = result.data;
+            if (result.coverLetter) setCoverLetter(result.coverLetter);
+            if (result.draftEmail) setDraftEmail(result.draftEmail);
 
             // 3. Format Data
             const formattedData: ResumeData = {
@@ -262,7 +409,8 @@ function ResumeStudioPageContent() {
                 body: JSON.stringify({
                     jobId: currentJob.id,
                     content: formattedData,
-                    resumeName: `Resume V${savedResumes.length + 1}`
+                    resumeName: `Resume V${savedResumes.length + 1}`,
+                    masterProfileName: masterProfileName
                 }),
             });
 
@@ -319,7 +467,8 @@ function ResumeStudioPageContent() {
                 body: JSON.stringify({
                     jobId: job.id,
                     content: resumeData,
-                    resumeName: name || `${job.company} Resume V${savedResumes.length + 1}`
+                    resumeName: name || `${job.company} Resume V${savedResumes.length + 1}`,
+                    masterProfileName: masterProfileName
                 })
             });
             const json = await res.json();
@@ -516,7 +665,10 @@ function ResumeStudioPageContent() {
                                                         </div>
                                                         <div>
                                                             <div className="text-sm font-bold text-[var(--foreground)] group-hover:text-[var(--primary)] transition">{resume.name}</div>
-                                                            <div className="text-[10px] text-[var(--text-secondary)]">{new Date(resume.createdAt).toLocaleString()}</div>
+                                                            <div className="text-[10px] text-[var(--text-secondary)]">
+                                                                {new Date(resume.createdAt).toLocaleString()}
+                                                                {resume.extensionData?.masterProfileName && ` • Tailored using: ${resume.extensionData.masterProfileName}`}
+                                                            </div>
                                                         </div>
                                                     </div>
                                                 </button>
@@ -528,6 +680,30 @@ function ResumeStudioPageContent() {
                                 {activeTab === "profile" && (
                                     <div className="space-y-4">
                                         <div className="bg-black/5 dark:bg-white/5 p-4 rounded-lg border border-[var(--border-color)]">
+                                            {masterProfilesList.length > 1 ? (
+                                                <div className="mb-4">
+                                                    <label className="text-xs text-[var(--text-secondary)] font-bold uppercase mb-1 block">Select Profile Context</label>
+                                                    <select 
+                                                        className="w-full bg-[var(--background)] border border-[var(--border-color)] text-[var(--foreground)] text-sm rounded-lg px-3 py-2 outline-none focus:border-[var(--primary)]"
+                                                        value={selectedMasterProfileId}
+                                                        onChange={async (e) => {
+                                                            const newId = e.target.value;
+                                                            setSelectedMasterProfileId(newId);
+                                                            const p = masterProfilesList.find(x => x.id === newId);
+                                                            if (p) setMasterProfileName(p.name);
+                                                            
+                                                            const profileRes = await fetch(`/api/profiles/${newId}`);
+                                                            const profileJson = await profileRes.json();
+                                                            setMasterProfile(profileJson.profile?.parsed_data || null);
+                                                        }}
+                                                    >
+                                                        {masterProfilesList.map(p => (
+                                                            <option key={p.id} value={p.id}>{p.name} {p.is_default ? '(Default)' : ''}</option>
+                                                        ))}
+                                                    </select>
+                                                </div>
+                                            ) : null}
+
                                             <h3 className="font-bold text-[var(--foreground)] text-lg">{masterProfile?.fullName}</h3>
                                             <p className="text-[var(--primary)] text-sm mb-3">{masterProfile?.jobTitle}</p>
                                             <p className="text-xs text-[var(--text-secondary)] mb-1">{masterProfile?.email}</p>
@@ -570,15 +746,21 @@ function ResumeStudioPageContent() {
                                 )}
                             </div>
 
-                            <div className="p-5 border-t border-[var(--border-color)] bg-black/5 dark:bg-white/5">
+                            <div className="p-5 border-t border-[var(--border-color)] bg-black/5 dark:bg-white/5 space-y-3">
                                 <button
                                     onClick={() => handleGenerateResume()}
                                     disabled={isGenerating}
                                     className="w-full flex items-center justify-center gap-2 bg-[var(--primary)] hover:bg-[var(--primary)]/90 text-[var(--background)] py-3.5 rounded-lg font-bold shadow-lg shadow-[var(--primary)]/20 transition-all disabled:opacity-50 hover:scale-[1.02] active:scale-[0.98]"
                                 >
                                     {isGenerating ? <Loader2 className="animate-spin h-5 w-5" /> : <Wand2 className="h-5 w-5 fill-current" />}
-                                    {isGenerating ? "AI is Thinking..." : "Generate Tailored Resume"}
+                                    {isGenerating ? "AI is Thinking..." : "🚀 Generate Application Pack (Resume + Cover Letter + Email)"}
                                 </button>
+                                <div className="text-center text-xs text-[var(--text-secondary)] font-medium">Or generate individually:</div>
+                                <div className="grid grid-cols-3 gap-2">
+                                    <button disabled={isGenerating} onClick={() => handleGenerateResumeOnly()} className="py-2 px-1 text-[10px] sm:text-xs font-semibold rounded bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 text-[var(--foreground)] border border-[var(--border-color)] transition-colors">📄 Resume</button>
+                                    <button disabled={isGenerating} onClick={() => handleGenerateCoverLetter()} className="py-2 px-1 text-[10px] sm:text-xs font-semibold rounded bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 text-[var(--foreground)] border border-[var(--border-color)] transition-colors">✉️ Cover Letter</button>
+                                    <button disabled={isGenerating} onClick={() => handleGenerateEmail()} className="py-2 px-1 text-[10px] sm:text-xs font-semibold rounded bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 text-[var(--foreground)] border border-[var(--border-color)] transition-colors">📨 Draft Email</button>
+                                </div>
                             </div>
                         </>
                     ) : (
@@ -697,6 +879,28 @@ function ResumeStudioPageContent() {
 
                 {/* === RIGHT PANEL (PDF PREVIEW / IS GENERATING VIEW) === */}
                 <div className={`${mobilePanelView === "preview" ? "flex" : "hidden"} md:flex flex-1 min-w-0 bg-black/5 dark:bg-[#525659] relative flex-col h-full border-l border-[var(--border-color)] overflow-hidden`}>
+                    {hasGenerated && !isGenerating && (
+                        <div className="flex items-center justify-center gap-4 py-3 bg-[var(--background)] border-b border-[var(--border-color)] shadow-sm z-10">
+                            <button 
+                                onClick={() => setActiveDocument('resume')} 
+                                className={`px-4 py-1.5 rounded-full text-sm font-bold transition-all ${activeDocument === 'resume' ? 'bg-[var(--primary)] text-[var(--background)] shadow-md' : 'text-[var(--text-secondary)] hover:text-[var(--foreground)] hover:bg-black/5 dark:hover:bg-white/5'}`}
+                            >
+                                📄 Resume
+                            </button>
+                            <button 
+                                onClick={() => setActiveDocument('cover-letter')} 
+                                className={`px-4 py-1.5 rounded-full text-sm font-bold transition-all ${activeDocument === 'cover-letter' ? 'bg-[var(--primary)] text-[var(--background)] shadow-md' : 'text-[var(--text-secondary)] hover:text-[var(--foreground)] hover:bg-black/5 dark:hover:bg-white/5'}`}
+                            >
+                                ✉️ Cover Letter
+                            </button>
+                            <button 
+                                onClick={() => setActiveDocument('email')} 
+                                className={`px-4 py-1.5 rounded-full text-sm font-bold transition-all ${activeDocument === 'email' ? 'bg-[var(--primary)] text-[var(--background)] shadow-md' : 'text-[var(--text-secondary)] hover:text-[var(--foreground)] hover:bg-black/5 dark:hover:bg-white/5'}`}
+                            >
+                                📨 Draft Email
+                            </button>
+                        </div>
+                    )}
                     {isGenerating ? (
                         <div className="flex-1 flex flex-col items-center justify-center p-10 text-center text-[var(--foreground)] relative overflow-hidden bg-[var(--background)]">
                             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-[var(--primary)]/5 rounded-full blur-[120px] animate-pulse pointer-events-none"></div>
@@ -720,7 +924,7 @@ function ResumeStudioPageContent() {
                             <h2 className="text-3xl font-bold text-[var(--foreground)] mb-3 tracking-tight z-10">Ready to Tailor</h2>
                             <p className="text-[var(--text-secondary)] max-w-md text-sm leading-relaxed z-10">AI Agent ready to analyze.</p>
                         </div>
-                    ) : (
+                    ) : activeDocument === "resume" ? (
                         /* Using Interactive Preview with Canva-like editing */
                         <InteractivePreviewPanel
                             data={resumeData!}
@@ -728,6 +932,28 @@ function ResumeStudioPageContent() {
                             designSettings={designSettings}
                             onDataChange={(newData) => setResumeData(newData)}
                         />
+                    ) : activeDocument === "cover-letter" ? (
+                        <div className="flex-1 overflow-auto p-6 lg:p-12 bg-white dark:bg-[#1e1e1e]">
+                            <div className="max-w-3xl mx-auto">
+                                <textarea
+                                    className="w-full min-h-[600px] p-6 text-sm text-[var(--foreground)] bg-transparent border border-[var(--border-color)] rounded-xl outline-none focus:border-[var(--primary)] resize-y leading-relaxed shadow-sm transition-all"
+                                    value={coverLetter || ""}
+                                    onChange={(e) => setCoverLetter(e.target.value)}
+                                    placeholder="Your Cover Letter will appear here..."
+                                />
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="flex-1 overflow-auto p-6 lg:p-12 bg-white dark:bg-[#1e1e1e]">
+                            <div className="max-w-3xl mx-auto">
+                                <textarea
+                                    className="w-full min-h-[400px] p-6 text-sm text-[var(--foreground)] bg-transparent border border-[var(--border-color)] rounded-xl outline-none focus:border-[var(--primary)] resize-y leading-relaxed shadow-sm transition-all"
+                                    value={draftEmail || ""}
+                                    onChange={(e) => setDraftEmail(e.target.value)}
+                                    placeholder="Your Draft Email will appear here..."
+                                />
+                            </div>
+                        </div>
                     )}
                 </div>
 

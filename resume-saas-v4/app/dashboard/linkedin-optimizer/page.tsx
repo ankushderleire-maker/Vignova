@@ -97,6 +97,7 @@ function LinkedInOptimizerContent() {
 
     const [isOptimizing, setIsOptimizing] = useState(false);
     const [aiReport, setAiReport] = useState<any>(null);
+    const [showCreditModal, setShowCreditModal] = useState(false);
     
     // Master profiles
     const [masterProfiles, setMasterProfiles] = useState<any[]>([]);
@@ -276,10 +277,22 @@ function LinkedInOptimizerContent() {
         }
     };
 
-    const handleOptimize = async () => {
+    const handleOptimize = () => {
         if (!result) return;
+        setShowCreditModal(true);
+    };
+
+    const proceedWithOptimization = async () => {
+        setShowCreditModal(false);
+        
         setIsOptimizing(true);
         try {
+            const creditRes = await fetch("/api/credits/deduct", { method: "POST" });
+            if (!creditRes.ok) {
+                if (creditRes.status === 403) throw new Error("Insufficient Credits to perform this action.");
+                throw new Error("Failed to deduct credit.");
+            }
+
             const res = await fetch("/api/python/linkedin/optimize", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -305,6 +318,30 @@ function LinkedInOptimizerContent() {
     const getScoreTextColor = (score: number) => { if (score < 50) return "text-red-500"; if (score < 80) return "text-yellow-500"; return "text-green-600 dark:text-green-500"; };
 
     return (
+        <>
+            {showCreditModal && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-200" style={{ position: 'fixed' }}>
+                    <div className="bg-[var(--sidebar-bg)] border border-[var(--border-color)] rounded-xl shadow-2xl w-full max-w-sm p-6 relative animate-in zoom-in-95 duration-200">
+                        <div className="flex flex-col items-center text-center space-y-4">
+                            <div className="w-12 h-12 rounded-full bg-[var(--primary)]/10 flex items-center justify-center text-[var(--primary)]">
+                                <Sparkles className="w-6 h-6" />
+                            </div>
+                            <h3 className="text-xl font-bold text-[var(--foreground)]">Use 1 Credit?</h3>
+                            <p className="text-sm text-[var(--text-secondary)]">
+                                LinkedIn Profile Optimization requires 1 credit to proceed. Do you want to continue?
+                            </p>
+                            <div className="flex items-center gap-3 w-full pt-2">
+                                <button onClick={() => setShowCreditModal(false)} className="flex-1 py-2.5 px-4 rounded-lg font-medium text-[var(--foreground)] bg-[var(--card-border-bg)] hover:bg-[var(--border-color)] transition">
+                                    Cancel
+                                </button>
+                                <button onClick={proceedWithOptimization} className="flex-1 py-2.5 px-4 rounded-lg font-medium text-white bg-[var(--primary)] hover:opacity-90 transition">
+                                    Continue
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         <div className="w-full max-w-7xl mx-auto min-h-[calc(100vh-120px)] flex flex-col space-y-6 animate-slide-down">
             
             <div className="flex items-center justify-end shrink-0">
@@ -752,5 +789,6 @@ function LinkedInOptimizerContent() {
                 );
             })()}
         </div>
+        </>
     );
 }

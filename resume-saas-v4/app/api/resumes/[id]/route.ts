@@ -13,7 +13,7 @@ export async function PUT(req: Request, props: { params: Promise<{ id: string }>
         const userId = (session.user as any).id;
 
         const body = await req.json();
-        const { content, name } = body;
+        const { content, name, masterProfileName } = body;
 
         // Verify ownership
         // Cast db to any because generated types might be out of sync
@@ -30,6 +30,7 @@ export async function PUT(req: Request, props: { params: Promise<{ id: string }>
             data: {
                 content,
                 name: name || existingResume.name,
+                ...(masterProfileName && { extensionData: { masterProfileName } }),
             },
         });
 

@@ -20,7 +20,9 @@ const FEATURE_LABELS: Record<string, string> = {
     extensionAccess: "Chrome Extension Access",
     multiProfile: "Multiple Profiles",
     unlimitedResumes: "Unlimited Resumes",
-    aiOptimization: "AI Optimization",
+    aiOptimization: "ATS Optimization",
+    linkedinOptimization: "AI LinkedIn Profile Optimization",
+    interviewPrep: "AI Interview Generator",
     templates: "Templates",
     support: "Support",
 };

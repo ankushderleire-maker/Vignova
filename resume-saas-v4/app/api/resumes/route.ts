@@ -39,7 +39,7 @@ export async function POST(req: Request) {
         if (!(session?.user as any)?.id) return new NextResponse("Unauthorized", { status: 401 });
 
         const body = await req.json();
-        const { jobId, content, resumeName } = body;
+        const { jobId, content, resumeName, masterProfileName } = body;
 
         if (!jobId || !content) {
             return new NextResponse("Job ID and Content are required", { status: 400 });
@@ -51,6 +51,7 @@ export async function POST(req: Request) {
                 jobId,
                 content,
                 name: resumeName || `Resume ${new Date().toLocaleString()}`,
+                extensionData: masterProfileName ? { masterProfileName } : undefined,
             },
         });
 

@@ -453,3 +453,69 @@ async def generate_tailored_resume(request: Request, payload: TailorRequest):
             if "429" in str(exc) or "quota" in msg or "resource_exhausted" in msg:
                 raise HTTPException(status_code=429, detail="Our AI is a little busy right now. Please wait a moment and try again.")
             raise HTTPException(status_code=500, detail="Resume generation failed. Please try again.")
+
+
+@router.post("/api/generate-cover-letter")
+@limiter.limit("5/minute")
+async def generate_cover_letter(request: Request, payload: TailorRequest):
+    job_description = payload.jobDescription
+    master_profile_str = json.dumps(payload.masterProfile, indent=2)
+
+    prompt = f"""Write a professional, compelling cover letter for the following job application.
+
+APPLICANT PROFILE:
+{master_profile_str}
+
+JOB DESCRIPTION:
+{_trim(job_description, _JD_MAX_CHARS)}
+
+INSTRUCTIONS:
+- Write a professional cover letter (3-4 paragraphs)
+- Highlight relevant skills and experience that match the job description
+- Show enthusiasm and cultural fit
+- Keep it concise (250-350 words)
+- Do NOT include addresses or date headers
+- Start with "Dear Hiring Manager," or similar
+- End with a professional closing
+- Output ONLY the cover letter text, no extra commentary
+"""
+
+    try:
+        loop = asyncio.get_event_loop()
+        response = await loop.run_in_executor(None, partial(model.generate_content, prompt))
+        return {"response": response.text.strip()}
+    except Exception as exc:
+        logger.error("Cover Letter error: %s", exc)
+        raise HTTPException(status_code=500, detail="Cover letter generation failed")
+
+@router.post("/api/generate-draft-email")
+@limiter.limit("5/minute")
+async def generate_draft_email(request: Request, payload: TailorRequest):
+    job_description = payload.jobDescription
+    master_profile_str = json.dumps(payload.masterProfile, indent=2)
+
+    prompt = f"""Write a concise, professional application email for the following job.
+
+APPLICANT PROFILE:
+{master_profile_str}
+
+JOB DESCRIPTION:
+{_trim(job_description, _JD_MAX_CHARS)}
+
+INSTRUCTIONS:
+- Write a short, professional email (150-200 words) to apply for this job
+- Subject line format: "Application for [Job Title] — [Your Name]"
+- Start with a brief, engaging opening
+- Mention 2-3 key qualifications that match
+- Express enthusiasm for the role
+- Close professionally with contact info
+- Output ONLY the email text, no extra commentary
+"""
+
+    try:
+        loop = asyncio.get_event_loop()
+        response = await loop.run_in_executor(None, partial(model.generate_content, prompt))
+        return {"response": response.text.strip()}
+    except Exception as exc:
+        logger.error("Draft Email error: %s", exc)
+        raise HTTPException(status_code=500, detail="Draft email generation failed")

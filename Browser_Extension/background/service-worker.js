@@ -28,6 +28,16 @@ async function warmExtensionCache(token) {
     } catch (err) {
         // Best effort only
     }
+
+    try {
+        const configResponse = await fetch(`${Vignova_API_BASE}/api/extension/config`, { headers });
+        const configData = await configResponse.json();
+        if (configResponse.ok && configData.config) {
+            await chrome.storage.local.set({ vignova_config: configData.config });
+        }
+    } catch (err) {
+        // Best effort only
+    }
 }
 
 // ─── Message Router ───
@@ -62,6 +72,40 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         chrome.storage.local.get(["vignova_token"], async (result) => {
             try {
                 const response = await fetch(`${Vignova_API_BASE}/api/extension/generate`, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "Authorization": `Bearer ${result.vignova_token}`,
+                    },
+                    body: JSON.stringify(message.data),
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    // Update cached credits
+                    chrome.storage.local.get(["vignova_user"], (stored) => {
+                        if (stored.vignova_user) {
+                            stored.vignova_user.credits_remaining = data.credits_remaining;
+                            chrome.storage.local.set({ vignova_user: stored.vignova_user });
+                        }
+                    });
+                    sendResponse({ success: true, ...data });
+                } else {
+                    sendResponse({ success: false, error: data.error || "Generation failed" });
+                }
+            } catch (err) {
+                sendResponse({ success: false, error: "Cannot connect to Vignova server." });
+            }
+        });
+        return true; // Keep channel open for async
+    }
+
+    // ─── API Proxy: Generate All (Resume + Cover Letter + Email) ───
+    if (message.type === "API_GENERATE_ALL") {
+        chrome.storage.local.get(["vignova_token"], async (result) => {
+            try {
+                const response = await fetch(`${Vignova_API_BASE}/api/extension/generate-all`, {
                     method: "POST",
                     headers: {
                         "Content-Type": "application/json",
@@ -244,7 +288,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                 const data = await response.json();
                 if (response.ok && data.profile) {
                     await chrome.storage.local.set({ vignova_agent_profile: data.profile });
-                    sendResponse({ success: true, profile: data.profile });
+                    sendResponse({ success: true, profile: data.profile, profileName: data.profileName });
                 } else {
                     sendResponse({ success: false, error: data.error || "Failed to fetch profile" });
                 }
@@ -391,32 +435,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                     sendResponse(data);
                 } else {
                     sendResponse({ success: false, error: data.error || "Failed to download document" });
-                }
-            } catch (err) {
-                sendResponse({ success: false, error: "Cannot connect to server" });
-            }
-        });
-        return true;
-    }
-
-    // ─── Agent: Get Profile from Master Profile API ───
-    if (message.type === "API_AGENT_GET_PROFILE") {
-        chrome.storage.local.get(["vignova_token"], async (result) => {
-            if (!result.vignova_token) {
-                sendResponse({ success: false, error: "Not authenticated" });
-                return;
-            }
-            try {
-                const response = await fetch(`${Vignova_API_BASE}/api/extension/agent-profile`, {
-                    headers: { "Authorization": `Bearer ${result.vignova_token}` },
-                });
-                const data = await response.json();
-                if (response.ok && data.profile) {
-                    // Cache in storage for quick access
-                    await chrome.storage.local.set({ vignova_agent_profile: data.profile });
-                    sendResponse({ success: true, profile: data.profile, profileName: data.profileName });
-                } else {
-                    sendResponse({ success: false, error: data.error || "Failed to fetch profile" });
                 }
             } catch (err) {
                 sendResponse({ success: false, error: "Cannot connect to server" });
@@ -721,9 +739,17 @@ chrome.runtime.onInstalled.addListener((details) => {
 chrome.action.onClicked.addListener((tab) => {
     if (!tab.id) return;
 
-    // Prevent injection attempts on restricted browser URLs
-    const restrictedPrefixes = ["chrome://", "edge://", "about:", "chrome-extension://"];
-    if (tab.url && restrictedPrefixes.some(prefix => tab.url.startsWith(prefix))) {
+    // Prevent injection attempts on restricted browser URLs.
+    // Chrome blocks content scripts on its own pages, the Web Store, and
+    // built-in viewers — opening the web dashboard is the graceful fallback.
+    const restrictedPrefixes = [
+        "chrome://", "edge://", "about:", "chrome-extension://",
+        "devtools://", "view-source:",
+        "https://chromewebstore.google.com",
+        "https://chrome.google.com/webstore",
+        "https://microsoftedge.microsoft.com/addons",
+    ];
+    if (!tab.url || restrictedPrefixes.some(prefix => tab.url.startsWith(prefix))) {
         // Fallback: Instead of failing to inject, open the Vignova web dashboard
         chrome.tabs.create({ url: "https://app.vignova.io/dashboard" });
         return;
@@ -747,6 +773,11 @@ chrome.action.onClicked.addListener((tab) => {
             setTimeout(() => {
                 chrome.tabs.sendMessage(tab.id, { type: "TOGGLE_DASHBOARD" }).catch(() => { });
             }, 300);
-        }).catch(err => console.error("[Vignova] Could not inject dashboard:", err));
+        }).catch(err => {
+            // Injection denied (page CSP sandbox, file:// without access, etc.)
+            // — never leave the user with a dead button.
+            console.warn("[Vignova] Could not inject dashboard, opening web dashboard instead:", err?.message || err);
+            chrome.tabs.create({ url: "https://app.vignova.io/dashboard" });
+        });
     });
 });
