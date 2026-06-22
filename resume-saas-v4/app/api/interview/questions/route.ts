@@ -16,10 +16,24 @@ export async function POST(req: NextRequest) {
     // Fetch user's master profile to personalise questions
     let userProfile: any = null;
     try {
-        const profileRow = await db.master_profiles.findFirst({
-            where: { user_id: userId },
-            orderBy: { updated_at: "desc" },
+        const whereClause: any = { user_id: userId };
+        if (body.profileId) {
+            whereClause.id = body.profileId;
+        } else {
+            whereClause.is_default = true;
+        }
+        
+        let profileRow = await db.master_profiles.findFirst({
+            where: whereClause,
         });
+
+        if (!profileRow && !body.profileId) {
+            profileRow = await db.master_profiles.findFirst({
+                where: { user_id: userId },
+                orderBy: { updated_at: "desc" },
+            });
+        }
+        
         userProfile = profileRow?.parsed_data ?? null;
     } catch (_) {}
 

@@ -247,13 +247,16 @@ export default function JobTracker() {
 
             {/* Header Info */}
             <div className="relative z-10 text-center mb-16 space-y-4 px-4">
-                <div className="inline-flex items-center px-3 py-1 rounded-full border border-blue-200 bg-blue-50 text-blue-600 text-xs font-medium mb-4">
+                <div className="inline-flex items-center px-3 py-1 rounded-full border border-blue-200 bg-blue-50 text-blue-600 text-xs font-bold uppercase tracking-widest mb-4">
                     <Sparkles className="w-3 h-3 mr-2" />
                     <span>Real-time Transformation</span>
                 </div>
-                <h2 className="text-4xl md:text-5xl font-bold text-gray-900 tracking-tight">
+                <h2 className="text-4xl md:text-5xl font-bold text-[#0A192F] tracking-tighter">
                     Raw Data to <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-600">Masterpiece</span>
                 </h2>
+                <p className="text-lg text-slate-500 font-light max-w-xl mx-auto">
+                    Watch unstructured career data become polished, recruiter-ready resumes — in real time.
+                </p>
             </div>
 
             {/* --- SCANNER STAGE --- */}

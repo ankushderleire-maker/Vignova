@@ -172,6 +172,8 @@ model plan_configs {
   has_extension_access Boolean  @default(false)
   has_multi_profile    Boolean  @default(false)
   has_unlimited_resumes Boolean @default(false)
+  has_linkedin_optimization Boolean @default(false)
+  has_interview_prep        Boolean @default(false)
 
   // Feature Display Strings
   resume_creation_label String  @default("3 resumes/month")

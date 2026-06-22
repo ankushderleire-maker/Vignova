@@ -27,6 +27,8 @@ interface PlanConfig {
     ai_optimization_label: string;
     templates_label: string;
     support_label: string;
+    has_linkedin_optimization: boolean;
+    has_interview_prep: boolean;
     is_popular: boolean;
 }
 
@@ -75,6 +77,8 @@ export default function AdminPlansPage() {
                     ai_optimization_label: plan.ai_optimization_label,
                     templates_label: plan.templates_label,
                     support_label: plan.support_label,
+                    has_linkedin_optimization: plan.has_linkedin_optimization,
+                    has_interview_prep: plan.has_interview_prep,
                     is_popular: plan.is_popular,
                 }),
             });
@@ -296,6 +300,8 @@ export default function AdminPlansPage() {
                                             { key: "has_extension_access", label: "Chrome Extension" },
                                             { key: "has_multi_profile", label: "Multiple Profiles" },
                                             { key: "has_unlimited_resumes", label: "Unlimited Resumes" },
+                                            { key: "has_linkedin_optimization", label: "AI LinkedIn Profile Optimization" },
+                                            { key: "has_interview_prep", label: "AI Interview Questions Generator" },
                                             { key: "is_popular", label: "Popular Badge" },
                                         ].map(({ key, label }) => (
                                             <label key={key} className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">

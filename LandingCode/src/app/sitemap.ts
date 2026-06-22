@@ -7,7 +7,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
   const baseUrl = 'https://vignova.io';
 
   // Static Pages
-  const routes = ['', '/how-it-works', '/blog', '/contact', '/privacy', '/terms'].map(
+  const routes = ['', '/how-it-works', '/blog', '/contact', '/privacy', '/terms', '/refund', '/about'].map(
     (route) => ({
       url: `${baseUrl}${route}`,
       lastModified: new Date().toISOString(),
