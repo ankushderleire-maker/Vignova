@@ -9,35 +9,7 @@ import Link from 'next/link';
 
 // Dynamically import PayPal button to avoid SSR issues
 const PayPalCheckoutButton = dynamic(() => import('@/components/billing/PayPalCheckoutButton'), { ssr: false });
-
-// Plan Configuration (Duplicate from BillingPage to ensure consistency, ideal to centralize)
-const PLANS: any = {
-    PRO: {
-        name: "Pro",
-        price_monthly: 9.99,
-        description: "Perfect for active job seekers",
-        features: [
-            "50 resumes/month",
-            "Chrome Extension Access",
-            "Multiple Profiles",
-            "Advanced AI Optimization",
-            "Priority Email Support"
-        ]
-    },
-    PREMIUM: {
-        name: "Premium",
-        price_monthly: 19.99,
-        description: "Unlimited power for professionals",
-        features: [
-            "Unlimited Resumes",
-            "Chrome Extension Access",
-            "Multiple Profiles",
-            "Premium AI Optimization",
-            "Custom Templates",
-            "24/7 Priority Support"
-        ]
-    },
-};
+const RazorpayCheckoutButton = dynamic(() => import('@/components/billing/RazorpayCheckoutButton'), { ssr: false });
 
 const BILLING_CYCLES: any = {
     MONTHLY: { label: "Monthly", discount: 0, months: 1 },
@@ -53,9 +25,79 @@ function CheckoutContent() {
 
     const [loading, setLoading] = useState(false);
     const [success, setSuccess] = useState(false);
+    const [previewData, setPreviewData] = useState<any>(null);
+    const [previewLoading, setPreviewLoading] = useState(true);
+    const [selectedCountry, setSelectedCountry] = useState<string>('');
+    const [planConfigs, setPlanConfigs] = useState<any[]>([]);
+    const [plansLoading, setPlansLoading] = useState(true);
+
+    useEffect(() => {
+        const fetchPlans = async () => {
+            try {
+                const res = await fetch("/api/plans");
+                const data = await res.json();
+                setPlanConfigs(data);
+            } catch (error) {
+                console.error("Failed to fetch plans:", error);
+            } finally {
+                setPlansLoading(false);
+            }
+        };
+        fetchPlans();
+    }, []);
 
     // Validate params
-    if (!planKey || !cycleKey || !PLANS[planKey] || !BILLING_CYCLES[cycleKey]) {
+    const cycle = cycleKey ? BILLING_CYCLES[cycleKey] : null;
+    const plan = planConfigs.find(p => p.plan_type === planKey);
+
+    useEffect(() => {
+        if (!plan || !cycle) return;
+
+        const basePrice = plan.monthly_price;
+        const discount = cycle.discount / 100;
+        const months = cycle.months;
+        const discountedMonthly = basePrice * (1 - discount);
+        const total = (discountedMonthly * months).toFixed(2);
+
+        const fetchPreview = async () => {
+            setPreviewLoading(true);
+            try {
+                const res = await fetch('/api/razorpay/preview', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        amount_usd: parseFloat(total),
+                        country: selectedCountry || undefined
+                    })
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    setPreviewData(data);
+                    if (!selectedCountry && data.country) {
+                        setSelectedCountry(data.country);
+                    }
+                }
+            } catch (err) {
+                console.error("Failed to fetch preview:", err);
+            } finally {
+                setPreviewLoading(false);
+            }
+        };
+
+        if (total) {
+            fetchPreview();
+        }
+    }, [plan, cycle, selectedCountry]);
+
+    if (plansLoading) {
+        return (
+            <div className="flex items-center justify-center min-h-[60vh]">
+                <Loader2 className="w-8 h-8 animate-spin text-[var(--primary)]" />
+            </div>
+        );
+    }
+
+    if (!planKey || !cycleKey || !plan || !cycle) {
         return (
             <div className="text-center py-20">
                 <h2 className="text-xl font-bold text-red-500">Invalid Checkout Link</h2>
@@ -66,11 +108,7 @@ function CheckoutContent() {
         );
     }
 
-    const plan = PLANS[planKey];
-    const cycle = BILLING_CYCLES[cycleKey];
-
-    // Calculate Price
-    const basePrice = plan.price_monthly;
+    const basePrice = plan.monthly_price;
     const discount = cycle.discount / 100;
     const months = cycle.months;
     const discountedMonthly = basePrice * (1 - discount);
@@ -127,17 +165,94 @@ function CheckoutContent() {
                         </div>
 
                         <div className="flex justify-between items-center py-4">
-                            <div className="text-lg font-bold text-white">Total</div>
+                            <div className="text-lg font-bold text-white">Total USD</div>
                             <div className="text-2xl font-bold text-[var(--primary)]">${total}</div>
                         </div>
 
+                        {/* Country and Exchange Rate Section */}
+                        <div className="mt-4 p-4 bg-white/[0.02] border border-white/5 rounded-xl">
+                            <label className="block text-sm font-medium text-gray-400 mb-2">Billing Country</label>
+                            <select
+                                value={selectedCountry}
+                                onChange={(e) => setSelectedCountry(e.target.value)}
+                                className="w-full bg-[#111111] border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none mb-3"
+                            >
+                                <option value="US">United States</option>
+                                <option value="IN">India</option>
+                                <option value="GB">United Kingdom</option>
+                                <option value="CA">Canada</option>
+                                <option value="AU">Australia</option>
+                                <option value="IE">Ireland</option>
+                            </select>
+
+                            {previewLoading ? (
+                                <div className="text-sm text-gray-500 flex items-center">
+                                    <Loader2 className="w-4 h-4 animate-spin mr-2" /> Calculating local price...
+                                </div>
+                            ) : previewData && previewData.currency !== 'USD' ? (
+                                <div className="space-y-2 text-sm">
+                                    <div className="flex justify-between text-gray-400">
+                                        <span>Exchange Rate</span>
+                                        <span>1 USD = {previewData.exchange_rate} {previewData.currency}</span>
+                                    </div>
+                                    <div className="flex justify-between font-bold text-white pt-2 border-t border-white/10">
+                                        <span>Final Amount</span>
+                                        <span className="text-[var(--primary)]">
+                                            {previewData.currency === 'INR' ? '₹' : ''}
+                                            {previewData.final_amount.toFixed(2)} {previewData.currency}
+                                        </span>
+                                    </div>
+                                </div>
+                            ) : null}
+                        </div>
+
                         <ul className="mt-4 space-y-2">
-                            {plan.features.map((feature: string, i: number) => (
-                                <li key={i} className="text-sm text-gray-400 flex items-center">
+                            <li className="text-sm text-gray-400 flex items-center">
+                                <CheckCircle className="w-3 h-3 text-[var(--primary)] mr-2" />
+                                {plan.resume_creation_label || `${plan.credits} resumes/month`}
+                            </li>
+                            <li className="text-sm text-gray-400 flex items-center">
+                                <CheckCircle className="w-3 h-3 text-[var(--primary)] mr-2" />
+                                {plan.ai_optimization_label || "Basic AI Optimization"}
+                            </li>
+                            <li className="text-sm text-gray-400 flex items-center">
+                                <CheckCircle className="w-3 h-3 text-[var(--primary)] mr-2" />
+                                {plan.templates_label || "Standard Templates"}
+                            </li>
+                            <li className="text-sm text-gray-400 flex items-center">
+                                <CheckCircle className="w-3 h-3 text-[var(--primary)] mr-2" />
+                                {plan.support_label || "Standard Support"}
+                            </li>
+                            {plan.has_extension_access && (
+                                <li className="text-sm text-gray-400 flex items-center">
                                     <CheckCircle className="w-3 h-3 text-[var(--primary)] mr-2" />
-                                    {feature}
+                                    Chrome Extension Access
                                 </li>
-                            ))}
+                            )}
+                            {plan.has_multi_profile && (
+                                <li className="text-sm text-gray-400 flex items-center">
+                                    <CheckCircle className="w-3 h-3 text-[var(--primary)] mr-2" />
+                                    Multiple Profiles
+                                </li>
+                            )}
+                            {plan.has_unlimited_resumes && (
+                                <li className="text-sm text-gray-400 flex items-center">
+                                    <CheckCircle className="w-3 h-3 text-[var(--primary)] mr-2" />
+                                    Unlimited Resumes
+                                </li>
+                            )}
+                            {plan.has_linkedin_optimization && (
+                                <li className="text-sm text-gray-400 flex items-center">
+                                    <CheckCircle className="w-3 h-3 text-[var(--primary)] mr-2" />
+                                    LinkedIn Optimization
+                                </li>
+                            )}
+                            {plan.has_interview_prep && (
+                                <li className="text-sm text-gray-400 flex items-center">
+                                    <CheckCircle className="w-3 h-3 text-[var(--primary)] mr-2" />
+                                    Interview Prep
+                                </li>
+                            )}
                         </ul>
                     </div>
                 </div>
@@ -162,6 +277,25 @@ function CheckoutContent() {
                                 billingCycle={cycleKey}
                                 onSuccess={handleSuccess}
                                 onError={(err) => console.error("PayPal Error:", err)}
+                            />
+                        </div>
+                    </div>
+
+                    {/* Razorpay Option */}
+                    <div className="mb-6">
+                        <div className="bg-indigo-600/10 border border-indigo-500/20 rounded-lg p-4 mb-4">
+                            <h4 className="font-medium text-indigo-400 mb-2">Pay with Razorpay</h4>
+                            <p className="text-sm text-gray-400 mb-4">
+                                Securely pay using Credit/Debit Cards, UPI, or Netbanking via Razorpay.
+                            </p>
+                            <RazorpayCheckoutButton
+                                amountUsd={parseFloat(total)}
+                                country={selectedCountry}
+                                planType={planKey}
+                                billingCycle={cycleKey}
+                                onSuccess={handleSuccess}
+                                onError={(err) => console.error("Razorpay Error:", err)}
+                                disabled={previewLoading}
                             />
                         </div>
                     </div>

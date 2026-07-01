@@ -62,7 +62,7 @@ export async function GET(req: Request) {
                 fullName: u.full_name,
                 role: u.role,
                 createdAt: u.created_at,
-                subscription: u.subscriptions[0] || null,
+                subscription: u.subscriptions || null,
                 counts: {
                     resumes: u._count.generated_resumes,
                     jobs: u._count.job_applications,

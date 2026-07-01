@@ -76,6 +76,10 @@ from app.routes.ats_ingest  import router as ats_ingest_router
 # LinkedIn Optimizer
 from app.routes.linkedin    import router as linkedin_router
 
+# Checkout and Payment
+from app.routes.checkout import router as checkout_router
+from app.routes.admin_exchange_rate import router as admin_exchange_router
+
 app.include_router(resume_router)
 app.include_router(ats_router)
 app.include_router(score_router)
@@ -91,3 +95,7 @@ app.include_router(ats_ingest_router)
 
 # LinkedIn Optimizer
 app.include_router(linkedin_router)
+
+# Checkout and Payment
+app.include_router(checkout_router)
+app.include_router(admin_exchange_router)
