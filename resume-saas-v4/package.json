@@ -28,6 +28,7 @@
     "next-auth": "^4.24.13",
     "nodemailer": "^7.0.13",
     "puppeteer-core": "^24.37.2",
+    "razorpay": "^2.9.6",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-to-print": "^3.2.0",

@@ -19,6 +19,7 @@ export function AuthForm({ defaultMode = "signup" }: AuthFormProps) {
     const [lastName, setLastName] = useState("");
     const [email, setEmail] = useState("");
     const [phone, setPhone] = useState("");
+    const [country, setCountry] = useState("US");
     const [password, setPassword] = useState("");
     const [showPassword, setShowPassword] = useState(false);
     
@@ -39,6 +40,7 @@ export function AuthForm({ defaultMode = "signup" }: AuthFormProps) {
                         fullName: `${firstName} ${lastName}`.trim(),
                         email,
                         password,
+                        country,
                     }),
                 });
 

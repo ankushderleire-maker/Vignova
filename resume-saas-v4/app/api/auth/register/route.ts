@@ -8,7 +8,7 @@ const MIN_PASSWORD_LENGTH = 8;
 const MAX_PASSWORD_LENGTH = 128;
 const MAX_NAME_LENGTH = 100;
 
-function validateRegistrationInput(email: string, password: string, fullName: string) {
+function validateRegistrationInput(email: string, password: string, fullName: string, country?: string) {
     const errors: string[] = [];
 
     // Email validation
@@ -47,16 +47,23 @@ function validateRegistrationInput(email: string, password: string, fullName: st
         errors.push(`Full name must be under ${MAX_NAME_LENGTH} characters`);
     }
 
+    // Country validation
+    if (!country) {
+        errors.push("Country is required");
+    } else if (country.length !== 2) {
+        errors.push("Invalid country code");
+    }
+
     return errors;
 }
 
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { email, password, fullName } = body;
+    const { email, password, fullName, country } = body;
 
     // Validate input
-    const validationErrors = validateRegistrationInput(email, password, fullName);
+    const validationErrors = validateRegistrationInput(email, password, fullName, country);
     if (validationErrors.length > 0) {
         return NextResponse.json(
             { error: validationErrors[0], errors: validationErrors },
@@ -86,6 +93,7 @@ export async function POST(req: Request) {
         email: sanitizedEmail,
         password_hash: hashed,
         full_name: fullName.trim(),
+        country: country,
         // Create related records automatically
         subscriptions: {
             create: { plan_type: "FREE", credits_remaining: 3 }
