@@ -23,6 +23,19 @@
         }
     }
 
+    /**
+     * Does THIS frame contain enough fillable fields to run the agent?
+     * Iframes use a lower threshold (a form iframe often holds only the form),
+     * the top frame a higher one (search bars etc. shouldn't trigger it).
+     */
+    function frameHasFillableFields(min) {
+        const els = document.querySelectorAll(
+            'input:not([type="hidden"]):not([type="submit"]):not([type="button"]):not([type="reset"]):not([type="image"]), textarea, select, [contenteditable="true"], [role="textbox"]'
+        );
+        // Reduce the required minimum to 1 to detect simple forms better
+        return els.length >= 1;
+    }
+
     // Heartbeat: remove stale dashboard/minimized UI when extension is reloaded/invalidated
     if (!isInIframe) {
         const _ctxHeartbeat = setInterval(() => {
@@ -42,11 +55,14 @@
             }
 
             if (isInIframe) {
-                startAgent();
-                sendResponse({ success: true, context: "iframe" });
+                if (frameHasFillableFields(2)) {
+                    startAgent();
+                    sendResponse({ success: true, context: "iframe" });
+                } else {
+                    sendResponse({ success: false, context: "iframe_no_form" });
+                }
             } else {
-                const hasFields = document.querySelectorAll("input, textarea, select").length > 3;
-                if (hasFields) {
+                if (frameHasFillableFields(4)) {
                     startAgent();
                     sendResponse({ success: true, context: "parent" });
                 } else {
@@ -116,11 +132,11 @@
             if (message.command === "pause_or_start") {
                 const Loop = window.Vignova_AgentLoop;
                 const ats = window.Vignova_ATSDetector ? window.Vignova_ATSDetector.detect() : null;
-                const hasFields = document.querySelectorAll("input, textarea, select").length > 3;
+                const hasFields = frameHasFillableFields(isInIframe ? 2 : 4);
 
                 if (agentStarted && Loop) {
                     if (Loop.getState().isPaused) Loop.resume(); else Loop.pause();
-                } else if (!agentStarted && (ats || hasFields || isInIframe)) {
+                } else if (!agentStarted && (ats || hasFields)) {
                     // This frame is qualified to run the agent
                     startAgent();
                 }
@@ -405,7 +421,7 @@
     if (!hasDedicatedScript) {
         setTimeout(() => {
             const ats = window.Vignova_ATSDetector ? window.Vignova_ATSDetector.detect() : null;
-            const hasFields = document.querySelectorAll("input, textarea, select").length > 3;
+            const hasFields = frameHasFillableFields(4);
 
             if (ats || hasFields) {
                 if (!isInIframe && !agentStarted) {

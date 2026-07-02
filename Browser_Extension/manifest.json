@@ -90,7 +90,8 @@
                 "content/dashboard_bridge.js"
             ],
             "run_at": "document_idle",
-            "all_frames": false
+            "all_frames": true,
+            "match_about_blank": true
         }
     ],
 
@@ -98,7 +99,8 @@
         "storage",
         "activeTab",
         "tabs",
-        "scripting"
+        "scripting",
+        "cookies"
     ],
 
     "host_permissions": [
@@ -120,9 +122,7 @@
                 "icons/*"
             ],
             "matches": [
-                "https://app.vignova.io/*",
-                "https://*.linkedin.com/*",
-                "https://*.indeed.com/*"
+                "<all_urls>"
             ]
         }
     ]

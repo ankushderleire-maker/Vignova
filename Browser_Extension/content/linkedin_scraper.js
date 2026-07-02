@@ -166,7 +166,9 @@ function scrapeProfileFromJson() {
         let profileEntity = null;
         for (const entity of entityMap.values()) {
             if (entity.$type === "com.linkedin.voyager.dash.identity.profile.Profile" && entity.publicIdentifier) {
-                if (window.location.href.includes(entity.publicIdentifier)) {
+                // Remove trailing slashes and query params for comparison
+                const cleanUrl = window.location.href.split('?')[0].replace(/\/$/, "");
+                if (cleanUrl.includes(entity.publicIdentifier)) {
                     profileEntity = entity;
                     break;
                 }
@@ -263,9 +265,10 @@ function scrapeProfileFromDom() {
 
     // ── 1. Top Card (Intro) ──
     try {
-        const topCard = safeQuery(document, 'section[data-member-id]') || document;
+        const topCard = safeQuery(document, 'section[data-member-id]') || safeQuery(document, '.ph5.pb5') || safeQuery(document, 'main') || document;
 
-        profileData.name = getText(safeQuery(topCard, 'h1')) || "";
+        let nameEl = safeQuery(topCard, 'h1') || safeQuery(document, 'h1.text-heading-xlarge') || safeQuery(document, 'h1');
+        profileData.name = getText(nameEl) || "";
         console.log("Vignova DOM: Name =", profileData.name);
 
         profileData.headline = getText(safeQuery(topCard, 'div.text-body-medium.break-words'))
