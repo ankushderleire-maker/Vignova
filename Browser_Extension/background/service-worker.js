@@ -40,8 +40,111 @@ async function warmExtensionCache(token) {
     }
 }
 
+// ═══════════════════════════════════════════
+//  AUTH CORE — single source of truth
+//  Every sign-in/sign-out path goes through these helpers so cached data
+//  from a previous account can never leak into the next one.
+// ═══════════════════════════════════════════
+
+const USER_DATA_KEYS = [
+    "vignova_token",
+    "vignova_user",
+    "vignova_agent_profile",
+    "vignova_recent_jobs",
+    "vignova_config",
+];
+
+function broadcastAuthChange() {
+    chrome.tabs.query({}, (tabs) => {
+        tabs.forEach((tab) => {
+            if (tab.id) {
+                chrome.tabs.sendMessage(tab.id, { type: "AUTH_STATE_CHANGED" }).catch(() => { });
+            }
+        });
+    });
+}
+
+async function signInWithToken(token, user) {
+    // Wipe the previous account's data first so nothing stale survives a switch
+    await chrome.storage.local.remove([...USER_DATA_KEYS, "vignova_signed_out"]);
+    await chrome.storage.local.set({ vignova_token: token, vignova_user: user });
+    await warmExtensionCache(token);
+    broadcastAuthChange();
+}
+
+async function signOut() {
+    await chrome.storage.local.remove(USER_DATA_KEYS);
+    // Remember the explicit sign-out so we don't silently log back in
+    // from the website session on the next popup open
+    await chrome.storage.local.set({ vignova_signed_out: true });
+    broadcastAuthChange();
+}
+
+/**
+ * Look up the website session (no side effects). This must run in the
+ * service worker: fetches from the (possibly iframed) popup never carry the
+ * SameSite=Lax NextAuth cookie, so the API would always answer 401 there.
+ * The cookie is checked first so no request is fired at all when the user
+ * is logged out of the website (no 401 console noise).
+ */
+async function probeWebSession() {
+    const cookieNames = ["__Secure-next-auth.session-token", "next-auth.session-token"];
+    let hasSession = false;
+    for (const name of cookieNames) {
+        const cookie = await chrome.cookies.get({ url: Vignova_API_BASE, name }).catch(() => null);
+        if (cookie) { hasSession = true; break; }
+    }
+    if (!hasSession) return { loggedIn: false };
+
+    try {
+        const res = await fetch(`${Vignova_API_BASE}/api/extension/session-token`, { credentials: "include" });
+        const data = await res.json();
+        if (res.ok && data.token) {
+            return { loggedIn: true, token: data.token, user: data.user };
+        }
+        return { loggedIn: false };
+    } catch (err) {
+        return { loggedIn: false, error: "Cannot connect to Vignova server." };
+    }
+}
+
 // ─── Message Router ───
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+
+    // Website-session lookup, read-only (login view uses this for "Continue as…")
+    if (message.type === "WEB_SESSION_PROBE") {
+        probeWebSession().then(sendResponse);
+        return true;
+    }
+
+    // Sign the extension in from the active website session
+    if (message.type === "WEB_SESSION_ADOPT") {
+        (async () => {
+            const session = await probeWebSession();
+            if (session.token) {
+                await signInWithToken(session.token, session.user);
+                sendResponse({ success: true, user: session.user });
+            } else {
+                sendResponse({ success: false, ...session });
+            }
+        })();
+        return true;
+    }
+
+    // Sign in with a token the popup obtained itself (OAuth tab-injection fallback)
+    if (message.type === "ADOPT_TOKEN") {
+        (async () => {
+            await signInWithToken(message.data.token, message.data.user);
+            sendResponse({ success: true });
+        })();
+        return true;
+    }
+
+    // Explicit sign-out (from popup)
+    if (message.type === "SIGN_OUT") {
+        signOut().then(() => sendResponse({ success: true }));
+        return true;
+    }
 
     // Auth status check (from content scripts)
     if (message.type === "GET_AUTH_STATUS") {
@@ -162,6 +265,28 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         return true;
     }
 
+    // ─── API Proxy: List Profiles ───
+    if (message.type === "API_GET_PROFILES") {
+        chrome.storage.local.get(["vignova_token"], async (result) => {
+            try {
+                const response = await fetch(`${Vignova_API_BASE}/api/extension/profiles`, {
+                    headers: { "Authorization": `Bearer ${result.vignova_token}` },
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    sendResponse({ success: true, profiles: data.profiles || [] });
+                } else {
+                    sendResponse({ success: false, error: data.error || "Failed to load profiles" });
+                }
+            } catch (err) {
+                sendResponse({ success: false, error: "Cannot connect to Vignova server." });
+            }
+        });
+        return true;
+    }
+
     // ─── API Proxy: Set Profile ───
     if (message.type === "API_SET_PROFILE") {
         chrome.storage.local.get(["vignova_token"], async (result) => {
@@ -202,19 +327,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                 const data = await response.json();
 
                 if (response.ok && data.token) {
-                    await chrome.storage.local.set({
-                        vignova_token: data.token,
-                        vignova_user: data.user,
-                    });
-                    await warmExtensionCache(data.token);
-                    // Notify content scripts
-                    chrome.tabs.query({}, (tabs) => {
-                        tabs.forEach((tab) => {
-                            if (tab.id) {
-                                chrome.tabs.sendMessage(tab.id, { type: "AUTH_STATE_CHANGED" }).catch(() => { });
-                            }
-                        });
-                    });
+                    await signInWithToken(data.token, data.user);
                     sendResponse({ success: true, user: data.user });
                 } else {
                     sendResponse({
@@ -243,7 +356,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                 });
 
                 if (response.status === 401) {
-                    await chrome.storage.local.remove(["vignova_token", "vignova_user"]);
+                    await chrome.storage.local.remove(USER_DATA_KEYS);
                     sendResponse({ authenticated: false, expired: true });
                     return;
                 }
