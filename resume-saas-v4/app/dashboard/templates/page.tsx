@@ -22,7 +22,7 @@ function TemplateSelectionPageContent() {
   const activeTemplateId = getActiveTemplate();
 
   const handleSaveAndContinue = () => {
-    // Navigate back to where we came from (AI Studio editing screen)
+    // Navigate back to where we came from (Resume Studio editing screen)
     const returnUrl = searchParams.get('returnUrl');
     if (returnUrl) {
       router.push(returnUrl);

@@ -43,7 +43,15 @@ export async function POST(req: NextRequest) {
         body: JSON.stringify({ ...body, user_profile: userProfile }),
     });
 
-    const data = await res.json();
+    let data;
+    try {
+        data = await res.json();
+    } catch (err) {
+        return NextResponse.json(
+            { error: "AI service returned an invalid response. Please try again." },
+            { status: 502 }
+        );
+    }
     
     // If successfully generated, save to database
     if (res.ok && data.questions && Array.isArray(data.questions)) {

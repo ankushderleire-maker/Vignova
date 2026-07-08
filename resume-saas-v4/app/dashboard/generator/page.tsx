@@ -181,7 +181,7 @@ export default function GeneratorPage() {
                         className="flex items-center gap-1.5 bg-[var(--primary)] text-[var(--background)] hover:bg-[var(--foreground)] hover:text-[var(--background)] px-3 py-2 rounded-lg text-xs font-bold transition-all shadow-md"
                       >
                         <Zap className="h-3.5 w-3.5 fill-current" />
-                        AI Studio
+                        Resume Studio
                       </button>
                     )}
                   </div>
@@ -226,7 +226,7 @@ export default function GeneratorPage() {
                         className="flex items-center gap-1.5 bg-[var(--primary)] text-[var(--background)] hover:bg-[var(--foreground)] hover:text-[var(--background)] px-3 py-1.5 rounded-md text-xs font-bold transition-all shadow-md hover:shadow-lg"
                       >
                         <Zap className="h-3 w-3 fill-current" />
-                        AI Studio
+                        Resume Studio
                       </button>
                     )}
                   </div>

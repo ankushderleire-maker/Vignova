@@ -353,7 +353,7 @@ export default function SavedResumesPage() {
                                 onClick={() => { setOpenJobId(null); router.push(`/dashboard/jobs/${activeGroup.jobId}`); }}
                                 className="text-xs text-[var(--text-secondary)] hover:text-[var(--foreground)] transition-colors"
                             >
-                                Go to AI Studio →
+                                Go to Resume Studio →
                             </button>
                             <button
                                 onClick={() => setOpenJobId(null)}
