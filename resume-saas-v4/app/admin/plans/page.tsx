@@ -39,9 +39,66 @@ export default function AdminPlansPage() {
     const [editingPlan, setEditingPlan] = useState<PlanConfig | null>(null);
     const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
+    const [exchangeRate, setExchangeRate] = useState<number | null>(null);
+    const [savingRate, setSavingRate] = useState(false);
+    const [seedingPlans, setSeedingPlans] = useState(false);
+
     useEffect(() => {
         fetchPlans();
+        fetchExchangeRate();
     }, []);
+
+    const fetchExchangeRate = async () => {
+        try {
+            const res = await fetch("/api/admin/exchange-rate");
+            if (res.ok) {
+                const data = await res.json();
+                setExchangeRate(data.rate);
+            }
+        } catch (e) {
+            console.error("Failed to fetch exchange rate", e);
+        }
+    };
+
+    const handleSaveExchangeRate = async () => {
+        if (!exchangeRate) return;
+        setSavingRate(true);
+        try {
+            const res = await fetch("/api/admin/exchange-rate", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ rate: exchangeRate })
+            });
+            if (res.ok) {
+                setMessage({ type: "success", text: "Exchange rate updated successfully" });
+            } else {
+                setMessage({ type: "error", text: "Failed to update exchange rate" });
+            }
+        } catch (e) {
+            setMessage({ type: "error", text: "Error updating exchange rate" });
+        } finally {
+            setSavingRate(false);
+        }
+    };
+
+    const handleSeedPlans = async () => {
+        setSeedingPlans(true);
+        setMessage(null);
+        try {
+            const res = await fetch("/api/admin/plans/seed", { method: "POST" });
+            if (res.ok) {
+                setMessage({ type: "success", text: "Default plans seeded successfully!" });
+                fetchPlans();
+            } else {
+                setMessage({ type: "error", text: "Failed to seed plans." });
+            }
+        } catch (e) {
+            setMessage({ type: "error", text: "Error seeding plans." });
+        } finally {
+            setSeedingPlans(false);
+        }
+    };
+
 
     const fetchPlans = async () => {
         setLoading(true);
@@ -136,8 +193,15 @@ export default function AdminPlansPage() {
 
                 {plans.length === 0 ? (
                     <div className="text-center py-20 text-gray-400">
-                        <p className="text-lg mb-2">No plans configured yet.</p>
-                        <p className="text-sm">Run <code className="bg-white/10 px-2 py-1 rounded">npx tsx prisma/seed-plans.ts</code> to seed default plans.</p>
+                        <p className="text-lg mb-4">No plans configured yet.</p>
+                        <button 
+                            onClick={handleSeedPlans}
+                            disabled={seedingPlans}
+                            className="bg-red-600 hover:bg-red-700 text-white px-6 py-2 rounded-xl transition-colors disabled:opacity-50 inline-flex items-center gap-2"
+                        >
+                            {seedingPlans ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                            Seed Default Plans
+                        </button>
                     </div>
                 ) : (
                     <div className="grid gap-6">
@@ -321,6 +385,40 @@ export default function AdminPlansPage() {
                         })}
                     </div>
                 )}
+
+                {/* Razorpay Exchange Rate Settings */}
+                <div className="mt-8 p-6 rounded-2xl border border-white/10 bg-white/5">
+                    <h3 className="text-lg font-bold text-white mb-2 flex items-center gap-2">
+                        <DollarSign className="w-5 h-5 text-green-400" />
+                        Razorpay Exchange Rate (USD to INR)
+                    </h3>
+                    <p className="text-sm text-gray-400 mb-4">
+                        Set the conversion rate used when international users (outside India) are charged in INR via Razorpay.
+                    </p>
+                    <div className="flex items-center gap-4 max-w-sm">
+                        <div className="flex-1">
+                            <label className="text-xs text-gray-500 mb-1 block">1 USD = ? INR</label>
+                            <input
+                                type="number"
+                                step="0.01"
+                                value={exchangeRate || ""}
+                                onChange={(e) => setExchangeRate(parseFloat(e.target.value))}
+                                placeholder="84.50"
+                                className="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-white text-sm"
+                            />
+                        </div>
+                        <div className="pt-5">
+                            <button
+                                onClick={handleSaveExchangeRate}
+                                disabled={savingRate || !exchangeRate}
+                                className="bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-lg transition-colors flex items-center gap-2 disabled:opacity-50 text-sm h-10"
+                            >
+                                {savingRate ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                                Save Rate
+                            </button>
+                        </div>
+                    </div>
+                </div>
 
                 {/* Refresh */}
                 <div className="flex justify-center pt-4">
