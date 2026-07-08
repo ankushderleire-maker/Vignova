@@ -54,7 +54,7 @@ export async function GET(req: Request, { params }: RouteParams) {
             fullName: user.full_name,
             role: user.role,
             createdAt: user.created_at,
-            subscription: user.subscriptions?.[0] || null,
+            subscription: user.subscriptions || null,
             profiles: user.master_profiles,
             resumes: user.generated_resumes,
             jobs: user.job_applications,

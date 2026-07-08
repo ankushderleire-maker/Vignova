@@ -128,6 +128,8 @@ function ResumeStudioPageContent() {
                 let defaultProfileId = pList.find((p: any) => p.is_default)?.id;
                 if (!defaultProfileId && pList.length > 0) defaultProfileId = pList[0].id;
                 
+                let fetchedProfile = null;
+                
                 if (defaultProfileId) {
                     setSelectedMasterProfileId(defaultProfileId);
                     const selectedP = pList.find((p: any) => p.id === defaultProfileId);
@@ -135,12 +137,14 @@ function ResumeStudioPageContent() {
                     
                     const profileRes = await fetch(`/api/profiles/${defaultProfileId}`);
                     const profileJson = await profileRes.json();
-                    setMasterProfile(profileJson.profile?.parsed_data || null);
+                    fetchedProfile = profileJson.profile?.parsed_data || null;
+                    setMasterProfile(fetchedProfile);
                 } else {
                     // Fallback to old route if somehow profiles array is empty
                     const fallbackRes = await fetch("/api/profile");
                     const fallbackJson = await fallbackRes.json();
-                    setMasterProfile(fallbackJson.data);
+                    fetchedProfile = fallbackJson.data;
+                    setMasterProfile(fetchedProfile);
                 }
 
                 // 3. Fetch Saved Resumes for this Job
@@ -181,13 +185,13 @@ function ResumeStudioPageContent() {
                             const parsedReport = savedReportRaw ? JSON.parse(savedReportRaw) : null;
                             setTimeout(() => handleGenerateResume({ ...foundJob, description: savedJd }, { raw_text: savedResumeRaw }, parsedReport), 500);
                         }
-                    } else if (profileJson.data) {
-                        setTimeout(() => handleGenerateResume(foundJob, profileJson.data), 500);
+                    } else if (fetchedProfile) {
+                        setTimeout(() => handleGenerateResume(foundJob, fetchedProfile), 500);
                     }
                 }
                 // 6. Auto Start Normal
-                else if (searchParams.get("autoStart") === "true" && foundJob && profileJson.data) {
-                    setTimeout(() => handleGenerateResume(foundJob, profileJson.data), 500);
+                else if (searchParams.get("autoStart") === "true" && foundJob && fetchedProfile) {
+                    setTimeout(() => handleGenerateResume(foundJob, fetchedProfile), 500);
                 }
 
             } catch (error) {
@@ -282,8 +286,8 @@ function ResumeStudioPageContent() {
                     website: aiData.website || ""
                 },
                 summary: aiData.summary,
-                skills: aiData.skills?.technical ? (Array.isArray(aiData.skills.technical) ? aiData.skills.technical : aiData.skills.technical.split(",").map(s => s.trim())) : [],
-                experience: aiData.experience?.map(exp => ({
+                skills: aiData.skills?.technical ? (Array.isArray(aiData.skills.technical) ? aiData.skills.technical : aiData.skills.technical.split(",").map((s: string) => s.trim())) : [],
+                experience: aiData.experience?.map((exp: any) => ({
                     id: exp.id || Math.random().toString(),
                     company: exp.company,
                     role: exp.role,
@@ -292,14 +296,14 @@ function ResumeStudioPageContent() {
                     description: Array.isArray(exp.description) ? exp.description : [exp.description],
                     location: exp.location || ""
                 })) || [],
-                projects: aiData.projects ? aiData.projects.map(proj => ({
+                projects: aiData.projects ? aiData.projects.map((proj: any) => ({
                     id: proj.id || Math.random().toString(),
                     name: proj.name,
                     techStack: proj.techStack,
                     description: Array.isArray(proj.description) ? proj.description : [proj.description],
                     link: proj.link || ""
                 })) : [],
-                education: aiData.education?.map(edu => ({
+                education: aiData.education?.map((edu: any) => ({
                     id: edu.id || Math.random().toString(),
                     school: edu.school,
                     degree: edu.degree,
