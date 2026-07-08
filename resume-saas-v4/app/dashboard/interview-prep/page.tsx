@@ -123,14 +123,19 @@ export default function InterviewPrepPage() {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
       });
-      const data = await res.json();
+      let data;
+      try {
+        data = await res.json();
+      } catch (parseError) {
+        throw new Error("The server took too long or returned an invalid response. Please try again.");
+      }
       if (!res.ok) throw new Error(data.error || data.detail || "Failed to generate questions");
       if (data.questions && Array.isArray(data.questions)) {
         setQuestions(data.questions);
         setPhase("results");
-      } else throw new Error("Invalid response format");
+      } else throw new Error("The AI returned an invalid format. Please try again.");
     } catch (err: any) {
-      setError(err.message || "Something went wrong.");
+      setError(err.message || "An unexpected error occurred.");
       setPhase("setup");
     }
   };

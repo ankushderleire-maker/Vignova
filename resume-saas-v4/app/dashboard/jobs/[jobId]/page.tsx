@@ -532,7 +532,7 @@ function ResumeStudioPageContent() {
                             <Zap className="h-4 w-4 md:h-5 md:w-5 text-[var(--primary)]" />
                         </div>
                         <div className="min-w-0">
-                            <h1 className="font-bold text-base md:text-xl text-[var(--foreground)] leading-tight">AI Studio</h1>
+                            <h1 className="font-bold text-base md:text-xl text-[var(--foreground)] leading-tight">Resume Studio</h1>
                             <p className="text-[10px] md:text-xs text-[var(--text-secondary)] truncate">{job.jobTitle} • {job.company}</p>
                         </div>
                     </div>

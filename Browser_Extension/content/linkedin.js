@@ -732,7 +732,18 @@
             }
         }
 
-        const jobDescription = descriptionEl?.textContent?.trim() || descriptionEl?.innerText?.trim() || "";
+        let jobDescription = descriptionEl?.innerText?.trim() || descriptionEl?.textContent?.trim() || "";
+        if (jobDescription) {
+            // Remove common unnecessary words from LinkedIn scraping
+            jobDescription = jobDescription
+                .replace(/Show more\s*$/i, '')
+                .replace(/Show less\s*$/i, '')
+                .replace(/See more\s*$/i, '')
+                .replace(/Report this job\s*$/i, '')
+                .trim();
+            // Clean up excessive newlines
+            jobDescription = jobDescription.replace(/\n{3,}/g, '\n\n');
+        }
 
         return { jobTitle, company, jobDescription, location, descriptionEl };
     }

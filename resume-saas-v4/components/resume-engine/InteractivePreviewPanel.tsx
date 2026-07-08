@@ -180,17 +180,7 @@ export const InteractivePreviewPanel: React.FC<InteractivePreviewPanelProps> = (
                     }
                 });
                 document.addEventListener('dblclick', (e) => {
-                    const editable = e.target.closest('[data-editable]');
-                    if (editable) {
-                        e.preventDefault();
-                        editable.setAttribute('contenteditable', 'true');
-                        editable.focus();
-                        const range = document.createRange();
-                        range.selectNodeContents(editable);
-                        const sel = window.getSelection();
-                        sel.removeAllRanges();
-                        sel.addRange(range);
-                    }
+                    // Double click edit removed as requested
                 });
                 document.addEventListener('input', (e) => {
                     const editable = e.target.closest('[data-editable]');
@@ -613,7 +603,7 @@ export const InteractivePreviewPanel: React.FC<InteractivePreviewPanelProps> = (
             {!selectedSection && blobUrl && (
                 <div className="sticky bottom-4 hidden md:flex justify-center pointer-events-none z-10">
                     <div className="bg-black/80 text-white px-4 py-2 rounded-lg text-xs">
-                        Click any section to select • Double-click to edit • Esc to deselect
+                        Click any section to select • Esc to deselect
                     </div>
                 </div>
             )}

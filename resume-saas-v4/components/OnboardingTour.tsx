@@ -43,7 +43,7 @@ const TOUR_STEPS: TourStep[] = [
     href: "/dashboard/generator",
     title: "Resume Generator",
     description:
-      "Click the AI Studio button next to any saved job to instantly generate a beautifully tailored resume.",
+      "Click the Resume Studio button next to any saved job to instantly generate a beautifully tailored resume.",
     placement: "left",
   },
   {

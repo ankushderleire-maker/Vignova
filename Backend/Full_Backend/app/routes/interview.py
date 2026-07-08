@@ -66,13 +66,13 @@ def _truncate(text: str, max_chars: int = 3000) -> str:
     return text[:max_chars] + "…" if len(text) > max_chars else text
 
 
+import re
+
 def _parse_json_response(text: str) -> dict:
     """Extract JSON from LLM response that may have markdown fences."""
     text = text.strip()
-    if text.startswith("```"):
-        lines = text.split("\n")
-        # Remove first and last fence lines
-        text = "\n".join(lines[1:-1]) if lines[-1].strip() == "```" else "\n".join(lines[1:])
+    text = re.sub(r"^```(?:json)?\s*\n?", "", text, flags=re.IGNORECASE)
+    text = re.sub(r"\n?```\s*$", "", text)
     return json.loads(text)
 
 
