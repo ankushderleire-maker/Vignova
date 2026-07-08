@@ -3,7 +3,7 @@
     "name": "Vignova - Your Career AI Assistant",
     "short_name": "Vignova",
     "version": "1.2.2",
-    "description": "AI-powered career copilot: tailor resumes for any job, auto-fill applications on LinkedIn & Indeed, track jobs with a Kanban board, and optimize your LinkedIn profile.",
+    "description": "AI career copilot: tailor resumes, auto-fill applications, track jobs with Kanban, and optimize your LinkedIn profile.",
 
     "minimum_chrome_version": "116",
 
@@ -100,7 +100,8 @@
         "activeTab",
         "tabs",
         "scripting",
-        "cookies"
+        "cookies",
+        "clipboardWrite"
     ],
 
     "host_permissions": [

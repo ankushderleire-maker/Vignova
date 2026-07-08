@@ -283,8 +283,8 @@ function LinkedInOptimizerContent() {
     };
 
     const proceedWithOptimization = async () => {
+        if (!result) return;
         setShowCreditModal(false);
-        
         setIsOptimizing(true);
         try {
             const creditRes = await fetch("/api/credits/deduct", { method: "POST" });
