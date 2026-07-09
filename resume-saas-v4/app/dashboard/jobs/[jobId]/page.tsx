@@ -100,6 +100,7 @@ function ResumeStudioPageContent() {
 
     const [loading, setLoading] = useState(true);
     const [isGenerating, setIsGenerating] = useState(false);
+    const [generatingType, setGeneratingType] = useState<"resume" | "cover-letter" | "email" | "all" | null>(null);
     const [hasGenerated, setHasGenerated] = useState(false);
     const [activeDocument, setActiveDocument] = useState<"resume" | "cover-letter" | "email">("resume");
     const [coverLetter, setCoverLetter] = useState<string | null>(null);
@@ -205,6 +206,7 @@ function ResumeStudioPageContent() {
 
         const handleGenerateCoverLetter = async () => {
         if (!masterProfile || !job) return;
+        setGeneratingType("cover-letter");
         setIsGenerating(true);
         try {
             const response = await fetch("/api/cover-letter/generate", {
@@ -232,6 +234,7 @@ function ResumeStudioPageContent() {
 
     const handleGenerateEmail = async () => {
         if (!masterProfile || !job) return;
+        setGeneratingType("email");
         setIsGenerating(true);
         try {
             const response = await fetch("/api/email/generate", {
@@ -259,6 +262,7 @@ function ResumeStudioPageContent() {
 
     const handleGenerateResumeOnly = async () => {
         if (!masterProfile || !job) return;
+        setGeneratingType("resume");
         setIsGenerating(true);
         try {
             const response = await fetch("/api/resume/generate", {
@@ -325,6 +329,7 @@ function ResumeStudioPageContent() {
 // --- GENERATION LOGIC ---
     const handleGenerateResume = async (currentJob = job, currentProfile = masterProfile, atsReport = null) => {
         if (!currentProfile || !currentJob) return;
+        setGeneratingType("all");
         setIsGenerating(true);
 
         try {
@@ -776,7 +781,7 @@ function ResumeStudioPageContent() {
                             />
 
                             {/* CONTENT TAB */}
-                            {activeSidebarTab === 'content' && (
+                            {activeSidebarTab === 'content' && activeDocument === 'resume' && (
                                 <div className="flex-1 overflow-y-auto p-4 space-y-6 scrollbar-thin scrollbar-thumb-black/10 dark:scrollbar-thumb-white/10 animate-slide-down">
                                     <div className="flex items-center justify-between mb-2">
                                         <h2 className="text-sm font-bold text-[var(--primary)] flex items-center gap-2">
@@ -870,6 +875,22 @@ function ResumeStudioPageContent() {
                                 </div>
                             )}
 
+                            {activeSidebarTab === 'content' && activeDocument === 'cover-letter' && (
+                                <div className="flex-1 p-6 flex flex-col items-center text-center justify-center text-[var(--text-secondary)] animate-slide-down">
+                                    <FileText className="w-12 h-12 mb-4 opacity-50" />
+                                    <h3 className="font-bold text-[var(--foreground)] mb-2">Cover Letter Editor</h3>
+                                    <p className="text-sm">You can edit your cover letter directly in the text area on the right side.</p>
+                                </div>
+                            )}
+
+                            {activeSidebarTab === 'content' && activeDocument === 'email' && (
+                                <div className="flex-1 p-6 flex flex-col items-center text-center justify-center text-[var(--text-secondary)] animate-slide-down">
+                                    <FileText className="w-12 h-12 mb-4 opacity-50" />
+                                    <h3 className="font-bold text-[var(--foreground)] mb-2">Draft Email Editor</h3>
+                                    <p className="text-sm">You can edit your draft email directly in the text area on the right side.</p>
+                                </div>
+                            )}
+
                             {/* TEMPLATES TAB */}
                             {activeSidebarTab === 'templates' && (
                                 <TemplatesTabContent />
@@ -914,7 +935,10 @@ function ResumeStudioPageContent() {
                             </div>
 
                             <h2 className="text-3xl font-bold text-[var(--foreground)] mb-3 tracking-tight z-10 bg-clip-text text-transparent bg-gradient-to-r from-[var(--foreground)] to-[var(--text-secondary)]">
-                                Generating Tailored Resume...
+                                {generatingType === "cover-letter" ? "Generating Cover Letter..." :
+                                 generatingType === "email" ? "Generating Draft Email..." :
+                                 generatingType === "all" ? "Generating Application Pack..." :
+                                 "Generating Tailored Resume..."}
                             </h2>
                             <div className="flex items-center gap-2 text-sm text-[var(--primary)] z-10 font-bold tracking-wide">
                                 <Loader2 className="w-4 h-4 animate-spin" />
