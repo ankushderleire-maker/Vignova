@@ -6,7 +6,7 @@ import dynamic from "next/dynamic";
 import {
     ArrowLeft, Wand2, Loader2, User, Briefcase,
     Trash2, LayoutTemplate, Zap, History, FileText, Save,
-    Bold, Italic, Target, Copy, Mail, Sparkles
+    Bold, Italic, Target, Copy, Mail, Sparkles, ChevronRight, Send
 } from "lucide-react";
 import { AIPreparationAnimation } from "@/components/resume-engine/AIPreparationAnimation";
 
@@ -772,52 +772,78 @@ function ResumeStudioPageContent() {
                                 )}
                             </div>
 
-                            <div className="p-6 border-t border-[var(--border-color)] bg-white dark:bg-[#111] space-y-4">
-                                <button
-                                    onClick={() => handleGenerateResume()}
-                                    disabled={isGenerating}
-                                    className="relative w-full group overflow-hidden rounded-xl p-[1px] transition-all hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50 disabled:pointer-events-none"
-                                >
-                                    <span className="absolute inset-0 bg-gradient-to-r from-[var(--primary)] via-indigo-500 to-[var(--primary)] bg-[length:200%_auto] animate-gradient-x rounded-xl opacity-70 group-hover:opacity-100 transition-opacity"></span>
-                                    <div className="relative w-full flex items-center justify-center gap-2 bg-white dark:bg-[#111] text-[var(--foreground)] py-3.5 rounded-xl font-bold transition-all group-hover:bg-opacity-0 group-hover:text-white dark:group-hover:bg-opacity-0">
-                                        <div className="absolute inset-0 bg-gradient-to-r from-[var(--primary)] to-indigo-600 opacity-10 dark:opacity-20 rounded-xl group-hover:opacity-100 transition-opacity z-0"></div>
-                                        {isGenerating ? <Loader2 className="animate-spin h-5 w-5 z-10 text-[var(--primary)] group-hover:text-white" /> : <Sparkles className="h-5 w-5 z-10 text-[var(--primary)] group-hover:text-white" />}
-                                        <span className="z-10">{isGenerating ? "AI is Thinking..." : "Generate Application Pack (Resume + Cover Letter + Email)"}</span>
-                                    </div>
-                                </button>
-                                
-                                <div className="flex items-center gap-3">
-                                    <div className="h-px bg-gradient-to-r from-transparent via-[var(--border-color)] to-transparent flex-1"></div>
-                                    <span className="text-[10px] uppercase tracking-wider text-[var(--text-secondary)] font-semibold">Or Generate Individually</span>
-                                    <div className="h-px bg-gradient-to-r from-transparent via-[var(--border-color)] to-transparent flex-1"></div>
-                                </div>
-                                
-                                <div className="grid grid-cols-3 gap-3">
+                            <div className="p-6 border-t border-[var(--border-color)] bg-[#fafafa] dark:bg-[#0a0a0a] space-y-6">
+                                {/* Individual Generation Cards */}
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                     <button 
                                         disabled={isGenerating} 
                                         onClick={() => handleGenerateResumeOnly()} 
-                                        className="group flex flex-col items-center gap-1.5 py-3 px-2 rounded-lg bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 border border-[var(--border-color)] transition-all disabled:opacity-50 hover:-translate-y-0.5"
+                                        className="group flex items-center justify-between p-4 rounded-xl bg-white dark:bg-[#111] hover:bg-gray-50 dark:hover:bg-[#161616] border border-[var(--border-color)] transition-all disabled:opacity-50 hover:shadow-md hover:border-blue-500/50 text-left"
                                     >
-                                        <FileText className="h-4 w-4 text-[var(--text-secondary)] group-hover:text-[var(--primary)] transition-colors" />
-                                        <span className="text-[11px] font-semibold text-[var(--foreground)]">Resume</span>
+                                        <div className="flex items-center gap-4">
+                                            <div className="w-10 h-10 rounded-full bg-blue-50 dark:bg-blue-500/10 flex items-center justify-center shrink-0">
+                                                <FileText className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                                            </div>
+                                            <div>
+                                                <h4 className="text-[13px] font-bold text-[var(--foreground)] mb-0.5">Resume</h4>
+                                                <p className="text-[10px] text-[var(--text-secondary)] leading-tight">Generate a tailored, ATS-friendly resume that highlights your best.</p>
+                                            </div>
+                                        </div>
+                                        <ChevronRight className="h-4 w-4 text-blue-600 dark:text-blue-400 opacity-0 -ml-2 group-hover:opacity-100 group-hover:ml-0 transition-all" />
                                     </button>
+
                                     <button 
                                         disabled={isGenerating} 
                                         onClick={() => handleGenerateCoverLetter()} 
-                                        className="group flex flex-col items-center gap-1.5 py-3 px-2 rounded-lg bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 border border-[var(--border-color)] transition-all disabled:opacity-50 hover:-translate-y-0.5"
+                                        className="group flex items-center justify-between p-4 rounded-xl bg-white dark:bg-[#111] hover:bg-gray-50 dark:hover:bg-[#161616] border border-[var(--border-color)] transition-all disabled:opacity-50 hover:shadow-md hover:border-purple-500/50 text-left"
                                     >
-                                        <Briefcase className="h-4 w-4 text-[var(--text-secondary)] group-hover:text-[var(--primary)] transition-colors" />
-                                        <span className="text-[11px] font-semibold text-[var(--foreground)]">Cover Letter</span>
+                                        <div className="flex items-center gap-4">
+                                            <div className="w-10 h-10 rounded-full bg-purple-50 dark:bg-purple-500/10 flex items-center justify-center shrink-0">
+                                                <Mail className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+                                            </div>
+                                            <div>
+                                                <h4 className="text-[13px] font-bold text-[var(--foreground)] mb-0.5">Cover Letter</h4>
+                                                <p className="text-[10px] text-[var(--text-secondary)] leading-tight">Create a personalized cover letter that gets you noticed.</p>
+                                            </div>
+                                        </div>
+                                        <ChevronRight className="h-4 w-4 text-purple-600 dark:text-purple-400 opacity-0 -ml-2 group-hover:opacity-100 group-hover:ml-0 transition-all" />
                                     </button>
+
                                     <button 
                                         disabled={isGenerating} 
                                         onClick={() => handleGenerateEmail()} 
-                                        className="group flex flex-col items-center gap-1.5 py-3 px-2 rounded-lg bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 border border-[var(--border-color)] transition-all disabled:opacity-50 hover:-translate-y-0.5"
+                                        className="group flex items-center justify-between p-4 rounded-xl bg-white dark:bg-[#111] hover:bg-gray-50 dark:hover:bg-[#161616] border border-[var(--border-color)] transition-all disabled:opacity-50 hover:shadow-md hover:border-green-500/50 text-left"
                                     >
-                                        <Mail className="h-4 w-4 text-[var(--text-secondary)] group-hover:text-[var(--primary)] transition-colors" />
-                                        <span className="text-[11px] font-semibold text-[var(--foreground)]">Draft Email</span>
+                                        <div className="flex items-center gap-4">
+                                            <div className="w-10 h-10 rounded-full bg-green-50 dark:bg-green-500/10 flex items-center justify-center shrink-0">
+                                                <Send className="h-5 w-5 text-green-600 dark:text-green-400" />
+                                            </div>
+                                            <div>
+                                                <h4 className="text-[13px] font-bold text-[var(--foreground)] mb-0.5">Draft Email</h4>
+                                                <p className="text-[10px] text-[var(--text-secondary)] leading-tight">Write a professional email to apply with confidence.</p>
+                                            </div>
+                                        </div>
+                                        <ChevronRight className="h-4 w-4 text-green-600 dark:text-green-400 opacity-0 -ml-2 group-hover:opacity-100 group-hover:ml-0 transition-all" />
                                     </button>
                                 </div>
+
+                                <div className="flex items-center gap-4 py-2">
+                                    <div className="h-px bg-[var(--border-color)] flex-1"></div>
+                                    <span className="text-[11px] text-[var(--text-secondary)] font-medium">Or generate everything together</span>
+                                    <div className="h-px bg-[var(--border-color)] flex-1"></div>
+                                </div>
+
+                                <button
+                                    onClick={() => handleGenerateResume()}
+                                    disabled={isGenerating}
+                                    className="w-full flex items-center justify-between bg-blue-600 hover:bg-blue-700 text-white py-4 px-6 rounded-xl font-bold shadow-[0_4px_14px_0_rgb(37,99,235,0.39)] transition-all disabled:opacity-50 hover:-translate-y-0.5 active:translate-y-0 group"
+                                >
+                                    <div className="flex items-center justify-center flex-1 gap-2">
+                                        {isGenerating ? <Loader2 className="animate-spin h-5 w-5" /> : <Sparkles className="h-5 w-5" />}
+                                        <span className="text-[15px]">{isGenerating ? "AI is Thinking..." : "Generate Application Pack (Resume + Cover Letter + Email)"}</span>
+                                    </div>
+                                    <ChevronRight className="h-5 w-5 opacity-70 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
+                                </button>
                             </div>
                         </>
                     ) : (
