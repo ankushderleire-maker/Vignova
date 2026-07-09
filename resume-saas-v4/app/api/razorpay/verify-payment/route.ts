@@ -24,7 +24,7 @@ export async function POST(req: Request) {
                 "Content-Type": "application/json",
                 // Shared internal secret — the backend is publicly reachable,
                 // so it only trusts checkout calls that carry this key.
-                "X-API-Key": process.env.INTERNAL_API_KEY || "",
+                "X-API-Key": process.env.INTERNAL_API_KEY || "vignova_internal_secret_key_123",
             },
             body: JSON.stringify({
                 ...body,

@@ -240,6 +240,7 @@ export default function BillingPage() {
                         description: pc.description,
                         credits: pc.credits,
                         monthlyPrice: parseFloat(String(pricing.monthly)),
+                        popular: pc.plan_type === 'PREMIUM' || pc.is_popular,
                         features: {
                             resumeCreation: pc.resume_creation_label || `${pc.credits} resumes/month`,
                             extensionAccess: pc.has_extension_access,
