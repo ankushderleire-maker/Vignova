@@ -255,7 +255,6 @@ export default function BillingPage() {
                         icon: PLAN_ICONS[pc.plan_type] || Zap,
                         color: colors.color,
                         gradient: colors.gradient,
-                        popular: pc.is_popular,
                     };
 
                     return (

@@ -548,18 +548,18 @@ function ResumeStudioPageContent() {
         <div className="h-full flex flex-col bg-[var(--background)] text-[var(--foreground)] overflow-hidden w-full">
 
             {/* HEADER */}
-            <div className="h-14 md:h-16 border-b border-[var(--border-color)] flex items-center justify-between px-3 md:px-6 bg-[var(--sidebar-bg)] shrink-0 w-full z-20 relative">
+            <div className="h-14 md:h-16 border-b border-[#222] flex items-center justify-between px-3 md:px-6 bg-[#111] shrink-0 w-full z-20 relative">
                 <div className="flex items-center gap-2 md:gap-4 min-w-0">
-                    <button onClick={() => router.back()} className="p-1.5 md:p-2 hover:bg-black/5 dark:hover:bg-white/10 rounded-lg text-[var(--text-secondary)] hover:text-[var(--foreground)] transition shrink-0">
+                    <button onClick={() => router.back()} className="p-1.5 md:p-2 hover:bg-white/10 rounded-lg text-gray-400 hover:text-white transition shrink-0">
                         <ArrowLeft className="h-4 w-4 md:h-5 md:w-5" />
                     </button>
                     <div className="flex items-center gap-2 md:gap-3 min-w-0">
-                        <div className="p-1.5 md:p-2 bg-[var(--primary)]/10 rounded-lg shrink-0">
+                        <div className="p-1.5 md:p-2 bg-[var(--primary)]/20 rounded-lg shrink-0">
                             <Zap className="h-4 w-4 md:h-5 md:w-5 text-[var(--primary)]" />
                         </div>
                         <div className="min-w-0">
-                            <h1 className="font-bold text-base md:text-xl text-[var(--foreground)] leading-tight">Resume Studio</h1>
-                            <p className="text-[10px] md:text-xs text-[var(--text-secondary)] truncate">{job.jobTitle} • {job.company}</p>
+                            <h1 className="font-bold text-base md:text-xl text-white leading-tight">Resume Studio</h1>
+                            <p className="text-[10px] md:text-xs text-gray-400 truncate">{job.jobTitle} • {job.company}</p>
                         </div>
                     </div>
                 </div>
@@ -593,7 +593,7 @@ function ResumeStudioPageContent() {
                         {/* SAVE BUTTON */}
                         <button
                             onClick={() => setIsSaveDialogOpen(true)}
-                            className="flex items-center gap-1.5 bg-black/5 dark:bg-white/10 text-[var(--foreground)] hover:bg-black/10 dark:hover:bg-white/20 px-2.5 md:px-3 py-1.5 rounded-lg text-xs font-bold transition-colors border border-[var(--border-color)] shadow-sm"
+                            className="flex items-center gap-1.5 bg-white/10 text-white hover:bg-white/20 px-2.5 md:px-3 py-1.5 rounded-lg text-xs font-bold transition-colors border border-white/10 shadow-sm"
                         >
                             <Save className="h-3.5 w-3.5 text-orange-500" />
                             <span className="hidden sm:inline">Save</span>
