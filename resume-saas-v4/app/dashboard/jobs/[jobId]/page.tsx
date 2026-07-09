@@ -6,7 +6,7 @@ import dynamic from "next/dynamic";
 import {
     ArrowLeft, Wand2, Loader2, User, Briefcase,
     Trash2, LayoutTemplate, Zap, History, FileText, Save,
-    Bold, Italic, Target
+    Bold, Italic, Target, Copy, Mail, Sparkles
 } from "lucide-react";
 import { AIPreparationAnimation } from "@/components/resume-engine/AIPreparationAnimation";
 
@@ -772,20 +772,51 @@ function ResumeStudioPageContent() {
                                 )}
                             </div>
 
-                            <div className="p-5 border-t border-[var(--border-color)] bg-black/5 dark:bg-white/5 space-y-3">
+                            <div className="p-6 border-t border-[var(--border-color)] bg-white dark:bg-[#111] space-y-4">
                                 <button
                                     onClick={() => handleGenerateResume()}
                                     disabled={isGenerating}
-                                    className="w-full flex items-center justify-center gap-2 bg-[var(--primary)] hover:bg-[var(--primary)]/90 text-[var(--background)] py-3.5 rounded-lg font-bold shadow-lg shadow-[var(--primary)]/20 transition-all disabled:opacity-50 hover:scale-[1.02] active:scale-[0.98]"
+                                    className="relative w-full group overflow-hidden rounded-xl p-[1px] transition-all hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50 disabled:pointer-events-none"
                                 >
-                                    {isGenerating ? <Loader2 className="animate-spin h-5 w-5" /> : <Wand2 className="h-5 w-5 fill-current" />}
-                                    {isGenerating ? "AI is Thinking..." : "🚀 Generate Application Pack (Resume + Cover Letter + Email)"}
+                                    <span className="absolute inset-0 bg-gradient-to-r from-[var(--primary)] via-indigo-500 to-[var(--primary)] bg-[length:200%_auto] animate-gradient-x rounded-xl opacity-70 group-hover:opacity-100 transition-opacity"></span>
+                                    <div className="relative w-full flex items-center justify-center gap-2 bg-white dark:bg-[#111] text-[var(--foreground)] py-3.5 rounded-xl font-bold transition-all group-hover:bg-opacity-0 group-hover:text-white dark:group-hover:bg-opacity-0">
+                                        <div className="absolute inset-0 bg-gradient-to-r from-[var(--primary)] to-indigo-600 opacity-10 dark:opacity-20 rounded-xl group-hover:opacity-100 transition-opacity z-0"></div>
+                                        {isGenerating ? <Loader2 className="animate-spin h-5 w-5 z-10 text-[var(--primary)] group-hover:text-white" /> : <Sparkles className="h-5 w-5 z-10 text-[var(--primary)] group-hover:text-white" />}
+                                        <span className="z-10">{isGenerating ? "AI is Thinking..." : "Generate Application Pack (Resume + Cover Letter + Email)"}</span>
+                                    </div>
                                 </button>
-                                <div className="text-center text-xs text-[var(--text-secondary)] font-medium">Or generate individually:</div>
-                                <div className="grid grid-cols-3 gap-2">
-                                    <button disabled={isGenerating} onClick={() => handleGenerateResumeOnly()} className="py-2 px-1 text-[10px] sm:text-xs font-semibold rounded bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 text-[var(--foreground)] border border-[var(--border-color)] transition-colors">📄 Resume</button>
-                                    <button disabled={isGenerating} onClick={() => handleGenerateCoverLetter()} className="py-2 px-1 text-[10px] sm:text-xs font-semibold rounded bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 text-[var(--foreground)] border border-[var(--border-color)] transition-colors">✉️ Cover Letter</button>
-                                    <button disabled={isGenerating} onClick={() => handleGenerateEmail()} className="py-2 px-1 text-[10px] sm:text-xs font-semibold rounded bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 text-[var(--foreground)] border border-[var(--border-color)] transition-colors">📨 Draft Email</button>
+                                
+                                <div className="flex items-center gap-3">
+                                    <div className="h-px bg-gradient-to-r from-transparent via-[var(--border-color)] to-transparent flex-1"></div>
+                                    <span className="text-[10px] uppercase tracking-wider text-[var(--text-secondary)] font-semibold">Or Generate Individually</span>
+                                    <div className="h-px bg-gradient-to-r from-transparent via-[var(--border-color)] to-transparent flex-1"></div>
+                                </div>
+                                
+                                <div className="grid grid-cols-3 gap-3">
+                                    <button 
+                                        disabled={isGenerating} 
+                                        onClick={() => handleGenerateResumeOnly()} 
+                                        className="group flex flex-col items-center gap-1.5 py-3 px-2 rounded-lg bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 border border-[var(--border-color)] transition-all disabled:opacity-50 hover:-translate-y-0.5"
+                                    >
+                                        <FileText className="h-4 w-4 text-[var(--text-secondary)] group-hover:text-[var(--primary)] transition-colors" />
+                                        <span className="text-[11px] font-semibold text-[var(--foreground)]">Resume</span>
+                                    </button>
+                                    <button 
+                                        disabled={isGenerating} 
+                                        onClick={() => handleGenerateCoverLetter()} 
+                                        className="group flex flex-col items-center gap-1.5 py-3 px-2 rounded-lg bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 border border-[var(--border-color)] transition-all disabled:opacity-50 hover:-translate-y-0.5"
+                                    >
+                                        <Briefcase className="h-4 w-4 text-[var(--text-secondary)] group-hover:text-[var(--primary)] transition-colors" />
+                                        <span className="text-[11px] font-semibold text-[var(--foreground)]">Cover Letter</span>
+                                    </button>
+                                    <button 
+                                        disabled={isGenerating} 
+                                        onClick={() => handleGenerateEmail()} 
+                                        className="group flex flex-col items-center gap-1.5 py-3 px-2 rounded-lg bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 border border-[var(--border-color)] transition-all disabled:opacity-50 hover:-translate-y-0.5"
+                                    >
+                                        <Mail className="h-4 w-4 text-[var(--text-secondary)] group-hover:text-[var(--primary)] transition-colors" />
+                                        <span className="text-[11px] font-semibold text-[var(--foreground)]">Draft Email</span>
+                                    </button>
                                 </div>
                             </div>
                         </>
@@ -987,9 +1018,16 @@ function ResumeStudioPageContent() {
                         )
                     ) : activeDocument === "cover-letter" ? (
                         <div className="flex-1 overflow-auto p-6 lg:p-12 bg-white dark:bg-[#1e1e1e]">
-                            <div className="max-w-3xl mx-auto">
+                            <div className="max-w-3xl mx-auto relative group">
+                                <button 
+                                    onClick={() => navigator.clipboard.writeText(coverLetter || "")}
+                                    className="absolute top-4 right-4 p-2 bg-[var(--background)]/80 hover:bg-black/5 dark:hover:bg-white/10 rounded-lg text-[var(--text-secondary)] hover:text-[var(--foreground)] opacity-0 group-hover:opacity-100 transition-all shadow-sm z-10"
+                                    title="Copy to clipboard"
+                                >
+                                    <Copy className="w-4 h-4" />
+                                </button>
                                 <textarea
-                                    className="w-full min-h-[600px] p-6 text-sm text-[var(--foreground)] bg-transparent border border-[var(--border-color)] rounded-xl outline-none focus:border-[var(--primary)] resize-y leading-relaxed shadow-sm transition-all"
+                                    className="w-full min-h-[600px] p-6 pt-12 text-sm text-[var(--foreground)] bg-transparent border border-[var(--border-color)] rounded-xl outline-none focus:border-[var(--primary)] resize-y leading-relaxed shadow-sm transition-all relative"
                                     value={coverLetter || ""}
                                     onChange={(e) => setCoverLetter(e.target.value)}
                                     placeholder="Your Cover Letter will appear here..."
@@ -998,9 +1036,16 @@ function ResumeStudioPageContent() {
                         </div>
                     ) : (
                         <div className="flex-1 overflow-auto p-6 lg:p-12 bg-white dark:bg-[#1e1e1e]">
-                            <div className="max-w-3xl mx-auto">
+                            <div className="max-w-3xl mx-auto relative group">
+                                <button 
+                                    onClick={() => navigator.clipboard.writeText(draftEmail || "")}
+                                    className="absolute top-4 right-4 p-2 bg-[var(--background)]/80 hover:bg-black/5 dark:hover:bg-white/10 rounded-lg text-[var(--text-secondary)] hover:text-[var(--foreground)] opacity-0 group-hover:opacity-100 transition-all shadow-sm z-10"
+                                    title="Copy to clipboard"
+                                >
+                                    <Copy className="w-4 h-4" />
+                                </button>
                                 <textarea
-                                    className="w-full min-h-[400px] p-6 text-sm text-[var(--foreground)] bg-transparent border border-[var(--border-color)] rounded-xl outline-none focus:border-[var(--primary)] resize-y leading-relaxed shadow-sm transition-all"
+                                    className="w-full min-h-[600px] p-6 pt-12 text-sm text-[var(--foreground)] bg-transparent border border-[var(--border-color)] rounded-xl outline-none focus:border-[var(--primary)] resize-y leading-relaxed shadow-sm transition-all relative"
                                     value={draftEmail || ""}
                                     onChange={(e) => setDraftEmail(e.target.value)}
                                     placeholder="Your Draft Email will appear here..."
