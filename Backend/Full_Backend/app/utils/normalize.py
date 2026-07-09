@@ -17,10 +17,15 @@ def normalize_data(data: dict):
         else:
              data["skills"] = {"technical": str(data.get("skills", "")), "soft": ""}
 
-    def flatten_description(desc):
+    def normalize_description(desc):
         if isinstance(desc, list):
-            return "\n".join([str(item) for item in desc])
-        return str(desc) if desc else ""
+            return [str(item).strip() for item in desc if str(item).strip()]
+        if isinstance(desc, str) and desc:
+            # Split by newlines, or by sentence if no newlines but very long
+            if "\n" in desc:
+                return [d.strip() for d in desc.split("\n") if d.strip()]
+            return [desc.strip()]
+        return []
 
     # Normalize Experience
     normalized_exp = []
@@ -32,7 +37,7 @@ def normalize_data(data: dict):
             "location": exp.get("location", ""),
             "startDate": exp.get("startDate", ""),
             "endDate": exp.get("endDate", ""),
-            "description": flatten_description(exp.get("description", "")),
+            "description": normalize_description(exp.get("description", "")),
         })
     data["experience"] = normalized_exp
 
@@ -58,7 +63,7 @@ def normalize_data(data: dict):
             "name": proj.get("name", ""),
             "techStack": proj.get("techStack", ""),
             "link": proj.get("link", ""),
-            "description": flatten_description(proj.get("description", "")),
+            "description": normalize_description(proj.get("description", "")),
         })
     data["projects"] = normalized_proj
 

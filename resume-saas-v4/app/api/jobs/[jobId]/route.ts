@@ -14,7 +14,7 @@ export async function PATCH(
 
     const { jobId } = await params;
     const body = await req.json();
-    const { status, company, jobTitle, description, location, jobUrl } = body;
+    const { status, company, jobTitle, description, location, jobUrl, coverLetter } = body;
 
     const updatedJob = await db.jobApplication.update({
       where: {
@@ -28,6 +28,7 @@ export async function PATCH(
         ...(description !== undefined && { description }),
         ...(location !== undefined && { location }),
         ...(jobUrl !== undefined && { jobUrl }),
+        ...(coverLetter !== undefined && { coverLetter }),
       },
     });
 
