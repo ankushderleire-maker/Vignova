@@ -1,20 +1,20 @@
 import { NextResponse } from 'next/server';
 import crypto from 'crypto';
 import nodemailer from 'nodemailer';
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { db } from '@/lib/db';
 
 export async function POST(req: Request) {
     try {
         const { email } = await req.json();
 
-        if (!email) {
+        if (!email || typeof email !== 'string') {
             return NextResponse.json({ message: "Email is required" }, { status: 400 });
         }
 
-        const user = await prisma.users.findUnique({
-            where: { email },
+        const normalizedEmail = email.trim().toLowerCase();
+
+        const user = await db.users.findUnique({
+            where: { email: normalizedEmail },
         });
 
         // We don't want to explicitly state the user doesn't exist to prevent email enumeration attacks.
@@ -27,8 +27,8 @@ export async function POST(req: Request) {
         const resetTokenExpiry = new Date(Date.now() + 3600000); // 1 hour from now
 
         // Save it to the database
-        await prisma.users.update({
-            where: { email },
+        await db.users.update({
+            where: { email: normalizedEmail },
             data: {
                 resetToken,
                 resetTokenExpiry,
@@ -76,7 +76,5 @@ export async function POST(req: Request) {
     } catch (error: any) {
         console.error("Forgot Password Error:", error);
         return NextResponse.json({ message: "An error occurred while attempting to send the reset link." }, { status: 500 });
-    } finally {
-        await prisma.$disconnect();
     }
 }

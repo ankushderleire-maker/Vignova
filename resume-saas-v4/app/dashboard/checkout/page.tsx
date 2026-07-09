@@ -155,14 +155,16 @@ function CheckoutContent() {
                                 <div className="text-sm text-gray-600 dark:text-gray-400">{cycle.label} Billing</div>
                             </div>
                             <div className="text-right">
-                                {/* <div className="text-gray-900 dark:text-white">${total}</div> */}
+                                <div className="text-gray-900 dark:text-white font-medium">${total}</div>
                             </div>
                         </div>
 
-                        <div className="flex justify-between items-center py-3 border-b border-gray-200 dark:border-white/10">
-                            <div className="text-gray-600 dark:text-gray-400">Billing Cycle</div>
-                            <div className="text-gray-900 dark:text-white">{cycle.label}</div>
-                        </div>
+                        {cycle.discount > 0 && (
+                            <div className="flex justify-between items-center py-3 border-b border-gray-200 dark:border-white/10">
+                                <div className="text-gray-600 dark:text-gray-400">Discount</div>
+                                <div className="text-green-500 font-medium">−{cycle.discount}%</div>
+                            </div>
+                        )}
 
                         <div className="flex justify-between items-center py-4">
                             <div className="text-lg font-bold text-gray-900 dark:text-white">Total USD</div>

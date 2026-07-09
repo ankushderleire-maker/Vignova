@@ -7,6 +7,13 @@ export async function GET() {
     if (auth.error) return auth.error;
 
     try {
+        const startOfMonth = new Date();
+        startOfMonth.setDate(1);
+        startOfMonth.setHours(0, 0, 0, 0);
+
+        const sevenDaysAgo = new Date();
+        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
         const [
             totalUsers,
             totalResumes,
@@ -15,6 +22,12 @@ export async function GET() {
             activeSubscriptions,
             revenueResult,
             newUsersToday,
+            revenueThisMonthResult,
+            newUsers7d,
+            resumes7d,
+            suspendedUsers,
+            adminCount,
+            failedPayments,
         ] = await Promise.all([
             db.users.count(),
             db.generatedResume.count(),
@@ -32,11 +45,16 @@ export async function GET() {
                     },
                 },
             }),
+            db.payment.aggregate({
+                _sum: { amount: true },
+                where: { status: "COMPLETED", createdAt: { gte: startOfMonth } },
+            }),
+            db.users.count({ where: { created_at: { gte: sevenDaysAgo } } }),
+            db.generatedResume.count({ where: { createdAt: { gte: sevenDaysAgo } } }),
+            db.users.count({ where: { status: "SUSPENDED" } }),
+            db.users.count({ where: { role: "ADMIN" } }),
+            db.payment.count({ where: { status: "FAILED" } }),
         ]);
-
-        // Recent signups (last 7 days)
-        const sevenDaysAgo = new Date();
-        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
         const recentUsers = await db.users.findMany({
             where: { created_at: { gte: sevenDaysAgo } },
@@ -58,7 +76,14 @@ export async function GET() {
             totalPayments,
             activeSubscriptions,
             totalRevenue: revenueResult._sum.amount || 0,
+            revenueThisMonth: revenueThisMonthResult._sum.amount || 0,
             newUsersToday,
+            newUsers7d,
+            resumes7d,
+            suspendedUsers,
+            adminCount,
+            failedPayments,
+            conversionRate: totalUsers > 0 ? (activeSubscriptions / totalUsers) * 100 : 0,
             recentUsers,
             planDistribution: planDistribution.map((p) => ({
                 plan: p.plan_type,

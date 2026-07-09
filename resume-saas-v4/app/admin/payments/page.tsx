@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { DataTable } from "@/components/admin/DataTable";
-import { Loader2 } from "lucide-react";
+import { Search, Download, DollarSign } from "lucide-react";
 
 interface Payment {
     id: string;
@@ -31,28 +31,51 @@ export default function AdminPaymentsPage() {
         page: 1, limit: 20, total: 0, totalPages: 0,
     });
     const [statusFilter, setStatusFilter] = useState("");
+    const [search, setSearch] = useState("");
+    const [fromDate, setFromDate] = useState("");
+    const [toDate, setToDate] = useState("");
+    const [completedTotal, setCompletedTotal] = useState(0);
     const [loading, setLoading] = useState(true);
+
+    const buildFilterParams = useCallback(() => {
+        const params = new URLSearchParams();
+        if (statusFilter) params.set("status", statusFilter);
+        if (search) params.set("search", search);
+        if (fromDate) params.set("from", fromDate);
+        if (toDate) params.set("to", toDate);
+        return params;
+    }, [statusFilter, search, fromDate, toDate]);
 
     const fetchPayments = useCallback(async (page = 1) => {
         setLoading(true);
         try {
-            const params = new URLSearchParams({ page: page.toString(), limit: "20" });
-            if (statusFilter) params.set("status", statusFilter);
+            const params = buildFilterParams();
+            params.set("page", page.toString());
+            params.set("limit", "20");
 
             const res = await fetch(`/api/admin/payments?${params}`);
             const data = await res.json();
             setPayments(data.payments);
             setPagination(data.pagination);
+            setCompletedTotal(data.summary?.completedTotal ?? 0);
         } catch (err) {
             console.error(err);
         } finally {
             setLoading(false);
         }
-    }, [statusFilter]);
+    }, [buildFilterParams]);
 
+    // Debounce the text search; other filters refetch immediately.
     useEffect(() => {
-        fetchPayments();
-    }, [fetchPayments]);
+        const t = setTimeout(() => fetchPayments(1), search ? 400 : 0);
+        return () => clearTimeout(t);
+    }, [fetchPayments, search]);
+
+    const handleExport = () => {
+        const params = buildFilterParams();
+        params.set("format", "csv");
+        window.open(`/api/admin/payments?${params}`, "_blank");
+    };
 
     const statusBadge = (status: string) => {
         const c: Record<string, string> = {
@@ -115,18 +138,61 @@ export default function AdminPaymentsPage() {
 
     return (
         <div className="space-y-6 max-w-7xl mx-auto animate-slide-down">
-            {/* Filter */}
-            <div className="flex items-center gap-4">
-                <select
-                    value={statusFilter}
-                    onChange={(e) => setStatusFilter(e.target.value)}
-                    className="bg-zinc-900 border border-white/10 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-red-500/50"
-                >
-                    <option value="">All Statuses</option>
-                    <option value="COMPLETED">Completed</option>
-                    <option value="PENDING">Pending</option>
-                    <option value="FAILED">Failed</option>
-                </select>
+            {/* Filters */}
+            <div className="flex flex-col lg:flex-row items-start lg:items-center gap-4">
+                <div className="relative flex-1 max-w-md w-full">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+                    <input
+                        type="text"
+                        placeholder="Search by user name or email..."
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                        className="w-full pl-10 pr-4 py-2.5 bg-zinc-900 border border-white/10 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:border-red-500/50"
+                    />
+                </div>
+                <div className="flex flex-wrap items-center gap-3">
+                    <select
+                        value={statusFilter}
+                        onChange={(e) => setStatusFilter(e.target.value)}
+                        className="bg-zinc-900 border border-white/10 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-red-500/50"
+                    >
+                        <option value="">All Statuses</option>
+                        <option value="COMPLETED">Completed</option>
+                        <option value="PENDING">Pending</option>
+                        <option value="FAILED">Failed</option>
+                    </select>
+                    <input
+                        type="date"
+                        value={fromDate}
+                        onChange={(e) => setFromDate(e.target.value)}
+                        title="From date"
+                        className="bg-zinc-900 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-red-500/50 [color-scheme:dark]"
+                    />
+                    <span className="text-gray-500 text-sm">to</span>
+                    <input
+                        type="date"
+                        value={toDate}
+                        onChange={(e) => setToDate(e.target.value)}
+                        title="To date"
+                        className="bg-zinc-900 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-red-500/50 [color-scheme:dark]"
+                    />
+                    <button
+                        onClick={handleExport}
+                        className="flex items-center gap-2 px-3 py-2.5 text-sm text-gray-300 bg-zinc-900 border border-white/10 rounded-lg hover:bg-zinc-800 hover:text-white transition-all"
+                        title="Export current filter as CSV"
+                    >
+                        <Download className="w-4 h-4" /> Export CSV
+                    </button>
+                </div>
+            </div>
+
+            {/* Summary for current filter */}
+            <div className="flex items-center gap-2 text-sm text-gray-400 bg-zinc-900/80 border border-white/10 rounded-xl px-4 py-3 w-fit">
+                <DollarSign className="w-4 h-4 text-green-400" />
+                Completed revenue in this view:
+                <span className="text-white font-bold">${completedTotal.toFixed(2)}</span>
+                <span className="text-gray-600">•</span>
+                {pagination.total} payment{pagination.total === 1 ? "" : "s"}
             </div>
 
             {/* Table */}

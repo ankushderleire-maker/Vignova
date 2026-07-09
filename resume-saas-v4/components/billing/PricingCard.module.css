@@ -148,12 +148,70 @@
 .priceContainer {
     text-align: center;
     margin-bottom: 2rem;
+    position: relative;
+}
+
+.originalPrice {
+    font-size: 1rem;
+    color: var(--text-secondary);
+    text-decoration: line-through;
+    opacity: 0.7;
+    margin-bottom: 0.15rem;
 }
 
 .price {
     font-size: 3rem;
     font-weight: 800;
     line-height: 1;
+}
+
+.totalBilled {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    margin-top: 0.4rem;
+}
+
+.savingsBadge {
+    display: inline-block;
+    margin-top: 0.6rem;
+    padding: 0.2rem 0.7rem;
+    border-radius: 999px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+    color: #059669;
+    background: rgba(16, 185, 129, 0.12);
+    border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+/* Popular card emphasis */
+.popularCard {
+    transform: scale(1.04);
+    z-index: 2;
+}
+
+.popularCard:hover {
+    transform: scale(1.04) translateY(-5px);
+}
+
+.popularCard::before {
+    opacity: 0.6;
+}
+
+.popularRibbon {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 3;
+    background: linear-gradient(135deg, var(--primary), #7c3aed);
+    color: #fff;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    padding: 0.3rem 1.1rem;
+    border-radius: 0 0 10px 10px;
+    box-shadow: 0 4px 12px rgba(124, 58, 237, 0.35);
 }
 
 .frequency {

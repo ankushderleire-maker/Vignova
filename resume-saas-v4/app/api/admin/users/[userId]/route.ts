@@ -1,5 +1,12 @@
 import { NextResponse } from "next/server";
-import { requireAdmin } from "@/lib/admin-guard";
+import {
+    requireAdmin,
+    logAdminAction,
+    VALID_ROLES,
+    VALID_PLANS,
+    VALID_USER_STATUSES,
+    MAX_CREDITS,
+} from "@/lib/admin-guard";
 import { db } from "@/lib/db";
 
 interface RouteParams {
@@ -53,6 +60,8 @@ export async function GET(req: Request, { params }: RouteParams) {
             email: user.email,
             fullName: user.full_name,
             role: user.role,
+            status: user.status,
+            country: user.country,
             createdAt: user.created_at,
             subscription: user.subscriptions || null,
             profiles: user.master_profiles,
@@ -66,7 +75,7 @@ export async function GET(req: Request, { params }: RouteParams) {
     }
 }
 
-// PATCH - Update user details
+// PATCH - Update user details (role / status / plan / credits)
 export async function PATCH(req: Request, { params }: RouteParams) {
     const auth = await requireAdmin();
     if (auth.error) return auth.error;
@@ -75,42 +84,113 @@ export async function PATCH(req: Request, { params }: RouteParams) {
 
     try {
         const body = await req.json();
-        const { role, plan_type, credits_remaining } = body;
+        const { role, status, plan_type, credits_remaining } = body;
 
-        // Update user role if provided
-        if (role) {
+        // ── Validate everything before touching the DB ──
+        if (role !== undefined && !VALID_ROLES.includes(role)) {
+            return NextResponse.json(
+                { error: `role must be one of: ${VALID_ROLES.join(", ")}` },
+                { status: 400 }
+            );
+        }
+        if (status !== undefined && !VALID_USER_STATUSES.includes(status)) {
+            return NextResponse.json(
+                { error: `status must be one of: ${VALID_USER_STATUSES.join(", ")}` },
+                { status: 400 }
+            );
+        }
+        if (plan_type !== undefined && !VALID_PLANS.includes(plan_type)) {
+            return NextResponse.json(
+                { error: `plan_type must be one of: ${VALID_PLANS.join(", ")}` },
+                { status: 400 }
+            );
+        }
+        let credits: number | undefined;
+        if (credits_remaining !== undefined) {
+            credits = Number(credits_remaining);
+            if (!Number.isInteger(credits) || credits < 0 || credits > MAX_CREDITS) {
+                return NextResponse.json(
+                    { error: `credits_remaining must be an integer between 0 and ${MAX_CREDITS}` },
+                    { status: 400 }
+                );
+            }
+        }
+
+        const target = await db.users.findUnique({
+            where: { id: userId },
+            select: { id: true, email: true, role: true, status: true },
+        });
+        if (!target) {
+            return NextResponse.json({ error: "User not found" }, { status: 404 });
+        }
+
+        // Admins cannot demote or suspend themselves — prevents locking
+        // yourself (or the last admin) out mid-session.
+        if (userId === auth.user.id) {
+            if (role !== undefined && role !== "ADMIN") {
+                return NextResponse.json(
+                    { error: "You cannot remove your own admin role" },
+                    { status: 400 }
+                );
+            }
+            if (status !== undefined && status !== "ACTIVE") {
+                return NextResponse.json(
+                    { error: "You cannot suspend your own account" },
+                    { status: 400 }
+                );
+            }
+        }
+
+        // Update user role/status if provided
+        const userData: Record<string, unknown> = {};
+        if (role !== undefined) userData.role = role;
+        if (status !== undefined) userData.status = status;
+        if (Object.keys(userData).length > 0) {
             await db.users.update({
                 where: { id: userId },
-                data: { role },
+                data: userData,
             });
         }
 
         // Update subscription if plan/credits provided
-        if (plan_type || credits_remaining !== undefined) {
+        if (plan_type !== undefined || credits !== undefined) {
             const existingSub = await db.subscriptions.findFirst({
                 where: { user_id: userId },
             });
 
             const updateData: Record<string, unknown> = {};
-            if (plan_type) updateData.plan_type = plan_type;
-            if (credits_remaining !== undefined) updateData.credits_remaining = credits_remaining;
+            if (plan_type !== undefined) updateData.plan_type = plan_type;
+            if (credits !== undefined) updateData.credits_remaining = credits;
 
             if (existingSub) {
                 await db.subscriptions.update({
                     where: { id: existingSub.id },
                     data: updateData,
                 });
-            } else if (plan_type) {
+            } else if (plan_type !== undefined) {
                 await db.subscriptions.create({
                     data: {
                         user_id: userId,
                         plan_type,
-                        credits_remaining: credits_remaining ?? 3,
-                        credits_total: credits_remaining ?? 3,
+                        credits_remaining: credits ?? 3,
+                        credits_total: credits ?? 3,
                     },
                 });
             }
         }
+
+        await logAdminAction({
+            admin: auth.user,
+            action: "USER_UPDATE",
+            targetType: "user",
+            targetId: userId,
+            details: {
+                targetEmail: target.email,
+                before: { role: target.role, status: target.status },
+                changes: { role, status, plan_type, credits_remaining: credits },
+            },
+            req,
+        });
 
         return NextResponse.json({ success: true });
     } catch (error) {
@@ -128,11 +208,38 @@ export async function DELETE(req: Request, { params }: RouteParams) {
 
     try {
         // Prevent self-deletion
-        if (auth.user && userId === auth.user.id) {
+        if (userId === auth.user.id) {
             return NextResponse.json({ error: "Cannot delete your own admin account" }, { status: 400 });
         }
 
+        const target = await db.users.findUnique({
+            where: { id: userId },
+            select: { id: true, email: true, role: true },
+        });
+        if (!target) {
+            return NextResponse.json({ error: "User not found" }, { status: 404 });
+        }
+
+        // Other admins must be demoted to USER before they can be deleted —
+        // stops one compromised admin session from wiping out the rest.
+        if (target.role === "ADMIN") {
+            return NextResponse.json(
+                { error: "Demote this admin to USER before deleting the account" },
+                { status: 400 }
+            );
+        }
+
         await db.users.delete({ where: { id: userId } });
+
+        await logAdminAction({
+            admin: auth.user,
+            action: "USER_DELETE",
+            targetType: "user",
+            targetId: userId,
+            details: { targetEmail: target.email },
+            req,
+        });
+
         return NextResponse.json({ success: true });
     } catch (error) {
         console.error("[ADMIN_USER_DELETE]", error);

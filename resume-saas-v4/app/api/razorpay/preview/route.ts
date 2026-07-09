@@ -23,6 +23,9 @@ export async function POST(req: Request) {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
+                // Shared internal secret — the backend is publicly reachable,
+                // so it only trusts checkout calls that carry this key.
+                "X-API-Key": process.env.INTERNAL_API_KEY || "",
             },
             body: JSON.stringify({
                 ...body,

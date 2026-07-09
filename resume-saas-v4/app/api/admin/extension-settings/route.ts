@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAdmin } from "@/lib/admin-guard";
+import { requireAdmin, logAdminAction } from "@/lib/admin-guard";
 import { db } from "@/lib/db";
 
 /**
@@ -118,6 +118,16 @@ export async function PUT(req: NextRequest) {
 
         const row = await readSingleton();
         if (!row) throw new Error("Row vanished after update");
+
+        await logAdminAction({
+            admin: auth.user!,
+            action: "EXTENSION_SETTINGS_UPDATE",
+            targetType: "settings",
+            targetId: "extension",
+            details: { extensionId, extensionVersion, extensionName, installUrl },
+            req,
+        });
+
         return NextResponse.json(shape(row));
     } catch (err) {
         console.error("[ADMIN_EXTENSION_SETTINGS_PUT]", err);

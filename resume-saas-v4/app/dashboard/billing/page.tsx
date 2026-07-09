@@ -9,7 +9,10 @@ import {
     Sparkles,
     Loader2,
     CreditCard,
-    Calendar
+    Calendar,
+    ShieldCheck,
+    RefreshCw,
+    Rocket
 } from "lucide-react";
 import { PricingCard } from "@/components/billing/PricingCard";
 import { CustomDialog } from "@/components/ui/CustomDialog";
@@ -163,6 +166,19 @@ export default function BillingPage() {
 
     return (
         <div className="max-w-6xl mx-auto space-y-8 pb-20 animate-slide-down">
+            {/* Hero */}
+            <div className="text-center max-w-2xl mx-auto pt-2">
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[var(--primary)]/10 border border-[var(--primary)]/20 text-[var(--primary)] text-xs font-semibold mb-4">
+                    <Sparkles className="h-3.5 w-3.5" /> Upgrade your job search
+                </div>
+                <h1 className="text-3xl sm:text-4xl font-bold text-[var(--foreground)] tracking-tight">
+                    Choose the plan that gets you hired
+                </h1>
+                <p className="text-[var(--text-secondary)] mt-3">
+                    Unlock AI resume optimization, unlimited applications, and premium templates. Cancel anytime.
+                </p>
+            </div>
+
             {/* Current Plan Summary */}
             <div className="bg-gradient-to-br from-[var(--primary)]/10 to-purple-500/10 border border-[var(--primary)]/20 rounded-2xl p-6">
                 <div className="flex items-center justify-between flex-wrap gap-4">
@@ -259,9 +275,23 @@ export default function BillingPage() {
                 })}
             </div>
 
-            {/* Payment Gateway Notice */}
-            <div className="text-center text-[var(--text-secondary)] text-sm">
-                <p>🔒 Secured by Data Privacy</p>
+            {/* Trust badges */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-4xl mx-auto pt-4">
+                {[
+                    { icon: ShieldCheck, title: "Secure payments", desc: "256-bit encrypted via PayPal & Razorpay" },
+                    { icon: Rocket, title: "Instant activation", desc: "Credits added the moment you pay" },
+                    { icon: RefreshCw, title: "Cancel anytime", desc: "No lock-in, downgrade whenever you want" },
+                ].map((b) => (
+                    <div key={b.title} className="flex items-center gap-3 bg-white/5 border border-white/10 rounded-xl p-4">
+                        <div className="p-2 rounded-lg bg-[var(--primary)]/15 text-[var(--primary)]">
+                            <b.icon className="h-5 w-5" />
+                        </div>
+                        <div>
+                            <div className="text-sm font-semibold text-[var(--foreground)]">{b.title}</div>
+                            <div className="text-xs text-[var(--text-secondary)]">{b.desc}</div>
+                        </div>
+                    </div>
+                ))}
             </div>
 
             <CustomDialog

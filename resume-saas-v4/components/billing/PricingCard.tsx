@@ -61,18 +61,27 @@ export const PricingCard: React.FC<PricingCardProps> = ({
         planKey === 'PRO' ? styles.ctaPro :
             styles.ctaFree;
 
+    // Currency-aware formatter
+    const fmt = (usd: number) => {
+        if (currency === "INR" && exchangeRate) return `₹${Math.round(usd * exchangeRate).toLocaleString("en-IN")}`;
+        return `$${usd % 1 === 0 ? usd : usd.toFixed(2)}`;
+    };
+
     // Calculate price for display
-    const convertedMonthlyPrice = currency === "INR" && exchangeRate
-        ? (plan.monthlyPrice * exchangeRate).toFixed(0)
-        : plan.monthlyPrice;
-    
-    const priceDisplay = plan.monthlyPrice === 0 ? "Free" : currency === "INR" ? `₹${convertedMonthlyPrice}` : `$${plan.monthlyPrice}`;
-    const cycleLabel = plan.monthlyPrice === 0 ? "forever" :
+    const isFree = plan.monthlyPrice === 0;
+    const priceDisplay = isFree ? "Free" : fmt(plan.monthlyPrice);
+    const cycleLabel = isFree ? "forever" :
         billingCycle === "MONTHLY" ? "per month" :
-            billingCycle === "ANNUAL" ? "per month, billed yearly" : "per month, billed every 6 months";
+            billingCycle === "ANNUAL" ? "per month · billed yearly" : "per month · billed every 6 months";
+
+    // Discount info for the current cycle
+    const cycleDiscount = billingCycle === "ANNUAL" ? 20 : billingCycle === "SEMI_ANNUAL" ? 10 : 0;
+    const showSavings = !isFree && cycleDiscount > 0;
+    const isPopular = plan.popular && !isCurrentPlan;
 
     return (
-        <div className={`${styles.cardWrapper} ${themeClass}`}>
+        <div className={`${styles.cardWrapper} ${themeClass} ${isPopular ? styles.popularCard : ''}`}>
+            {isPopular && <div className={styles.popularRibbon}>★ Most Popular</div>}
             <div className={styles.innerCard}>
                 {/* Header */}
                 <div className={styles.header}>
@@ -82,8 +91,17 @@ export const PricingCard: React.FC<PricingCardProps> = ({
 
                 {/* Price */}
                 <div className={styles.priceContainer}>
+                    {showSavings && (
+                        <div className={styles.originalPrice}>{fmt(plan.monthlyPrice / (1 - cycleDiscount / 100))}</div>
+                    )}
                     <div className={`${styles.price} ${priceClass}`}>{priceDisplay}</div>
                     <div className={styles.frequency}>{cycleLabel}</div>
+                    {!isFree && totalPrice > 0 && billingCycle !== "MONTHLY" && (
+                        <div className={styles.totalBilled}>{fmt(totalPrice)} billed today</div>
+                    )}
+                    {showSavings && (
+                        <div className={styles.savingsBadge}>Save {cycleDiscount}%</div>
+                    )}
                 </div>
 
                 {/* Features */}

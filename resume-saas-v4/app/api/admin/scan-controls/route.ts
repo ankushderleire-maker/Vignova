@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAdmin } from "@/lib/admin-guard";
+import { requireAdmin, logAdminAction } from "@/lib/admin-guard";
 import { db } from "@/lib/db";
 
 /**
@@ -130,6 +130,16 @@ export async function PUT(req: NextRequest) {
         );
         const row = await readSingleton();
         if (!row) throw new Error("settings vanished after update");
+
+        await logAdminAction({
+            admin: auth.user!,
+            action: "SCAN_SETTINGS_UPDATE",
+            targetType: "settings",
+            targetId: "scan-controls",
+            details: { cooldown, scanEnabled, reason },
+            req,
+        });
+
         return NextResponse.json(shape(row));
     } catch (err) {
         console.error("[ADMIN_SCAN_CONTROLS_PUT]", err);

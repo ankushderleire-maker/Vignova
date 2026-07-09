@@ -2,8 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { AdminStatCard } from "@/components/admin/StatsCards";
-import { Users, DollarSign, FileText, Briefcase, Crown, UserPlus } from "lucide-react";
-import { Loader2 } from "lucide-react";
+import {
+    Users, DollarSign, FileText, Briefcase, Crown, UserPlus,
+    TrendingUp, Percent, Ban, ShieldAlert, Loader2,
+} from "lucide-react";
 
 interface Stats {
     totalUsers: number;
@@ -12,7 +14,14 @@ interface Stats {
     totalPayments: number;
     activeSubscriptions: number;
     totalRevenue: number;
+    revenueThisMonth: number;
     newUsersToday: number;
+    newUsers7d: number;
+    resumes7d: number;
+    suspendedUsers: number;
+    adminCount: number;
+    failedPayments: number;
+    conversionRate: number;
     recentUsers: Array<{
         id: string;
         email: string;
@@ -86,6 +95,40 @@ export default function AdminOverviewPage() {
                     value={stats.newUsersToday}
                     icon={UserPlus}
                     color="#06b6d4"
+                />
+                <AdminStatCard
+                    title="Revenue This Month"
+                    value={`$${(stats.revenueThisMonth ?? 0).toFixed(2)}`}
+                    icon={TrendingUp}
+                    color="#22c55e"
+                />
+                <AdminStatCard
+                    title="Conversion Rate"
+                    value={`${(stats.conversionRate ?? 0).toFixed(1)}%`}
+                    icon={Percent}
+                    color="#3b82f6"
+                    subtitle="Paid / total users"
+                />
+                <AdminStatCard
+                    title="Signups (7 days)"
+                    value={stats.newUsers7d ?? 0}
+                    icon={UserPlus}
+                    color="#8b5cf6"
+                    subtitle={`${stats.resumes7d ?? 0} resumes generated`}
+                />
+                <AdminStatCard
+                    title="Suspended Users"
+                    value={stats.suspendedUsers ?? 0}
+                    icon={Ban}
+                    color="#ef4444"
+                    subtitle={`${stats.failedPayments ?? 0} failed payments`}
+                />
+                <AdminStatCard
+                    title="Admin Accounts"
+                    value={stats.adminCount ?? 0}
+                    icon={ShieldAlert}
+                    color="#f59e0b"
+                    subtitle="Review in Audit Log"
                 />
             </div>
 

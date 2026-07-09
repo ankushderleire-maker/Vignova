@@ -1,57 +1,60 @@
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { db } from "@/lib/db";
+import { requireAdmin, logAdminAction } from "@/lib/admin-guard";
 
-export async function GET(req: Request) {
+export async function GET() {
+    const auth = await requireAdmin();
+    if (auth.error) return auth.error;
+
     try {
-        const session = await getServerSession(authOptions);
-        if (!session?.user?.email) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-        
-        const user = await db.users.findUnique({ where: { email: session.user.email } });
-        if (user?.role !== "ADMIN") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-
         let rateEntry = await db.exchange_rates.findFirst({
             where: { base_currency: "USD", target_currency: "INR" }
         });
-        
+
         if (!rateEntry) {
             rateEntry = await db.exchange_rates.create({
                 data: {
                     base_currency: "USD",
                     target_currency: "INR",
                     rate: 84.50,
-                    updated_by: user.id
+                    updated_by: auth.user.id
                 }
             });
         }
 
         return NextResponse.json({ rate: rateEntry.rate });
-    } catch (error: any) {
-        return NextResponse.json({ error: error.message }, { status: 500 });
+    } catch (error) {
+        console.error("[ADMIN_EXCHANGE_RATE_GET]", error);
+        return NextResponse.json({ error: "Failed to load exchange rate" }, { status: 500 });
     }
 }
 
 export async function POST(req: Request) {
-    try {
-        const session = await getServerSession(authOptions);
-        if (!session?.user?.email) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-        
-        const user = await db.users.findUnique({ where: { email: session.user.email } });
-        if (user?.role !== "ADMIN") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    const auth = await requireAdmin();
+    if (auth.error) return auth.error;
 
+    try {
         const body = await req.json();
-        const { rate } = body;
-        if (!rate || typeof rate !== 'number') return NextResponse.json({ error: "Invalid rate" }, { status: 400 });
+        const rate = Number(body?.rate);
+        // Sanity bounds — a fat-fingered rate (0.85 or 8450) would misprice
+        // every INR checkout on the site.
+        if (!Number.isFinite(rate) || rate <= 0 || rate > 10000) {
+            return NextResponse.json(
+                { error: "rate must be a positive number (max 10000)" },
+                { status: 400 }
+            );
+        }
 
         let rateEntry = await db.exchange_rates.findFirst({
             where: { base_currency: "USD", target_currency: "INR" }
         });
-        
+
+        const previousRate = rateEntry?.rate ?? null;
+
         if (rateEntry) {
             rateEntry = await db.exchange_rates.update({
                 where: { id: rateEntry.id },
-                data: { rate, updated_by: user.id }
+                data: { rate, updated_by: auth.user.id }
             });
         } else {
             rateEntry = await db.exchange_rates.create({
@@ -59,13 +62,23 @@ export async function POST(req: Request) {
                     base_currency: "USD",
                     target_currency: "INR",
                     rate,
-                    updated_by: user.id
+                    updated_by: auth.user.id
                 }
             });
         }
-        
+
+        await logAdminAction({
+            admin: auth.user,
+            action: "EXCHANGE_RATE_UPDATE",
+            targetType: "exchange_rate",
+            targetId: "USD/INR",
+            details: { previousRate, newRate: rate },
+            req,
+        });
+
         return NextResponse.json({ success: true, rate: rateEntry.rate });
-    } catch (error: any) {
-        return NextResponse.json({ error: error.message }, { status: 500 });
+    } catch (error) {
+        console.error("[ADMIN_EXCHANGE_RATE_POST]", error);
+        return NextResponse.json({ error: "Failed to update exchange rate" }, { status: 500 });
     }
 }

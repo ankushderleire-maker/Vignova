@@ -15,7 +15,15 @@ export async function POST(req: NextRequest, context: any) {
         const params = await context.params;
         const pathArray = params?.path || [];
         const path = pathArray.join("/");
-        
+
+        // Defense in depth: this proxy runs under a plain USER session, so it
+        // must never forward to admin-only backend paths. Admin operations go
+        // through the dedicated /api/admin/* routes (which enforce ADMIN role).
+        const firstSegment = String(pathArray[0] || "").toLowerCase();
+        if (firstSegment === "admin" || path.toLowerCase().includes("/admin")) {
+            return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+        }
+
         const url = new URL(req.url);
         const AI_BACKEND_URL = process.env.AI_BACKEND_URL || "http://localhost:8000";
         const backendUrl = `${AI_BACKEND_URL}/api/${path}${url.search}`;

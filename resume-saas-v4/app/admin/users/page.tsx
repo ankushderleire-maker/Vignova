@@ -4,13 +4,14 @@ import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { DataTable } from "@/components/admin/DataTable";
 import { UserModal } from "@/components/admin/UserModal";
-import { Search } from "lucide-react";
+import { Search, Download, Eye } from "lucide-react";
 
 interface User {
     id: string;
     email: string;
     fullName: string | null;
     role: string;
+    status: string;
     createdAt: string;
     subscription: {
         plan_type: string;
@@ -40,50 +41,81 @@ export default function AdminUsersPage() {
     });
     const [search, setSearch] = useState("");
     const [planFilter, setPlanFilter] = useState("");
+    const [roleFilter, setRoleFilter] = useState("");
+    const [statusFilter, setStatusFilter] = useState("");
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
     const [selectedUser, setSelectedUser] = useState<User | null>(null);
+
+    const buildFilterParams = useCallback(() => {
+        const params = new URLSearchParams();
+        if (search) params.set("search", search);
+        if (planFilter) params.set("plan", planFilter);
+        if (roleFilter) params.set("role", roleFilter);
+        if (statusFilter) params.set("status", statusFilter);
+        return params;
+    }, [search, planFilter, roleFilter, statusFilter]);
 
     const fetchUsers = useCallback(async (page = 1) => {
         setLoading(true);
+        setError(null);
         try {
-            const params = new URLSearchParams({
-                page: page.toString(),
-                limit: "20",
-            });
-            if (search) params.set("search", search);
-            if (planFilter) params.set("plan", planFilter);
+            const params = buildFilterParams();
+            params.set("page", page.toString());
+            params.set("limit", "20");
 
             const res = await fetch(`/api/admin/users?${params}`);
             const data = await res.json();
+            if (!res.ok) throw new Error(data.error || "Failed to load users");
             setUsers(data.users);
             setPagination(data.pagination);
         } catch (err) {
-            console.error(err);
+            setError(err instanceof Error ? err.message : "Failed to load users");
         } finally {
             setLoading(false);
         }
-    }, [search, planFilter]);
+    }, [buildFilterParams]);
 
+    // Debounce the text search; filters refetch immediately.
     useEffect(() => {
-        fetchUsers();
-    }, [fetchUsers]);
+        const t = setTimeout(() => fetchUsers(1), search ? 400 : 0);
+        return () => clearTimeout(t);
+    }, [fetchUsers, search]);
 
-    const handleSave = async (data: { role?: string; plan_type?: string; credits_remaining?: number }) => {
+    const handleSave = async (data: {
+        role?: string;
+        status?: string;
+        plan_type?: string;
+        credits_remaining?: number;
+    }) => {
         if (!selectedUser) return;
-        await fetch(`/api/admin/users/${selectedUser.id}`, {
+        const res = await fetch(`/api/admin/users/${selectedUser.id}`, {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(data),
         });
+        const body = await res.json();
+        if (!res.ok) {
+            throw new Error(body.error || "Failed to save changes");
+        }
         setSelectedUser(null);
         fetchUsers(pagination.page);
     };
 
     const handleDelete = async () => {
         if (!selectedUser) return;
-        await fetch(`/api/admin/users/${selectedUser.id}`, { method: "DELETE" });
+        const res = await fetch(`/api/admin/users/${selectedUser.id}`, { method: "DELETE" });
+        const body = await res.json();
+        if (!res.ok) {
+            setError(body.error || "Failed to delete user");
+        }
         setSelectedUser(null);
         fetchUsers(1);
+    };
+
+    const handleExport = () => {
+        const params = buildFilterParams();
+        window.open(`/api/admin/users/export?${params}`, "_blank");
     };
 
     const planBadge = (plan: string | undefined) => {
@@ -100,6 +132,18 @@ export default function AdminUsersPage() {
         );
     };
 
+    const statusBadge = (status: string) => (
+        <span
+            className={`px-2 py-0.5 text-[10px] font-bold rounded border ${
+                status === "SUSPENDED"
+                    ? "text-red-400 bg-red-400/10 border-red-500/20"
+                    : "text-green-400 bg-green-400/10 border-green-500/20"
+            }`}
+        >
+            {status || "ACTIVE"}
+        </span>
+    );
+
     const columns = [
         {
             key: "email",
@@ -110,6 +154,11 @@ export default function AdminUsersPage() {
                     <p className="text-xs text-gray-500">{u.email}</p>
                 </div>
             ),
+        },
+        {
+            key: "status",
+            label: "Status",
+            render: (u: User) => statusBadge(u.status),
         },
         {
             key: "role",
@@ -146,34 +195,78 @@ export default function AdminUsersPage() {
                 <span className="text-gray-400 text-xs">{new Date(u.createdAt).toLocaleDateString()}</span>
             ),
         },
+        {
+            key: "detail",
+            label: "",
+            render: (u: User) => (
+                <button
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        router.push(`/admin/users/${u.id}`);
+                    }}
+                    title="View full detail"
+                    className="p-1.5 rounded-lg text-gray-500 hover:text-white hover:bg-white/10 transition-all"
+                >
+                    <Eye className="w-4 h-4" />
+                </button>
+            ),
+        },
     ];
 
     return (
         <div className="space-y-6 max-w-7xl mx-auto animate-slide-down">
             {/* Filters */}
-            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
-                <div className="relative flex-1 max-w-md">
+            <div className="flex flex-col lg:flex-row items-start lg:items-center gap-4">
+                <div className="relative flex-1 max-w-md w-full">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
                     <input
                         type="text"
                         placeholder="Search by name or email..."
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
-                        onKeyDown={(e) => e.key === "Enter" && fetchUsers(1)}
                         className="w-full pl-10 pr-4 py-2.5 bg-zinc-900 border border-white/10 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:border-red-500/50"
                     />
                 </div>
-                <select
-                    value={planFilter}
-                    onChange={(e) => setPlanFilter(e.target.value)}
-                    className="bg-zinc-900 border border-white/10 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-red-500/50"
-                >
-                    <option value="">All Plans</option>
-                    <option value="FREE">Free</option>
-                    <option value="PRO">Pro</option>
-                    <option value="PREMIUM">Premium</option>
-                </select>
+                <div className="flex flex-wrap items-center gap-3">
+                    <select
+                        value={planFilter}
+                        onChange={(e) => setPlanFilter(e.target.value)}
+                        className="bg-zinc-900 border border-white/10 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-red-500/50"
+                    >
+                        <option value="">All Plans</option>
+                        <option value="FREE">Free</option>
+                        <option value="PRO">Pro</option>
+                        <option value="PREMIUM">Premium</option>
+                    </select>
+                    <select
+                        value={roleFilter}
+                        onChange={(e) => setRoleFilter(e.target.value)}
+                        className="bg-zinc-900 border border-white/10 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-red-500/50"
+                    >
+                        <option value="">All Roles</option>
+                        <option value="USER">User</option>
+                        <option value="ADMIN">Admin</option>
+                    </select>
+                    <select
+                        value={statusFilter}
+                        onChange={(e) => setStatusFilter(e.target.value)}
+                        className="bg-zinc-900 border border-white/10 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-red-500/50"
+                    >
+                        <option value="">All Statuses</option>
+                        <option value="ACTIVE">Active</option>
+                        <option value="SUSPENDED">Suspended</option>
+                    </select>
+                    <button
+                        onClick={handleExport}
+                        className="flex items-center gap-2 px-3 py-2.5 text-sm text-gray-300 bg-zinc-900 border border-white/10 rounded-lg hover:bg-zinc-800 hover:text-white transition-all"
+                        title="Export current filter as CSV"
+                    >
+                        <Download className="w-4 h-4" /> Export CSV
+                    </button>
+                </div>
             </div>
+
+            {error && <p className="text-sm text-red-400">{error}</p>}
 
             {/* Table */}
             <DataTable
