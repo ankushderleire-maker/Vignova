@@ -12,6 +12,7 @@ import {
     Package,
     Gauge,
     Chrome,
+    ScrollText,
 } from "lucide-react";
 
 const adminNav = [
@@ -22,6 +23,7 @@ const adminNav = [
     { name: "Analytics",     href: "/admin/analytics",     icon: BarChart3 },
     { name: "Scan Controls", href: "/admin/scan-controls", icon: Gauge },
     { name: "Extension",     href: "/admin/extension",     icon: Chrome },
+    { name: "Audit Log",     href: "/admin/audit-log",     icon: ScrollText },
 ];
 
 export function AdminSidebar() {

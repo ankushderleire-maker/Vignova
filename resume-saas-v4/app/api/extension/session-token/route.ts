@@ -4,14 +4,30 @@ import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { db } from "@/lib/db";
 import { generateExtensionToken } from "@/lib/extensionAuth";
 
+// This route authenticates via the NextAuth *cookie* and returns a 24h
+// extension token, so it MUST NOT reflect arbitrary origins with credentials —
+// otherwise any website the logged-in user visits could silently read their
+// token. Only the browser extension (chrome-extension:// / moz-extension://)
+// and our own app origin are allowed to make credentialed calls.
+function isAllowedOrigin(origin: string | null): boolean {
+    if (!origin) return false;
+    if (origin.startsWith("chrome-extension://") || origin.startsWith("moz-extension://")) return true;
+    const appUrl = process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL || "";
+    return !!appUrl && origin === appUrl.replace(/\/$/, "");
+}
+
 function getCorsHeaders(req: Request) {
-    const origin = req.headers.get("origin") || "*";
-    return {
-        "Access-Control-Allow-Origin": origin,
-        "Access-Control-Allow-Credentials": "true",
+    const origin = req.headers.get("origin");
+    const headers: Record<string, string> = {
         "Access-Control-Allow-Methods": "GET, OPTIONS",
         "Access-Control-Allow-Headers": "Content-Type, Authorization",
+        "Vary": "Origin",
     };
+    if (isAllowedOrigin(origin)) {
+        headers["Access-Control-Allow-Origin"] = origin as string;
+        headers["Access-Control-Allow-Credentials"] = "true";
+    }
+    return headers;
 }
 
 // CORS preflight

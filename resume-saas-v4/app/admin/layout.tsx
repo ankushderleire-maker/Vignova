@@ -15,10 +15,10 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     // DB-authoritative role check — not trusting client-visible session
     const user = await db.users.findUnique({
         where: { email: session.user.email },
-        select: { role: true },
+        select: { role: true, status: true },
     });
 
-    if (user?.role !== "ADMIN") {
+    if (user?.role !== "ADMIN" || user.status === "SUSPENDED") {
         redirect("/dashboard");
     }
 

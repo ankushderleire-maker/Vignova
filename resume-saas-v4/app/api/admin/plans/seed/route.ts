@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { db } from "@/lib/db";
+import { requireAdmin, logAdminAction } from "@/lib/admin-guard";
 
 const defaultPlans = [
     {
@@ -58,17 +57,10 @@ const defaultPlans = [
 ];
 
 export async function POST(req: Request) {
-    try {
-        const session = await getServerSession(authOptions);
-        if (!session?.user?.email) {
-            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-        }
-        
-        const user = await db.users.findUnique({ where: { email: session.user.email } });
-        if (user?.role !== "ADMIN") {
-            return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-        }
+    const auth = await requireAdmin();
+    if (auth.error) return auth.error;
 
+    try {
         for (const plan of defaultPlans) {
             await db.plan_configs.upsert({
                 where: { plan_type: plan.plan_type },
@@ -76,9 +68,17 @@ export async function POST(req: Request) {
                 create: plan,
             });
         }
-        
+
+        await logAdminAction({
+            admin: auth.user,
+            action: "PLANS_SEED",
+            targetType: "plan",
+            req,
+        });
+
         return NextResponse.json({ success: true });
-    } catch (error: any) {
-        return NextResponse.json({ error: error.message }, { status: 500 });
+    } catch (error) {
+        console.error("[ADMIN_PLANS_SEED]", error);
+        return NextResponse.json({ error: "Failed to seed plans" }, { status: 500 });
     }
 }

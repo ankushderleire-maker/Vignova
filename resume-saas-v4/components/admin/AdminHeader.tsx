@@ -9,6 +9,9 @@ const PAGE_TITLES: Record<string, string> = {
     "/admin/plans": "Plan Management",
     "/admin/payments": "Payment History",
     "/admin/analytics": "Analytics",
+    "/admin/scan-controls": "Scan Controls",
+    "/admin/extension": "Extension Settings",
+    "/admin/audit-log": "Audit Log",
 };
 
 export function AdminHeader() {

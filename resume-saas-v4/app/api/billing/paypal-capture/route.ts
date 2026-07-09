@@ -12,14 +12,36 @@ const PAYPAL_CLIENT_SECRET = process.env.PAYPAL_CLIENT_SECRET || '';
 const VALID_PLAN_TYPES = ['PRO', 'PREMIUM'];
 const VALID_BILLING_CYCLES = ['MONTHLY', 'SEMI_ANNUAL', 'ANNUAL'];
 
+// Billing-cycle discounts — must match the billing UI and the backend
+// checkout pricing (BILLING_CYCLES in app/dashboard/billing/page.tsx).
+const CYCLE_MONTHS: Record<string, number> = { MONTHLY: 1, SEMI_ANNUAL: 6, ANNUAL: 12 };
+const CYCLE_DISCOUNT: Record<string, number> = { MONTHLY: 0, SEMI_ANNUAL: 0.1, ANNUAL: 0.2 };
+const FALLBACK_MONTHLY_PRICE: Record<string, number> = { PRO: 13.99, PREMIUM: 29.99 };
+
+// Authoritative USD total for a plan + cycle, computed server-side so a
+// tampered client "amount" can never buy a plan for less than it costs.
+async function expectedUsdTotal(planType: string, billingCycle: string): Promise<number> {
+    let monthly = FALLBACK_MONTHLY_PRICE[planType];
+    try {
+        const cfg = await db.plan_configs.findUnique({ where: { plan_type: planType } });
+        if (cfg && typeof cfg.monthly_price === 'number' && cfg.monthly_price > 0) {
+            monthly = cfg.monthly_price;
+        }
+    } catch { /* use fallback */ }
+    const months = CYCLE_MONTHS[billingCycle] ?? 1;
+    const discount = CYCLE_DISCOUNT[billingCycle] ?? 0;
+    return Number((monthly * (1 - discount) * months).toFixed(2));
+}
+
 /**
  * Verify a PayPal order server-side by calling PayPal's API
  */
 async function verifyPayPalOrder(orderID: string): Promise<{ verified: boolean; amount?: number; currency?: string }> {
-    // If no PayPal credentials configured, log warning but allow (for dev)
+    // Never grant a plan without a real server-side verification. If the
+    // credentials are missing we FAIL CLOSED rather than trusting the client.
     if (!PAYPAL_CLIENT_ID || !PAYPAL_CLIENT_SECRET) {
-        console.warn('[PAYPAL_CAPTURE] PayPal credentials not configured. Skipping server verification. SET PAYPAL_CLIENT_ID and PAYPAL_CLIENT_SECRET for production!');
-        return { verified: true, amount: 0, currency: 'USD' };
+        console.error('[PAYPAL_CAPTURE] PayPal credentials not configured — refusing to grant plan. Set PAYPAL_CLIENT_ID and PAYPAL_CLIENT_SECRET.');
+        return { verified: false };
     }
 
     try {
@@ -54,17 +76,39 @@ async function verifyPayPalOrder(orderID: string): Promise<{ verified: boolean; 
             return { verified: false };
         }
 
-        const orderData = await orderResponse.json();
+        let orderData = await orderResponse.json();
 
-        // Step 3: Verify order status is COMPLETED or APPROVED
-        if (orderData.status !== 'COMPLETED' && orderData.status !== 'APPROVED') {
-            console.error(`[PAYPAL_CAPTURE] Order status is ${orderData.status}, not COMPLETED/APPROVED`);
+        // Step 3: An APPROVED order has been authorized by the buyer but the
+        // money has NOT been taken yet — we must capture it server-side.
+        // Only a COMPLETED capture means funds actually moved.
+        if (orderData.status === 'APPROVED') {
+            const captureResponse = await fetch(`${PAYPAL_API_BASE}/v2/checkout/orders/${encodeURIComponent(orderID)}/capture`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${access_token}`,
+                    'Content-Type': 'application/json',
+                },
+            });
+            if (!captureResponse.ok) {
+                console.error('[PAYPAL_CAPTURE] Failed to capture PayPal order');
+                return { verified: false };
+            }
+            orderData = await captureResponse.json();
+        }
+
+        if (orderData.status !== 'COMPLETED') {
+            console.error(`[PAYPAL_CAPTURE] Order status is ${orderData.status}, not COMPLETED`);
             return { verified: false };
         }
 
-        // Extract amount
-        const amount = parseFloat(orderData.purchase_units?.[0]?.amount?.value || '0');
-        const currency = orderData.purchase_units?.[0]?.amount?.currency_code || 'USD';
+        // Extract the amount that was actually captured.
+        const capture = orderData.purchase_units?.[0]?.payments?.captures?.[0];
+        const amount = parseFloat(
+            capture?.amount?.value ?? orderData.purchase_units?.[0]?.amount?.value ?? '0'
+        );
+        const currency = capture?.amount?.currency_code
+            ?? orderData.purchase_units?.[0]?.amount?.currency_code
+            ?? 'USD';
 
         return { verified: true, amount, currency };
     } catch (error) {
@@ -104,6 +148,16 @@ export async function POST(req: NextRequest) {
         const paypalResult = await verifyPayPalOrder(orderID);
         if (!paypalResult.verified) {
             return NextResponse.json({ error: 'Payment verification failed. Please contact support.' }, { status: 402 });
+        }
+
+        // ── AMOUNT VALIDATION ──
+        // The buyer must have actually paid at least what the plan costs.
+        // PayPal is charged in USD, so compare against the USD total.
+        const expected = await expectedUsdTotal(planType, billingCycle);
+        const paid = paypalResult.amount ?? 0;
+        if ((paypalResult.currency || 'USD') !== 'USD' || paid + 0.01 < expected) {
+            console.error(`[PAYPAL_CAPTURE] Amount mismatch: paid ${paid} ${paypalResult.currency}, expected ${expected} USD`);
+            return NextResponse.json({ error: 'Payment amount does not match plan price.' }, { status: 402 });
         }
 
         const user = await db.users.findUnique({

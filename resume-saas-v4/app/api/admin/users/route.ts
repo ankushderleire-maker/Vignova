@@ -8,10 +8,12 @@ export async function GET(req: Request) {
 
     try {
         const { searchParams } = new URL(req.url);
-        const page = parseInt(searchParams.get("page") || "1");
-        const limit = parseInt(searchParams.get("limit") || "20");
+        const page = Math.max(1, parseInt(searchParams.get("page") || "1") || 1);
+        const limit = Math.min(100, Math.max(1, parseInt(searchParams.get("limit") || "20") || 20));
         const search = searchParams.get("search") || "";
         const plan = searchParams.get("plan") || "";
+        const role = searchParams.get("role") || "";
+        const status = searchParams.get("status") || "";
         const skip = (page - 1) * limit;
 
         // Build where clause
@@ -25,8 +27,11 @@ export async function GET(req: Request) {
         }
 
         if (plan) {
-            where.subscriptions = { some: { plan_type: plan } };
+            where.subscriptions = { is: { plan_type: plan } };
         }
+
+        if (role) where.role = role;
+        if (status) where.status = status;
 
         const [users, total] = await Promise.all([
             db.users.findMany({
@@ -61,6 +66,7 @@ export async function GET(req: Request) {
                 email: u.email,
                 fullName: u.full_name,
                 role: u.role,
+                status: u.status,
                 createdAt: u.created_at,
                 subscription: u.subscriptions || null,
                 counts: {

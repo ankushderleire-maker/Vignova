@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAdmin } from "@/lib/admin-guard";
+import { requireAdmin, logAdminAction } from "@/lib/admin-guard";
 import { db } from "@/lib/db";
 
 /**
@@ -142,6 +142,15 @@ export async function PUT(req: NextRequest, { params }: RouteParams) {
             expires_at: string | null;
             updated_at: string;
         }>;
+        await logAdminAction({
+            admin: auth.user!,
+            action: "SCAN_OVERRIDE_UPDATE",
+            targetType: "user",
+            targetId: userId,
+            details: { cooldown, scanDisabled, reason, expiresAt },
+            req,
+        });
+
         const r = rows[0];
         return NextResponse.json(
             r
@@ -174,6 +183,14 @@ export async function DELETE(_req: NextRequest, { params }: RouteParams) {
             `DELETE FROM user_cooldown_overrides WHERE user_id = $1::uuid`,
             userId
         );
+
+        await logAdminAction({
+            admin: auth.user!,
+            action: "SCAN_OVERRIDE_CLEAR",
+            targetType: "user",
+            targetId: userId,
+        });
+
         return NextResponse.json({ success: true });
     } catch (err) {
         console.error("[ADMIN_SCAN_CONTROLS_USER_DELETE]", err);

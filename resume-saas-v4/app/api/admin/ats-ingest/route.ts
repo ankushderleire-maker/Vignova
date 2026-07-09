@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireAdmin } from "@/lib/admin-guard";
+import { requireAdmin, logAdminAction } from "@/lib/admin-guard";
 import { callBackend } from "@/lib/career-ops";
 
 /**
@@ -48,6 +48,13 @@ export async function GET() {
 export async function POST() {
     const auth = await requireAdmin();
     if (auth.error) return auth.error;
+
+    await logAdminAction({
+        admin: auth.user,
+        action: "ATS_INGEST_RUN",
+        targetType: "system",
+        targetId: "ats-ingest",
+    });
 
     const result = await callBackend<any>("/api/ats/ingest", {
         method: "POST",

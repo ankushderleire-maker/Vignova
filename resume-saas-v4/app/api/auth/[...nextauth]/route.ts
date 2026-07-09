@@ -50,6 +50,11 @@ export const authOptions: NextAuthOptions = {
           throw new Error("Invalid email or password");
         }
 
+        // 3b. Block suspended accounts
+        if (user.status === "SUSPENDED") {
+          throw new Error("This account has been suspended. Contact support.");
+        }
+
         // 4. Return user object (include role for admin checks)
         return {
           id: user.id,
@@ -87,6 +92,11 @@ export const authOptions: NextAuthOptions = {
               role: "USER"
             }
           });
+        }
+
+        // Block suspended accounts on OAuth sign-in too
+        if (dbUser?.status === "SUSPENDED") {
+          return false;
         }
       }
       return true;

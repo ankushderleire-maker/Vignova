@@ -12,6 +12,7 @@ interface UserDetail {
     email: string;
     fullName: string | null;
     role: string;
+    status?: string;
     createdAt: string;
     subscription: {
         plan_type: string;
@@ -90,6 +91,9 @@ export default function AdminUserDetailPage() {
                         </div>
                     </div>
                     <div className="flex items-center gap-3">
+                        <span className={`text-xs font-bold px-2 py-1 rounded ${user.status === "SUSPENDED" ? "text-red-400 bg-red-400/10" : "text-green-400 bg-green-400/10"}`}>
+                            {user.status || "ACTIVE"}
+                        </span>
                         <span className={`flex items-center gap-1 text-xs font-bold px-2 py-1 rounded ${user.role === "ADMIN" ? "text-red-400 bg-red-400/10" : "text-gray-400 bg-gray-400/10"}`}>
                             <Shield className="w-3 h-3" /> {user.role}
                         </span>
