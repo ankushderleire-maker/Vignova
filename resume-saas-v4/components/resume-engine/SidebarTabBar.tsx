@@ -12,7 +12,7 @@ interface SidebarTabBarProps {
 
 export function SidebarTabBar({ activeTab, onTabChange }: SidebarTabBarProps) {
     return (
-        <div className="flex border-b border-white/10 bg-[#0a0a0a]">
+        <div className="flex bg-[#130d26] pt-2 px-2 w-full">
             <TabButton
                 active={activeTab === 'content'}
                 onClick={() => onTabChange('content')}
@@ -25,7 +25,6 @@ export function SidebarTabBar({ activeTab, onTabChange }: SidebarTabBarProps) {
                 icon={<LayoutTemplate className="h-4 w-4" />}
                 label="Templates"
             />
-
         </div>
     );
 }
@@ -40,10 +39,11 @@ function TabButton({ active, onClick, icon, label }: {
         <button
             onClick={onClick}
             className={`
-                flex-1 flex items-center justify-center gap-2 py-3 px-4 text-sm font-medium transition-all
+                flex-1 flex items-center justify-center gap-2 py-3 px-4 text-sm font-bold transition-all
+                rounded-t-xl
                 ${active
-                    ? 'text-white border-b-2 border-[#667eea] bg-white/5'
-                    : 'text-gray-400 hover:text-white hover:bg-white/5'
+                    ? 'text-[var(--primary)] bg-white dark:bg-[#1e1e1e] border-none shadow-sm z-10'
+                    : 'text-white/60 hover:text-white hover:bg-white/5 bg-transparent border-none'
                 }
             `}
         >
