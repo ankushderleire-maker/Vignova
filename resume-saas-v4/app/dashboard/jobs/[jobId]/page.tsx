@@ -833,7 +833,7 @@ function ResumeStudioPageContent() {
                                         <textarea className="w-full h-24 bg-[var(--background)]/50 border border-[var(--border-color)] rounded-lg p-3 text-xs text-[var(--foreground)]/90 focus:border-[var(--primary)] outline-none resize-none leading-relaxed" value={Array.isArray(resumeData?.skills) ? resumeData.skills.join(", ") : ""} onChange={(e) => updateField('skills', e.target.value.split(", "))} />
                                     </Section>
                                     <Section title="Experience">
-                                        {resumeData?.experience.map((exp, idx) => (
+                                        {resumeData?.experience?.map((exp, idx) => (
                                             <div key={idx} className="bg-black/5 dark:bg-white/5 p-3 rounded-lg border border-[var(--border-color)] mb-3 relative group hover:border-[var(--foreground)]/20 transition-colors">
                                                 <button onClick={() => removeArrayItem('experience', idx)} className="absolute top-3 right-3 text-[var(--text-secondary)] hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 className="h-3 w-3" /></button>
                                                 <Input label="Company" value={exp.company || ""} onChange={(v) => updateArrayItem('experience', idx, 'company', v)} />
@@ -849,7 +849,7 @@ function ResumeStudioPageContent() {
                                     </Section>
 
                                     <Section title="Projects">
-                                        {resumeData?.projects.map((proj, idx) => (
+                                        {resumeData?.projects?.map((proj, idx) => (
                                             <div key={idx} className="bg-black/5 dark:bg-white/5 p-3 rounded-lg border border-[var(--border-color)] mb-3 relative group hover:border-[var(--foreground)]/20 transition-colors">
                                                 <button onClick={() => removeArrayItem('projects', idx)} className="absolute top-3 right-3 text-[var(--text-secondary)] hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 className="h-3 w-3" /></button>
                                                 <Input label="Project Name" value={proj.name || ""} onChange={(v) => updateArrayItem('projects', idx, 'name', v)} />
@@ -861,7 +861,7 @@ function ResumeStudioPageContent() {
                                     </Section>
 
                                     <Section title="Education">
-                                        {resumeData?.education.map((edu, idx) => (
+                                        {resumeData?.education?.map((edu, idx) => (
                                             <div key={idx} className="bg-black/5 dark:bg-white/5 p-3 rounded-lg border border-[var(--border-color)] mb-3 relative group hover:border-[var(--foreground)]/20 transition-colors">
                                                 <button onClick={() => removeArrayItem('education', idx)} className="absolute top-3 right-3 text-[var(--text-secondary)] hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 className="h-3 w-3" /></button>
                                                 <Input label="School" value={edu.school || ""} onChange={(v) => updateArrayItem('education', idx, 'school', v)} />
@@ -970,13 +970,21 @@ function ResumeStudioPageContent() {
                             <p className="text-[var(--text-secondary)] max-w-md text-sm leading-relaxed z-10">AI Agent ready to analyze.</p>
                         </div>
                     ) : activeDocument === "resume" ? (
-                        /* Using Interactive Preview with Canva-like editing */
-                        <InteractivePreviewPanel
-                            data={resumeData!}
-                            templateId={activeTemplateId}
-                            designSettings={designSettings}
-                            onDataChange={(newData) => setResumeData(newData)}
-                        />
+                        resumeData ? (
+                            /* Using Interactive Preview with Canva-like editing */
+                            <InteractivePreviewPanel
+                                data={resumeData}
+                                templateId={activeTemplateId}
+                                designSettings={designSettings}
+                                onDataChange={(newData) => setResumeData(newData)}
+                            />
+                        ) : (
+                            <div className="flex-1 flex flex-col items-center justify-center p-10 text-center text-[var(--foreground)] bg-[var(--background)]">
+                                <FileText className="w-16 h-16 text-[var(--border-color)] mb-4" />
+                                <h3 className="text-xl font-bold mb-2">No Resume Generated</h3>
+                                <p className="text-sm text-[var(--text-secondary)] max-w-md">You haven't generated a tailored resume for this job yet. Click "Generate Resume" or "Generate Application Pack" in the left panel to create one.</p>
+                            </div>
+                        )
                     ) : activeDocument === "cover-letter" ? (
                         <div className="flex-1 overflow-auto p-6 lg:p-12 bg-white dark:bg-[#1e1e1e]">
                             <div className="max-w-3xl mx-auto">
