@@ -384,7 +384,7 @@ async def parse_resume(request: Request, file: UploadFile = File(...)):
 
 
 @router.post("/api/generate-tailored-resume")
-@limiter.limit("5/minute")
+@limiter.limit("50/minute")
 async def generate_tailored_resume(request: Request, payload: TailorRequest):
     job_description    = payload.jobDescription
     master_profile_str = json.dumps(payload.masterProfile, indent=2)
@@ -456,7 +456,7 @@ async def generate_tailored_resume(request: Request, payload: TailorRequest):
 
 
 @router.post("/api/generate-cover-letter")
-@limiter.limit("5/minute")
+@limiter.limit("50/minute")
 async def generate_cover_letter(request: Request, payload: TailorRequest):
     job_description = payload.jobDescription
     master_profile_str = json.dumps(payload.masterProfile, indent=2)
@@ -489,7 +489,7 @@ INSTRUCTIONS:
         raise HTTPException(status_code=500, detail="Cover letter generation failed")
 
 @router.post("/api/generate-draft-email")
-@limiter.limit("5/minute")
+@limiter.limit("50/minute")
 async def generate_draft_email(request: Request, payload: TailorRequest):
     job_description = payload.jobDescription
     master_profile_str = json.dumps(payload.masterProfile, indent=2)
