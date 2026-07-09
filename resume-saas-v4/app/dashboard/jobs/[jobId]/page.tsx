@@ -221,7 +221,15 @@ function ResumeStudioPageContent() {
             }
             if (!response.ok) throw new Error("Failed to generate cover letter");
             const result = await response.json();
-            if (result.coverLetter) setCoverLetter(result.coverLetter);
+            if (result.coverLetter) {
+                setCoverLetter(result.coverLetter);
+                // Save to Job Application
+                await fetch(`/api/jobs/${job.id}`, {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ coverLetter: result.coverLetter }),
+                });
+            }
             setHasGenerated(true);
             setActiveDocument("cover-letter");
             setMobilePanelView("preview");
@@ -423,7 +431,16 @@ function ResumeStudioPageContent() {
                 }),
             });
 
-            const saveJson = await saveRes.json();
+            // 5. Save Cover Letter to Job Application
+            if (result.coverLetter) {
+                await fetch(`/api/jobs/${currentJob.id}`, {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ coverLetter: result.coverLetter }),
+                });
+            }
+
+            if (!saveRes.ok) throw new Error("Failed to save generated resume");const saveJson = await saveRes.json();
             if (saveJson.data?.id) {
                 setCurrentResumeId(saveJson.data.id);
                 setCurrentResumeName(saveJson.data.name);

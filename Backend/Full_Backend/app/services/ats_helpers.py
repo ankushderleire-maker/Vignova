@@ -97,7 +97,23 @@ def _extract_keywords_locally(jd_text: str) -> list[str]:
         "experience", "years", "year", "team", "teams", "role", "company", "client", "clients",
         "opportunity", "exciting", "working", "work", "business", "environment", "candidate",
         "including", "preferred", "required", "ability", "strong", "excellent", "using",
-        "build", "develop", "design", "support", "knowledge", "understanding",
+        "build", "develop", "design", "support", "knowledge", "understanding", "about", "the",
+        "your", "could", "directly", "how", "world", "expertise", "rolewhat", "what", "can",
+        "you", "we", "our", "are", "with", "for", "and", "this", "that", "from", "have", "has",
+        "been", "will", "all", "other", "any", "which", "their", "they", "not", "but", "also",
+        "when", "where", "who", "why", "how", "then", "than", "there", "these", "those",
+        "into", "through", "during", "before", "after", "above", "below", "to", "of", "in",
+        "on", "at", "by", "as", "if", "or", "because", "while", "until", "unless", "since",
+        "so", "very", "much", "more", "most", "some", "such", "no", "nor", "too", "only",
+        "same", "few", "both", "each", "every", "own", "out", "over", "under", "again",
+        "further", "then", "once", "here", "there", "why", "how", "all", "any", "both",
+        "each", "few", "more", "most", "other", "some", "such", "no", "nor", "not", "only",
+        "own", "same", "so", "than", "too", "very", "s", "t", "can", "will", "just", "don",
+        "should", "now", "d", "ll", "m", "o", "re", "ve", "y", "ain", "aren", "couldn", "didn",
+        "doesn", "hadn", "hasn", "haven", "isn", "ma", "mightn", "mustn", "needn", "shan",
+        "shouldn", "wasn", "weren", "won", "wouldn", "rolewhat", "what", "your", "expertise",
+        "world", "about", "could", "directly", "within", "must", "make", "sure", "like", "such",
+        "good", "well", "new", "throughout", "across"
     }
 
     for term in single_terms:
@@ -235,7 +251,16 @@ def calculate_keyword_score(jd_text: str, resume_text: str) -> dict:
                 if array_match:
                     cleaned_response = array_match.group(0)
 
-            extracted_keywords = normalize_keyword_list(json.loads(cleaned_response))
+            try:
+                extracted_keywords = normalize_keyword_list(json.loads(cleaned_response))
+            except json.JSONDecodeError:
+                # Fallback if it's comma separated or just lines
+                if ',' in cleaned_response and not cleaned_response.startswith('['):
+                    items = [x.strip(' "\'[]') for x in cleaned_response.split(',')]
+                    extracted_keywords = normalize_keyword_list(items)
+                else:
+                    items = [x.strip(' "\'-*•') for x in cleaned_response.split('\n')]
+                    extracted_keywords = normalize_keyword_list(items)
         except Exception:
             logger.warning("ATS keyword extraction returned invalid AI output. Falling back to local extraction.")
             extracted_keywords = _extract_keywords_locally(jd_text)

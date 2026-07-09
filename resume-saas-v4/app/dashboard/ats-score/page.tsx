@@ -280,9 +280,13 @@ function AtsScoreContent() {
                 parts.push(`${exp.role || exp.title || ""} at ${exp.company || ""} (${exp.startDate || ""} - ${exp.endDate || ""})`);
                 if (exp.location) parts.push(exp.location);
                 if (exp.description) {
-                    const desc = Array.isArray(exp.description)
-                        ? exp.description.map((d: string) => `• ${d}`).join("\n")
-                        : `• ${exp.description}`;
+                    let bullets: string[] = [];
+                    if (Array.isArray(exp.description)) {
+                        bullets = exp.description;
+                    } else if (typeof exp.description === "string") {
+                        bullets = exp.description.includes("\n") ? exp.description.split("\n") : [exp.description];
+                    }
+                    const desc = bullets.filter(Boolean).map((d: string) => `• ${d.replace(/^[-•*]\s*/, '')}`).join("\n");
                     parts.push(desc);
                 }
             }
@@ -303,9 +307,13 @@ function AtsScoreContent() {
             for (const proj of data.projects) {
                 parts.push(`${proj.name || ""} (${proj.techStack || ""})`);
                 if (proj.description) {
-                    const desc = Array.isArray(proj.description)
-                        ? proj.description.map((d: string) => `• ${d}`).join("\n")
-                        : `• ${proj.description}`;
+                    let bullets: string[] = [];
+                    if (Array.isArray(proj.description)) {
+                        bullets = proj.description;
+                    } else if (typeof proj.description === "string") {
+                        bullets = proj.description.includes("\n") ? proj.description.split("\n") : [proj.description];
+                    }
+                    const desc = bullets.filter(Boolean).map((d: string) => `• ${d.replace(/^[-•*]\s*/, '')}`).join("\n");
                     parts.push(desc);
                 }
             }
