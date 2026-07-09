@@ -166,10 +166,17 @@ function CheckoutContent() {
                             </div>
                         )}
 
-                        <div className="flex justify-between items-center py-4">
-                            <div className="text-lg font-bold text-gray-900 dark:text-white">Total USD</div>
-                            <div className="text-2xl font-bold text-[var(--primary)]">${total}</div>
-                        </div>
+                        {previewData?.currency === 'INR' ? (
+                            <div className="flex justify-between items-center py-3 border-b border-gray-200 dark:border-white/10">
+                                <div className="text-gray-600 dark:text-gray-400">Total USD</div>
+                                <div className="text-gray-900 dark:text-white font-medium">${total}</div>
+                            </div>
+                        ) : (
+                            <div className="flex justify-between items-center py-4">
+                                <div className="text-lg font-bold text-gray-900 dark:text-white">Total USD</div>
+                                <div className="text-2xl font-bold text-[var(--primary)]">${total}</div>
+                            </div>
+                        )}
 
                         {/* Country and Exchange Rate Section */}
                         <div className="mt-4 p-4 bg-gray-50 dark:bg-white/[0.02] border border-gray-200 dark:border-white/5 rounded-xl">
@@ -197,9 +204,9 @@ function CheckoutContent() {
                                         <span>Exchange Rate</span>
                                         <span>1 USD = {previewData.exchange_rate} {previewData.currency}</span>
                                     </div>
-                                    <div className="flex justify-between font-bold text-gray-900 dark:text-white pt-2 border-t border-gray-200 dark:border-white/10">
-                                        <span>Final Amount</span>
-                                        <span className="text-[var(--primary)]">
+                                     <div className="flex justify-between items-end font-bold text-gray-900 dark:text-white pt-4 mt-2 border-t border-gray-200 dark:border-white/10">
+                                        <span className="text-lg">Final Amount</span>
+                                        <span className="text-2xl text-[var(--primary)]">
                                             {previewData.currency === 'INR' ? '₹' : ''}
                                             {previewData.final_amount.toFixed(2)} {previewData.currency}
                                         </span>
