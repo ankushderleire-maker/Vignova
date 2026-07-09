@@ -778,52 +778,34 @@ function ResumeStudioPageContent() {
                                     <button 
                                         disabled={isGenerating} 
                                         onClick={() => handleGenerateResumeOnly()} 
-                                        className="group flex items-center justify-between p-4 rounded-xl bg-white dark:bg-[#111] hover:bg-gray-50 dark:hover:bg-[#161616] border border-[var(--border-color)] transition-all disabled:opacity-50 hover:shadow-md hover:border-blue-500/50 text-left"
+                                        className="group flex items-center justify-center gap-3 py-3 px-4 rounded-xl bg-white dark:bg-[#111] hover:bg-gray-50 dark:hover:bg-[#161616] border border-[var(--border-color)] transition-all disabled:opacity-50 hover:shadow-sm hover:border-blue-500/30"
                                     >
-                                        <div className="flex items-center gap-4">
-                                            <div className="w-10 h-10 rounded-full bg-blue-50 dark:bg-blue-500/10 flex items-center justify-center shrink-0">
-                                                <FileText className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-                                            </div>
-                                            <div>
-                                                <h4 className="text-[13px] font-bold text-[var(--foreground)] mb-0.5">Resume</h4>
-                                                <p className="text-[10px] text-[var(--text-secondary)] leading-tight">Generate a tailored, ATS-friendly resume that highlights your best.</p>
-                                            </div>
+                                        <div className="w-8 h-8 rounded-full bg-blue-50 dark:bg-blue-500/10 flex items-center justify-center shrink-0">
+                                            <FileText className="h-4 w-4 text-blue-600 dark:text-blue-400" />
                                         </div>
-                                        <ChevronRight className="h-4 w-4 text-blue-600 dark:text-blue-400 opacity-0 -ml-2 group-hover:opacity-100 group-hover:ml-0 transition-all" />
+                                        <span className="text-[13px] font-bold text-[var(--foreground)]">Resume</span>
                                     </button>
 
                                     <button 
                                         disabled={isGenerating} 
                                         onClick={() => handleGenerateCoverLetter()} 
-                                        className="group flex items-center justify-between p-4 rounded-xl bg-white dark:bg-[#111] hover:bg-gray-50 dark:hover:bg-[#161616] border border-[var(--border-color)] transition-all disabled:opacity-50 hover:shadow-md hover:border-purple-500/50 text-left"
+                                        className="group flex items-center justify-center gap-3 py-3 px-4 rounded-xl bg-white dark:bg-[#111] hover:bg-gray-50 dark:hover:bg-[#161616] border border-[var(--border-color)] transition-all disabled:opacity-50 hover:shadow-sm hover:border-purple-500/30"
                                     >
-                                        <div className="flex items-center gap-4">
-                                            <div className="w-10 h-10 rounded-full bg-purple-50 dark:bg-purple-500/10 flex items-center justify-center shrink-0">
-                                                <Mail className="h-5 w-5 text-purple-600 dark:text-purple-400" />
-                                            </div>
-                                            <div>
-                                                <h4 className="text-[13px] font-bold text-[var(--foreground)] mb-0.5">Cover Letter</h4>
-                                                <p className="text-[10px] text-[var(--text-secondary)] leading-tight">Create a personalized cover letter that gets you noticed.</p>
-                                            </div>
+                                        <div className="w-8 h-8 rounded-full bg-purple-50 dark:bg-purple-500/10 flex items-center justify-center shrink-0">
+                                            <Mail className="h-4 w-4 text-purple-600 dark:text-purple-400" />
                                         </div>
-                                        <ChevronRight className="h-4 w-4 text-purple-600 dark:text-purple-400 opacity-0 -ml-2 group-hover:opacity-100 group-hover:ml-0 transition-all" />
+                                        <span className="text-[13px] font-bold text-[var(--foreground)]">Cover Letter</span>
                                     </button>
 
                                     <button 
                                         disabled={isGenerating} 
                                         onClick={() => handleGenerateEmail()} 
-                                        className="group flex items-center justify-between p-4 rounded-xl bg-white dark:bg-[#111] hover:bg-gray-50 dark:hover:bg-[#161616] border border-[var(--border-color)] transition-all disabled:opacity-50 hover:shadow-md hover:border-green-500/50 text-left"
+                                        className="group flex items-center justify-center gap-3 py-3 px-4 rounded-xl bg-white dark:bg-[#111] hover:bg-gray-50 dark:hover:bg-[#161616] border border-[var(--border-color)] transition-all disabled:opacity-50 hover:shadow-sm hover:border-green-500/30"
                                     >
-                                        <div className="flex items-center gap-4">
-                                            <div className="w-10 h-10 rounded-full bg-green-50 dark:bg-green-500/10 flex items-center justify-center shrink-0">
-                                                <Send className="h-5 w-5 text-green-600 dark:text-green-400" />
-                                            </div>
-                                            <div>
-                                                <h4 className="text-[13px] font-bold text-[var(--foreground)] mb-0.5">Draft Email</h4>
-                                                <p className="text-[10px] text-[var(--text-secondary)] leading-tight">Write a professional email to apply with confidence.</p>
-                                            </div>
+                                        <div className="w-8 h-8 rounded-full bg-green-50 dark:bg-green-500/10 flex items-center justify-center shrink-0">
+                                            <Send className="h-4 w-4 text-green-600 dark:text-green-400" />
                                         </div>
-                                        <ChevronRight className="h-4 w-4 text-green-600 dark:text-green-400 opacity-0 -ml-2 group-hover:opacity-100 group-hover:ml-0 transition-all" />
+                                        <span className="text-[13px] font-bold text-[var(--foreground)]">Draft Email</span>
                                     </button>
                                 </div>
 
