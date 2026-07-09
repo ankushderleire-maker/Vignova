@@ -63,6 +63,7 @@ export default function BillingPage() {
     const [subscription, setSubscription] = useState<Subscription | null>(null);
     const [planConfigs, setPlanConfigs] = useState<PlanConfig[]>([]);
     const [loading, setLoading] = useState(true);
+    const [billingInfo, setBillingInfo] = useState<{ currency: string; exchange_rate: number | null; country: string } | null>(null);
     const [upgrading, setUpgrading] = useState<string | null>(null);
     const [dialogConfig, setDialogConfig] = useState<{
         isOpen: boolean;
@@ -75,7 +76,7 @@ export default function BillingPage() {
     }>({ isOpen: false, type: 'alert', title: '', description: '', variant: 'default' });
 
     useEffect(() => {
-        Promise.all([fetchSubscription(), fetchPlans()]).finally(() => setLoading(false));
+        Promise.all([fetchSubscription(), fetchPlans(), fetchBillingInfo()]).finally(() => setLoading(false));
     }, []);
 
     const fetchSubscription = async () => {
@@ -95,6 +96,20 @@ export default function BillingPage() {
             setPlanConfigs(data);
         } catch (error) {
             console.error("Failed to fetch plans:", error);
+        }
+    };
+
+    const fetchBillingInfo = async () => {
+        try {
+            const res = await fetch('/api/razorpay/preview', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ amount_usd: 1 })
+            });
+            const data = await res.json();
+            setBillingInfo({ currency: data.currency, exchange_rate: data.exchange_rate, country: data.country });
+        } catch (e) {
+            console.error("Failed to fetch billing info:", e);
         }
     };
 
@@ -142,6 +157,9 @@ export default function BillingPage() {
 
     const currentPlan = subscription?.plan_type || "FREE";
     const currentPlanConfig = planConfigs.find(p => p.plan_type === currentPlan);
+
+    const PLAN_RANK: Record<string, number> = { FREE: 0, PRO: 1, PREMIUM: 2 };
+    const currentRank = PLAN_RANK[currentPlan] || 0;
 
     return (
         <div className="max-w-6xl mx-auto space-y-8 pb-20 animate-slide-down">
@@ -198,6 +216,7 @@ export default function BillingPage() {
                 {planConfigs.map((pc) => {
                     const pricing = calculatePrice(pc.monthly_price, billingCycle);
                     const isCurrentPlan = currentPlan === pc.plan_type;
+                    const isDowngrade = (PLAN_RANK[pc.plan_type] || 0) < currentRank;
                     const colors = PLAN_COLORS[pc.plan_type] || PLAN_COLORS.FREE;
 
                     const displayPlan = {
@@ -229,6 +248,9 @@ export default function BillingPage() {
                             planKey={pc.plan_type}
                             billingCycle={billingCycle}
                             isCurrentPlan={isCurrentPlan}
+                            isDowngrade={isDowngrade}
+                            currency={billingInfo?.currency || "USD"}
+                            exchangeRate={billingInfo?.exchange_rate}
                             onUpgrade={handleUpgrade}
                             loading={upgrading === pc.plan_type}
                             totalPrice={parseFloat(String(pricing.total))}
