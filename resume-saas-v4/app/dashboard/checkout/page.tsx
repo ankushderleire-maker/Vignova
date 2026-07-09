@@ -172,18 +172,18 @@ function CheckoutContent() {
                         {/* Country and Exchange Rate Section */}
                         <div className="mt-4 p-4 bg-gray-50 dark:bg-white/[0.02] border border-gray-200 dark:border-white/5 rounded-xl">
                             <label className="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">Billing Country</label>
-                            <select
-                                value={selectedCountry}
-                                onChange={(e) => setSelectedCountry(e.target.value)}
-                                className="w-full bg-white dark:bg-[#111111] border border-gray-200 dark:border-white/10 rounded-lg px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none mb-3"
-                            >
-                                <option value="US">United States</option>
-                                <option value="IN">India</option>
-                                <option value="GB">United Kingdom</option>
-                                <option value="CA">Canada</option>
-                                <option value="AU">Australia</option>
-                                <option value="IE">Ireland</option>
-                            </select>
+                            {previewLoading ? (
+                                <div className="text-sm text-gray-500 mb-3">Detecting country...</div>
+                            ) : (
+                                <div className="w-full bg-white dark:bg-[#111111] border border-gray-200 dark:border-white/10 rounded-lg px-3 py-2 text-sm text-gray-900 dark:text-white mb-3">
+                                    {selectedCountry === 'US' ? 'United States' : 
+                                     selectedCountry === 'IN' ? 'India' : 
+                                     selectedCountry === 'GB' ? 'United Kingdom' : 
+                                     selectedCountry === 'CA' ? 'Canada' : 
+                                     selectedCountry === 'AU' ? 'Australia' : 
+                                     selectedCountry === 'IE' ? 'Ireland' : selectedCountry || 'Detecting...'}
+                                </div>
+                            )}
 
                             {previewLoading ? (
                                 <div className="text-sm text-gray-500 flex items-center">
@@ -265,21 +265,23 @@ function CheckoutContent() {
                     </h3>
 
                     {/* PayPal Option */}
-                    <div className="mb-6">
-                        <div className="bg-blue-600/10 border border-blue-500/20 rounded-lg p-4 mb-4">
-                            <h4 className="font-medium text-blue-400 mb-2">Pay with PayPal</h4>
-                            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-                                Securely pay using your PayPal account or Credit Card via PayPal.
-                            </p>
-                            <PayPalCheckoutButton
-                                amount={parseFloat(total)}
-                                planType={planKey}
-                                billingCycle={cycleKey}
-                                onSuccess={handleSuccess}
-                                onError={(err) => console.error("PayPal Error:", err)}
-                            />
+                    {selectedCountry !== 'IN' && (
+                        <div className="mb-6">
+                            <div className="bg-blue-600/10 border border-blue-500/20 rounded-lg p-4 mb-4">
+                                <h4 className="font-medium text-blue-400 mb-2">Pay with PayPal</h4>
+                                <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                                    Securely pay using your PayPal account or Credit Card via PayPal.
+                                </p>
+                                <PayPalCheckoutButton
+                                    amount={parseFloat(total)}
+                                    planType={planKey}
+                                    billingCycle={cycleKey}
+                                    onSuccess={handleSuccess}
+                                    onError={(err) => console.error("PayPal Error:", err)}
+                                />
+                            </div>
                         </div>
-                    </div>
+                    )}
 
                     {/* Razorpay Option */}
                     <div className="mb-6">

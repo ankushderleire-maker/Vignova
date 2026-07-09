@@ -10,6 +10,9 @@ interface PricingCardProps {
     planKey: string;
     billingCycle: string;
     isCurrentPlan: boolean;
+    isDowngrade?: boolean;
+    currency?: string;
+    exchangeRate?: number | null;
     onUpgrade: (planKey: string) => void;
     loading: boolean;
     totalPrice?: number;
@@ -32,6 +35,9 @@ export const PricingCard: React.FC<PricingCardProps> = ({
     planKey,
     billingCycle,
     isCurrentPlan,
+    isDowngrade = false,
+    currency = "USD",
+    exchangeRate = null,
     onUpgrade,
     loading,
     totalPrice = 0
@@ -56,7 +62,11 @@ export const PricingCard: React.FC<PricingCardProps> = ({
             styles.ctaFree;
 
     // Calculate price for display
-    const priceDisplay = plan.monthlyPrice === 0 ? "Free" : `$${plan.monthlyPrice}`;
+    const convertedMonthlyPrice = currency === "INR" && exchangeRate
+        ? (plan.monthlyPrice * exchangeRate).toFixed(0)
+        : plan.monthlyPrice;
+    
+    const priceDisplay = plan.monthlyPrice === 0 ? "Free" : currency === "INR" ? `₹${convertedMonthlyPrice}` : `$${plan.monthlyPrice}`;
     const cycleLabel = plan.monthlyPrice === 0 ? "forever" :
         billingCycle === "MONTHLY" ? "per month" :
             billingCycle === "ANNUAL" ? "per month, billed yearly" : "per month, billed every 6 months";
@@ -120,6 +130,8 @@ export const PricingCard: React.FC<PricingCardProps> = ({
                         "Current Plan"
                     ) : planKey === "FREE" ? (
                         "Default Plan"
+                    ) : isDowngrade ? (
+                        "Downgrade"
                     ) : (
                         "Upgrade Now"
                     )}
