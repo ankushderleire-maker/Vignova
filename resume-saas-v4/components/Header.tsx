@@ -24,6 +24,7 @@ import {
   Linkedin,
   MessageSquare,
   Menu,
+  Bell,
   type LucideIcon
 } from "lucide-react";
 import { useTheme } from "@/components/providers/ThemeContext";
@@ -100,8 +101,23 @@ export function Header({ onMenuClick }: HeaderProps) {
   const { data: session } = useSession();
   const pathname = usePathname();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const notificationsRef = useRef<HTMLDivElement>(null);
+  const [unreadTickets, setUnreadTickets] = useState<any[]>([]);
   const { theme, setTheme } = useTheme();
+
+  useEffect(() => {
+    // Fetch unread tickets on load
+    if (session?.user) {
+      fetch("/api/tickets/unread")
+        .then(res => res.json())
+        .then(data => {
+          if (Array.isArray(data)) setUnreadTickets(data);
+        })
+        .catch(err => console.error("Failed to fetch unread tickets", err));
+    }
+  }, [session?.user]);
 
   // Fetch live subscription data
   const [sub, setSub] = useState<{ plan_type: string; credits_remaining: number; has_unlimited_resumes: boolean } | null>(null);
@@ -129,6 +145,9 @@ export function Header({ onMenuClick }: HeaderProps) {
     function handleClickOutside(event: MouseEvent) {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setIsDropdownOpen(false);
+      }
+      if (notificationsRef.current && !notificationsRef.current.contains(event.target as Node)) {
+        setIsNotificationsOpen(false);
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
@@ -187,6 +206,63 @@ export function Header({ onMenuClick }: HeaderProps) {
 
       {/* Right side: Credits & Profile */}
       <div className="flex items-center gap-2 sm:gap-4 md:gap-6 shrink-0">
+
+        {/* Notifications Bell */}
+        <div className="relative" ref={notificationsRef}>
+          <button
+            onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
+            className="relative p-2 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 transition-colors"
+          >
+            <Bell className="w-5 h-5" />
+            {unreadTickets.length > 0 && (
+              <span className="absolute top-1.5 right-2 w-2 h-2 rounded-full bg-red-500 ring-2 ring-[#000000]" />
+            )}
+          </button>
+
+          {/* Notifications Dropdown */}
+          {isNotificationsOpen && (
+            <div className="absolute right-0 top-full mt-2 w-72 origin-top-right rounded-xl bg-[var(--sidebar-bg)] border border-[var(--border-color)] shadow-2xl ring-1 ring-black ring-opacity-5 focus:outline-none animate-in fade-in zoom-in-95 duration-200">
+              <div className="p-3 border-b border-[var(--border-color)]">
+                <h3 className="font-semibold text-[var(--foreground)] text-sm">Notifications</h3>
+              </div>
+              <div className="max-h-64 overflow-y-auto">
+                {unreadTickets.length === 0 ? (
+                  <div className="p-4 text-center text-sm text-[var(--text-secondary)]">
+                    No new notifications
+                  </div>
+                ) : (
+                  <div className="p-1">
+                    {unreadTickets.map(ticket => (
+                      <Link
+                        key={ticket.id}
+                        href={`/dashboard/help/${ticket.id}`}
+                        onClick={() => setIsNotificationsOpen(false)}
+                        className="block p-3 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                      >
+                        <div className="flex gap-3">
+                          <div className="w-8 h-8 rounded-full bg-blue-500/10 text-blue-500 flex items-center justify-center shrink-0 mt-0.5">
+                            <MessageSquare className="w-4 h-4" />
+                          </div>
+                          <div>
+                            <p className="text-sm text-[var(--foreground)] font-medium leading-tight mb-1">
+                              You got a response on your ticket
+                            </p>
+                            <p className="text-xs text-[var(--text-secondary)] truncate w-48">
+                              {ticket.subject}
+                            </p>
+                            <p className="text-[10px] text-[var(--text-secondary)] mt-1">
+                              {new Date(ticket.updatedAt).toLocaleDateString()}
+                            </p>
+                          </div>
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
 
         {/* Credits Counter */}
         <div id="tour-credits" className={`flex items-center gap-1.5 rounded-full px-2.5 md:px-4 py-1.5 border ${badgeBg}`}>
@@ -302,7 +378,7 @@ export function Header({ onMenuClick }: HeaderProps) {
                 </button>
 
                 <Link
-                  href="#"
+                  href="/dashboard/help"
                   className="flex items-center gap-3 px-3 py-2 text-sm text-[var(--text-secondary)] rounded-lg hover:bg-black/5 dark:hover:bg-white/5 hover:text-[var(--foreground)] transition-colors"
                 >
                   <HelpCircle className="h-4 w-4" />

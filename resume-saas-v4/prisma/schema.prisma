@@ -32,6 +32,9 @@ model users {
   scan_jobs               ScanJob[]
   subscriptions           subscriptions?
   user_cooldown_overrides user_cooldown_overrides?
+  atsReports              AtsScoreReport[]
+  supportTickets          SupportTicket[]
+  ticketMessages          TicketMessage[]
 }
 
 model Payment {
@@ -97,12 +100,33 @@ model JobApplication {
   source           String            @default("manual")
   sourceUrl        String?
   coverLetter      String?
+  atsReport        Json?
+  aiReport         Json?
   generatedResumes GeneratedResume[]
+  atsReports       AtsScoreReport[]
   user             users             @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([source])
   @@index([status])
+}
+
+model AtsScoreReport {
+  id          String   @id @default(cuid())
+  userId      String   @db.Uuid
+  jobId       String
+  resumeId    String?
+  resumeText  String?
+  atsResult   Json
+  aiReport    Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  job         JobApplication @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  user        users          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([jobId])
 }
 
 model GeneratedResume {
@@ -122,6 +146,38 @@ model GeneratedResume {
   @@index([jobId])
   @@index([createdAt])
   @@index([source])
+}
+
+model SupportTicket {
+  id          String   @id @default(cuid())
+  userId      String   @db.Uuid
+  subject     String
+  status      String   @default("OPEN")
+  category    String   @default("GENERAL")
+  priority    String   @default("NORMAL")
+  hasUnreadReply Boolean @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user        users    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages    TicketMessage[]
+
+  @@index([userId])
+}
+
+model TicketMessage {
+  id          String   @id @default(cuid())
+  ticketId    String
+  senderId    String   @db.Uuid
+  message     String   @db.Text
+  isAdmin     Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  ticket      SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  sender      users         @relation(fields: [senderId], references: [id], onDelete: Cascade)
+
+  @@index([ticketId])
+  @@index([senderId])
 }
 
 model plan_configs {

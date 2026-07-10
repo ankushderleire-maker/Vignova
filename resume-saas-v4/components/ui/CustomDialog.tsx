@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { AlertTriangle, CheckCircle2, Info, Loader2, Trash2, X } from "lucide-react";
 
 interface DialogProps {
@@ -51,6 +52,12 @@ export function CustomDialog({
     loading = false,
     autoCloseMs,
 }: DialogProps) {
+    const [mounted, setMounted] = useState(false);
+
+    useEffect(() => {
+        setMounted(true);
+    }, []);
+
     useEffect(() => {
         if (!isOpen) return;
 
@@ -77,12 +84,12 @@ export function CustomDialog({
         return () => window.clearTimeout(timer);
     }, [autoCloseMs, isOpen, loading, onClose, type, variant]);
 
-    if (!isOpen) return null;
+    if (!isOpen || !mounted) return null;
 
     const current = variantMap[variant];
     const Icon = current.icon;
 
-    return (
+    return createPortal(
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
             <button
                 type="button"
@@ -145,6 +152,7 @@ export function CustomDialog({
                     </button>
                 </div>
             </div>
-        </div>
+        </div>,
+        document.body
     );
 }

@@ -34,6 +34,18 @@ import {
 import { useRouter, useSearchParams } from "next/navigation";
 import { CustomDialog } from "@/components/ui/CustomDialog";
 
+const SectionHeader = ({ number, title, description }: { number: number, title: string, description?: string }) => (
+    <div className="mb-6 mt-10">
+        <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-[var(--primary)] text-white flex items-center justify-center font-bold text-sm shadow-md">
+                {number}
+            </div>
+            <h3 className="text-xl font-bold text-[var(--foreground)]">{title}</h3>
+        </div>
+        {description && <p className="text-sm text-[var(--text-secondary)] ml-11 mt-1">{description}</p>}
+    </div>
+);
+
 type Job = {
     id: string;
     company: string;
@@ -160,8 +172,9 @@ function AtsScoreContent() {
     const [result, setResult] = useState<ATSResult | null>(null);
     const [error, setError] = useState("");
     const [expandedCard, setExpandedCard] = useState<string | null>(null);
-    const [activeSection, setActiveSection] = useState("overview");
-    const [dialogConfig, setDialogConfig] = useState<{
+    const [existingReportId, setExistingReportId] = useState<string | null>(null);
+    const [previousReports, setPreviousReports] = useState<any[]>([]);
+        const [dialogConfig, setDialogConfig] = useState<{
         isOpen: boolean;
         type: 'alert' | 'confirm';
         title: string;
@@ -200,6 +213,19 @@ function AtsScoreContent() {
             setSelectedResumeId(prefillResumeId);
         }
     }, [searchParams]);
+
+    useEffect(() => {
+        if (selectedJobId) {
+            fetch(`/api/ats-reports?jobId=${selectedJobId}`)
+                .then(r => r.json())
+                .then(data => {
+                    if (Array.isArray(data)) setPreviousReports(data);
+                })
+                .catch(e => console.error("Failed to fetch previous reports:", e));
+        } else {
+            setPreviousReports([]);
+        }
+    }, [selectedJobId]);
 
     const fetchSubscription = async () => {
         try { const r = await fetch("/api/subscription"); setSubscription(await r.json()); } catch (e) { console.error(e); }
@@ -333,6 +359,23 @@ function AtsScoreContent() {
         return parts.filter(Boolean).join("\n");
     };
 
+    const loadPreviousReport = (reportId: string) => {
+        const report = previousReports.find(r => r.id === reportId);
+        if (!report) return;
+        
+        setResult(report.atsResult);
+        setAiReport(report.aiReport);
+        setExistingReportId(report.id);
+        
+        if (resumeSource === "saved" && report.resumeId) setSelectedResumeId(report.resumeId);
+        setLastResumeText(report.resumeText || "");
+        
+        const selectedJob = jobs.find((j) => j.id === selectedJobId);
+        if (selectedJob?.description) setLastJdText(selectedJob.description);
+
+        setStep("result");
+    };
+
     const handleRunAnalysis = async () => {
         setError("");
         if (!selectedJobId) { setError("Please select a Job Description."); return; }
@@ -364,6 +407,28 @@ function AtsScoreContent() {
             if (!response.ok) throw new Error(await response.text());
             const data = await response.json();
             setResult(data);
+            
+            // Save to DB
+            try {
+                const saveRes = await fetch("/api/ats-reports", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        jobId: selectedJobId,
+                        resumeId: resumeSource === "saved" ? selectedResumeId : undefined,
+                        resumeText: usedResumeText,
+                        atsResult: data
+                    })
+                });
+                if (saveRes.ok) {
+                    const savedReport = await saveRes.json();
+                    setExistingReportId(savedReport.id);
+                    setPreviousReports([savedReport, ...previousReports]);
+                }
+            } catch (e) {
+                console.error("Failed to save ATS report", e);
+            }
+
             setStep("result");
         } catch (err: any) {
             console.error(err);
@@ -391,7 +456,26 @@ function AtsScoreContent() {
 
             const res = await fetch("/api/python/enhance-ats-report", { method: "POST", body: formData });
             if (!res.ok) throw new Error(await res.text());
-            setAiReport(await res.json());
+            
+            const aiData = await res.json();
+            setAiReport(aiData);
+            
+            // Save AI Report to DB
+            if (existingReportId) {
+                try {
+                    await fetch(`/api/ats-reports/${existingReportId}`, {
+                        method: "PATCH",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ aiReport: aiData })
+                    });
+                    
+                    // Update in local state
+                    setPreviousReports(prev => prev.map(r => r.id === existingReportId ? { ...r, aiReport: aiData } : r));
+                } catch (e) {
+                    console.error("Failed to update AI report", e);
+                }
+            }
+            
             fetchSubscription();
         } catch (e: any) {
             console.error(e);
@@ -425,7 +509,7 @@ function AtsScoreContent() {
         good_length: "Resume length is appropriate",
     };
 
-    const startOver = () => { setStep("setup"); setResult(null); setAiReport(null); setError(""); setAiError(""); setUploadFile(null); setExpandedCard(null); setActiveSection("overview"); };
+    const startOver = () => { setStep("setup"); setResult(null); setAiReport(null); setError(""); setAiError(""); setUploadFile(null); setExpandedCard(null); setExistingReportId(null); };
 
     const toggleCard = (card: string) => setExpandedCard(expandedCard === card ? null : card);
 
@@ -586,9 +670,17 @@ function AtsScoreContent() {
                                 </div>
                             )}
 
-                            <div className="mt-auto pt-4">
-                                <button id="tour-run-ats" onClick={handleRunAnalysis} disabled={!selectedJobId || (resumeSource === "saved" && !selectedResumeId) || (resumeSource === "upload" && !uploadFile)} className="w-full flex items-center justify-center gap-2 bg-[var(--primary)] hover:bg-[var(--primary)]/90 text-white px-5 py-3 rounded-xl transition shadow-lg shadow-[var(--primary)]/20 font-medium text-sm disabled:opacity-40 disabled:cursor-not-allowed">
-                                    <ScanLine className="h-4 w-4" /> Run ATS Analysis
+                            <div className="mt-auto pt-4 flex gap-2">
+                                {previousReports.length > 0 && (
+                                    <button 
+                                        onClick={() => loadPreviousReport(previousReports[0].id)} 
+                                        className="flex-1 flex items-center justify-center gap-2 bg-[var(--sidebar-bg)] border border-[var(--primary)] text-[var(--primary)] hover:bg-[var(--primary)]/10 px-5 py-3 rounded-xl transition font-medium text-sm"
+                                    >
+                                        Load Previous Report
+                                    </button>
+                                )}
+                                <button id="tour-run-ats" onClick={handleRunAnalysis} disabled={!selectedJobId || (resumeSource === "saved" && !selectedResumeId) || (resumeSource === "upload" && !uploadFile)} className="flex-[2] flex items-center justify-center gap-2 bg-[var(--primary)] hover:bg-[var(--primary)]/90 text-white px-5 py-3 rounded-xl transition shadow-lg shadow-[var(--primary)]/20 font-medium text-sm disabled:opacity-40 disabled:cursor-not-allowed">
+                                    <ScanLine className="h-4 w-4" /> {previousReports.length > 0 ? "Run New Analysis" : "Run ATS Analysis"}
                                 </button>
                             </div>
                         </div>
@@ -647,7 +739,7 @@ function AtsScoreContent() {
             {/* ─── RESULT STEP ─── */}
             {
                 step === "result" && result && (
-                    <div>
+                    <div className="max-w-[1400px] mx-auto px-4 md:px-8 w-full">
 
                         {/* Inline keyframes for animations */}
                         <style>{`
@@ -661,85 +753,43 @@ function AtsScoreContent() {
                         .ats-score-pop { animation: ats-score-pop 0.8s ease-out both; animation-delay: 0.3s; }
                     `}</style>
 
-                        <div className="flex gap-6">
+
 
                             {/* ── Sticky Section Sidebar ── */}
-                            <div className="hidden lg:block w-56 shrink-0">
-                                <div className="sticky top-4 space-y-1.5 bg-[var(--sidebar-bg)]/50 border border-[var(--border-color)] rounded-xl p-3 shadow-xl">
-                                    <div className="px-2 py-1.5 mb-1">
-                                        <div className={`text-2xl font-bold ${result.overall_ats_score >= 80 ? 'text-green-600 dark:text-green-500' : result.overall_ats_score >= 50 ? 'text-yellow-500' : 'text-red-500'}`}>
-                                            {result.overall_ats_score}%
-                                        </div>
-                                        <p className="text-[10px] text-[var(--text-secondary)] uppercase font-bold tracking-wider">ATS Score</p>
-                                    </div>
-                                    <div className="border-t border-[var(--border-color)] pt-1.5">
-                                        {[
-                                            { id: "overview", label: "Overview", icon: <Layers className="w-3.5 h-3.5" />, badge: null },
-                                            { id: "keywords", label: "Keywords", icon: <Target className="w-3.5 h-3.5" />, badge: `${result.found_skills?.length || 0}/${(result.found_skills?.length || 0) + (result.missing_skills?.length || 0)}` },
-                                            { id: "sections", label: "Sections & Format", icon: <Shield className="w-3.5 h-3.5" />, badge: null },
-                                            { id: "improvements", label: "Improvements", icon: <AlertTriangle className="w-3.5 h-3.5" />, badge: result.improvements?.length ? `${result.improvements.length}` : null },
-                                            { id: "content", label: "Content Quality", icon: <Repeat className="w-3.5 h-3.5" />, badge: result.content_analysis?.repeated_words?.length ? `${result.content_analysis.repeated_words.length}` : null },
-                                            { id: "review", label: "Resume Review", icon: <Eye className="w-3.5 h-3.5" />, badge: null },
-                                            { id: "ai", label: "AI Insights", icon: <Sparkles className="w-3.5 h-3.5" />, badge: isPremium ? null : "PRO" },
-                                        ].map((tab) => (
-                                            <button
-                                                key={tab.id}
-                                                onClick={() => setActiveSection(tab.id)}
-                                                className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left transition-all duration-150 text-xs font-medium ${activeSection === tab.id
-                                                    ? "bg-[var(--primary)]/10 text-[var(--primary)] border border-[var(--primary)]/20"
-                                                    : "text-[var(--text-secondary)] hover:bg-[var(--sidebar-bg)] hover:text-[var(--foreground)]"
-                                                    }`}
-                                            >
-                                                {tab.icon}
-                                                <span className="flex-1 truncate">{tab.label}</span>
-                                                {tab.badge && (
-                                                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${tab.id === "ai" && !isPremium ? "bg-purple-500/15 text-purple-400" :
-                                                        "bg-[var(--border-color)] text-[var(--text-secondary)]"
-                                                        }`}>{tab.badge}</span>
-                                                )}
-                                            </button>
-                                        ))}
-                                    </div>
-                                    {/* Start Over button */}
-                                    <div className="border-t border-[var(--border-color)] pt-2 mt-1">
-                                        <button onClick={startOver} className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs font-medium text-[var(--text-secondary)] hover:bg-red-500/10 hover:text-red-400 transition-colors">
-                                            <RefreshCw className="w-3.5 h-3.5" /> Start Over
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* ── Mobile tabs (horizontal scroll) ── */}
-                            <div className="lg:hidden flex gap-2 overflow-x-auto pb-3 -mx-1 px-1 mb-2">
-                                {[
-                                    { id: "overview", label: "Overview", icon: <Layers className="w-3.5 h-3.5" /> },
-                                    { id: "keywords", label: "Keywords", icon: <Target className="w-3.5 h-3.5" /> },
-                                    { id: "sections", label: "Sections", icon: <Shield className="w-3.5 h-3.5" /> },
-                                    { id: "improvements", label: "Fixes", icon: <AlertTriangle className="w-3.5 h-3.5" /> },
-                                    { id: "content", label: "Content", icon: <Repeat className="w-3.5 h-3.5" /> },
-                                    { id: "review", label: "Review", icon: <Eye className="w-3.5 h-3.5" /> },
-                                    { id: "ai", label: "AI", icon: <Sparkles className="w-3.5 h-3.5" /> },
-                                ].map((tab) => (
-                                    <button
-                                        key={tab.id}
-                                        onClick={() => setActiveSection(tab.id)}
-                                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all shrink-0 ${activeSection === tab.id
-                                            ? "bg-[var(--primary)]/10 text-[var(--primary)] border border-[var(--primary)]/20"
-                                            : "bg-[var(--sidebar-bg)]/50 text-[var(--text-secondary)] border border-[var(--border-color)]"
-                                            }`}
-                                    >
-                                        {tab.icon}{tab.label}
-                                    </button>
-                                ))}
-                            </div>
-
-                            {/* ── Content Area ── */}
-                            <div className="flex-1 min-w-0 space-y-6">
+                            
 
                                 {/* ── OVERVIEW Section ── */}
-                                {activeSection === "overview" && (<>
+                                <div>
+                                    <SectionHeader number={1} title="Overview" description="A high-level summary of your resume's performance against the job description." />
+                                    
+                                    {/* ── ATS CALCULATION INFO ── */}
+                                    <div className="mb-6 bg-[var(--sidebar-bg)]/50 border border-[var(--border-color)] rounded-xl p-6 shadow-xl ats-row-1">
+                                        <h4 className="text-sm font-bold text-[var(--foreground)] mb-3">How is ATS Score calculated?</h4>
+                                        <p className="text-xs text-[var(--text-secondary)] mb-4">
+                                            We analyze your resume against the job description using 6 key factors that ATS systems consider important.
+                                        </p>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                                            <div className="flex items-start gap-2 text-[11px] text-[var(--text-secondary)] bg-black/5 dark:bg-white/5 rounded-lg p-3">
+                                                <CheckCircle2 className="w-4 h-4 text-green-500 shrink-0" />
+                                                <span>Higher score = Higher chance of getting shortlisted</span>
+                                            </div>
+                                            <div className="flex items-start gap-2 text-[11px] text-[var(--text-secondary)] bg-black/5 dark:bg-white/5 rounded-lg p-3">
+                                                <CheckCircle2 className="w-4 h-4 text-green-500 shrink-0" />
+                                                <span>Green scores mean you're doing great</span>
+                                            </div>
+                                            <div className="flex items-start gap-2 text-[11px] text-[var(--text-secondary)] bg-black/5 dark:bg-white/5 rounded-lg p-3">
+                                                <CheckCircle2 className="w-4 h-4 text-green-500 shrink-0" />
+                                                <span>Focus on low-scoring areas to improve</span>
+                                            </div>
+                                            <div className="flex items-start gap-2 text-[11px] text-[var(--text-secondary)] bg-black/5 dark:bg-white/5 rounded-lg p-3">
+                                                <CheckCircle2 className="w-4 h-4 text-green-500 shrink-0" />
+                                                <span>Aim for 80%+ for better results</span>
+                                            </div>
+                                        </div>
+                                    </div>
+
                                     {/* ── ROW 1: Overall Score + Score Breakdown + Experience Badge ── */}
-                                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 ats-row-1">
+                                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 ats-row-2">
 
                                         {/* Overall Score */}
                                         <div className="lg:col-span-3 bg-[var(--sidebar-bg)]/50 border border-[var(--border-color)] rounded-xl p-6 shadow-xl flex flex-col items-center justify-center space-y-4">
@@ -768,6 +818,7 @@ function AtsScoreContent() {
                                                     </p>
                                                 </div>
                                             )}
+
                                         </div>
 
                                         {/* Score Breakdown — 6 dimensions */}
@@ -832,10 +883,11 @@ function AtsScoreContent() {
                                             </div>
                                         </div>
                                     </div>
-                                </>)}
+                                </div>
 
                                 {/* ── KEYWORDS Section ── */}
-                                {activeSection === "keywords" && (
+                                <div>
+<SectionHeader number={2} title="Keywords" description="Analyze how well your resume matches the required skills and keywords." />
                                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 ats-row-1">
 
                                         {/* Found Keywords with Relevance */}
@@ -882,10 +934,11 @@ function AtsScoreContent() {
                                             </div>
                                         </div>
                                     </div>
-                                )}
+                                </div>
 
                                 {/* ── SECTIONS & FORMAT Section ── */}
-                                {activeSection === "sections" && (
+                                <div>
+<SectionHeader number={3} title="Sections & Format" description="Ensure your resume structure is easy for ATS parsers to read and understand." />
                                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 ats-row-1">
 
                                         {/* Section Coverage */}
@@ -930,10 +983,11 @@ function AtsScoreContent() {
                                             </div>
                                         </div>
                                     </div>
-                                )}
+                                </div>
 
                                 {/* ── IMPROVEMENTS Section ── */}
-                                {activeSection === "improvements" && (<>
+                                <div>
+<SectionHeader number={4} title="Improvements" description="Actionable recommendations to enhance your resume's impact and readability." />
                                     {result.improvements && result.improvements.length > 0 && (
                                         <div className="bg-[var(--sidebar-bg)]/50 border border-[var(--border-color)] rounded-xl p-6 shadow-xl space-y-4 ats-row-1">
                                             <h4 className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider flex items-center gap-2">
@@ -965,10 +1019,11 @@ function AtsScoreContent() {
                                             <p className="text-xs text-[var(--text-secondary)]">Your resume is well-optimized for this job description.</p>
                                         </div>
                                     )}
-                                </>)}
+                                </div>
 
                                 {/* ── CONTENT QUALITY Section ── */}
-                                {activeSection === "content" && (<>
+                                <div>
+<SectionHeader number={5} title="Content Quality" description="Detailed analysis of your word choice, action verbs, and repetitive phrasing." />
                                     {result.content_analysis?.repeated_words && result.content_analysis.repeated_words.length > 0 && (
                                         <div className="bg-[var(--sidebar-bg)]/50 border border-[var(--border-color)] rounded-xl p-6 shadow-xl space-y-4 ats-row-1">
                                             <h4 className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider flex items-center gap-2">
@@ -1001,10 +1056,11 @@ function AtsScoreContent() {
                                             <p className="text-xs text-[var(--text-secondary)]">No excessively repeated action verbs detected.</p>
                                         </div>
                                     )}
-                                </>)}
+                                </div>
 
                                 {/* ── RESUME REVIEW Section ── */}
-                                {activeSection === "review" && (<>
+                                <div>
+<SectionHeader number={6} title="Resume Review" description="A line-by-line breakdown of your resume content with specific formatting checks." />
                                     {result.content_analysis?.section_diagnostics && (
                                         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 ats-row-1">
 
@@ -1115,10 +1171,11 @@ function AtsScoreContent() {
                                             </div>
                                         </div>
                                     )}
-                                </>)}
+                                </div>
 
                                 {/* ── AI INSIGHTS Section ── */}
-                                {activeSection === "ai" && (
+                                <div>
+<SectionHeader number={7} title="AI Insights" description="Deep semantic analysis generated by our advanced AI model." />
                                     <div className="ats-row-1">
                                         {!aiReport && !isLoadingAi && (
                                             <div className="bg-gradient-to-r from-purple-500/5 to-pink-500/5 border border-purple-500/20 rounded-xl p-6 shadow-xl">
@@ -1301,10 +1358,10 @@ function AtsScoreContent() {
                                             </div>
                                         )}
                                     </div>
-                                )}
+                                </div>
 
-                            </div>{/* end content area */}
-                        </div>{/* end flex container */}
+                            
+                        
                     </div>
                 )}
 

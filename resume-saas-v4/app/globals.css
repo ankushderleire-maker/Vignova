@@ -74,6 +74,16 @@ body {
   transition: background-color 0.3s, color 0.3s;
 }
 
+/* GLOBAL CURSOR STYLES */
+button, 
+a, 
+[role="button"],
+input[type="button"],
+input[type="submit"],
+input[type="reset"] {
+  cursor: pointer;
+}
+
 /* GLOBAL SCROLLBAR STYLES (Matches Resume Preview) */
 ::-webkit-scrollbar {
   width: 8px;
