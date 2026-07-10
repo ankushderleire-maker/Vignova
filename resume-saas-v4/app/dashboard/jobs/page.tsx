@@ -422,7 +422,6 @@ export default function JobTrackerPage() {
                                     {...provided.dragHandleProps}
                                     style={{
                                       ...provided.draggableProps.style,
-                                      marginLeft: snapshot.isDragging && typeof window !== 'undefined' && window.innerWidth >= 768 ? '-256px' : '0px'
                                     }}
                                     className={`mb-2.5 w-full bg-[var(--sidebar-bg)] border hover:border-[var(--primary)]/50 focus-within:border-[var(--primary)]/50 rounded-xl p-3 shadow-sm hover:shadow-md relative group flex flex-col ${snapshot.isDragging ? 'border-[var(--primary)] shadow-lg z-50 cursor-grabbing' : 'border-[var(--border-color)] cursor-grab'}`}
                                     onClick={() => router.push(`/dashboard/jobs/${job.id}`)}
@@ -487,7 +486,7 @@ export default function JobTrackerPage() {
                               </Draggable>
                             ))
                           )}
-                          {provided.placeholder}
+                          <div style={{ display: 'none' }}>{provided.placeholder}</div>
                         </div>
                       )}
                     </Droppable>

@@ -13,6 +13,7 @@ import {
     Gauge,
     Chrome,
     ScrollText,
+    LifeBuoy,
 } from "lucide-react";
 
 const adminNav = [
@@ -23,6 +24,7 @@ const adminNav = [
     { name: "Analytics",     href: "/admin/analytics",     icon: BarChart3 },
     { name: "Scan Controls", href: "/admin/scan-controls", icon: Gauge },
     { name: "Extension",     href: "/admin/extension",     icon: Chrome },
+    { name: "Tickets",       href: "/admin/tickets",       icon: LifeBuoy },
     { name: "Audit Log",     href: "/admin/audit-log",     icon: ScrollText },
 ];
 

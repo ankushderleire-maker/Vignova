@@ -6,7 +6,7 @@ import dynamic from "next/dynamic";
 import {
     ArrowLeft, Wand2, Loader2, User, Briefcase,
     Trash2, LayoutTemplate, Zap, History, FileText, Save,
-    Bold, Italic, Target, Copy, Mail, Sparkles, ChevronRight, Send
+    Bold, Italic, Target, Copy, Mail, Sparkles, ChevronRight, Send, ArrowRight, Rocket
 } from "lucide-react";
 import { AIPreparationAnimation } from "@/components/resume-engine/AIPreparationAnimation";
 
@@ -772,59 +772,76 @@ function ResumeStudioPageContent() {
                                 )}
                             </div>
 
-                            <div className="p-6 border-t border-[var(--border-color)] bg-[#fafafa] dark:bg-[#0a0a0a] space-y-6">
+                            <div className="p-3 md:p-4 border-t border-[var(--border-color)] bg-[var(--sidebar-bg)] space-y-3 shrink-0">
                                 {/* Individual Generation Cards */}
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div className="grid grid-cols-3 gap-2">
+                                    
+                                    {/* Card 1: Resume */}
                                     <button 
                                         disabled={isGenerating} 
                                         onClick={() => handleGenerateResumeOnly()} 
-                                        className="group flex items-center justify-center gap-3 py-3 px-4 rounded-xl bg-white dark:bg-[#111] hover:bg-gray-50 dark:hover:bg-[#161616] border border-[var(--border-color)] transition-all disabled:opacity-50 hover:shadow-sm hover:border-blue-500/30"
+                                        className="group flex flex-row items-center justify-center p-2 rounded-lg bg-[var(--background)] border border-[var(--border-color)] border-b-[2px] border-b-blue-500 shadow-sm hover:shadow-md transition-all duration-300 hover:-translate-y-0.5 disabled:opacity-50 w-full cursor-pointer gap-1.5 md:gap-2"
                                     >
-                                        <div className="w-8 h-8 rounded-full bg-blue-50 dark:bg-blue-500/10 flex items-center justify-center shrink-0">
-                                            <FileText className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                                        </div>
-                                        <span className="text-[13px] font-bold text-[var(--foreground)]">Resume</span>
+                                        <FileText className="h-3.5 w-3.5 md:h-4 md:w-4 text-blue-500 shrink-0" strokeWidth={2.5} />
+                                        <h4 className="text-[10px] md:text-[11px] font-bold text-[var(--foreground)] leading-tight truncate">Resume</h4>
                                     </button>
 
+                                    {/* Card 2: Cover Letter */}
                                     <button 
                                         disabled={isGenerating} 
                                         onClick={() => handleGenerateCoverLetter()} 
-                                        className="group flex items-center justify-center gap-3 py-3 px-4 rounded-xl bg-white dark:bg-[#111] hover:bg-gray-50 dark:hover:bg-[#161616] border border-[var(--border-color)] transition-all disabled:opacity-50 hover:shadow-sm hover:border-purple-500/30"
+                                        className="group flex flex-row items-center justify-center p-2 rounded-lg bg-[var(--background)] border border-[var(--border-color)] border-b-[2px] border-b-purple-500 shadow-sm hover:shadow-md transition-all duration-300 hover:-translate-y-0.5 disabled:opacity-50 w-full cursor-pointer gap-1.5 md:gap-2"
                                     >
-                                        <div className="w-8 h-8 rounded-full bg-purple-50 dark:bg-purple-500/10 flex items-center justify-center shrink-0">
-                                            <Mail className="h-4 w-4 text-purple-600 dark:text-purple-400" />
-                                        </div>
-                                        <span className="text-[13px] font-bold text-[var(--foreground)]">Cover Letter</span>
+                                        <Mail className="h-3.5 w-3.5 md:h-4 md:w-4 text-purple-500 shrink-0" strokeWidth={2.5} />
+                                        <h4 className="text-[10px] md:text-[11px] font-bold text-[var(--foreground)] leading-tight truncate">Cover Letter</h4>
                                     </button>
 
+                                    {/* Card 3: Draft Email */}
                                     <button 
                                         disabled={isGenerating} 
                                         onClick={() => handleGenerateEmail()} 
-                                        className="group flex items-center justify-center gap-3 py-3 px-4 rounded-xl bg-white dark:bg-[#111] hover:bg-gray-50 dark:hover:bg-[#161616] border border-[var(--border-color)] transition-all disabled:opacity-50 hover:shadow-sm hover:border-green-500/30"
+                                        className="group flex flex-row items-center justify-center p-2 rounded-lg bg-[var(--background)] border border-[var(--border-color)] border-b-[2px] border-b-emerald-500 shadow-sm hover:shadow-md transition-all duration-300 hover:-translate-y-0.5 disabled:opacity-50 w-full cursor-pointer gap-1.5 md:gap-2"
                                     >
-                                        <div className="w-8 h-8 rounded-full bg-green-50 dark:bg-green-500/10 flex items-center justify-center shrink-0">
-                                            <Send className="h-4 w-4 text-green-600 dark:text-green-400" />
-                                        </div>
-                                        <span className="text-[13px] font-bold text-[var(--foreground)]">Draft Email</span>
+                                        <Send className="h-3.5 w-3.5 md:h-4 md:w-4 text-emerald-500 shrink-0" strokeWidth={2.5} />
+                                        <h4 className="text-[10px] md:text-[11px] font-bold text-[var(--foreground)] leading-tight truncate">Draft Email</h4>
                                     </button>
                                 </div>
 
-                                <div className="flex items-center gap-4 py-2">
+                                {/* Divider Section */}
+                                <div className="flex items-center gap-2 py-0 max-w-sm mx-auto">
                                     <div className="h-px bg-[var(--border-color)] flex-1"></div>
-                                    <span className="text-[11px] text-[var(--text-secondary)] font-medium">Or generate everything together</span>
+                                    <span className="text-[10px] text-[var(--text-secondary)] font-medium uppercase tracking-wider">Or Generate All</span>
                                     <div className="h-px bg-[var(--border-color)] flex-1"></div>
                                 </div>
 
+                                {/* Bottom CTA Button */}
                                 <button
                                     onClick={() => handleGenerateResume()}
                                     disabled={isGenerating}
-                                    className="w-full flex items-center justify-between bg-blue-600 hover:bg-blue-700 text-white py-4 px-6 rounded-xl font-bold shadow-[0_4px_14px_0_rgb(37,99,235,0.39)] transition-all disabled:opacity-50 hover:-translate-y-0.5 active:translate-y-0 group"
+                                    style={{
+                                        backgroundImage: "linear-gradient(to right, #3B82F6, #2563EB)",
+                                    }}
+                                    className="w-full flex items-center justify-center p-3 md:p-3.5 rounded-xl text-white transition-all duration-300 hover:scale-[1.01] hover:shadow-md disabled:opacity-50 group relative cursor-pointer"
                                 >
-                                    <div className="flex items-center justify-center flex-1 gap-2">
-                                        {isGenerating ? <Loader2 className="animate-spin h-5 w-5" /> : <Sparkles className="h-5 w-5" />}
-                                        <span className="text-[15px]">{isGenerating ? "AI is Thinking..." : "Generate Application Pack (Resume + Cover Letter + Email)"}</span>
+                                    <div className="flex items-center gap-2 relative z-10">
+                                        {isGenerating ? <Loader2 className="animate-spin h-4 w-4 text-white" /> : (
+                                            <div className="flex items-center gap-1.5">
+                                                <Wand2 className="h-4 w-4 text-white" />
+                                                <Rocket className="h-4 w-4 text-white" />
+                                            </div>
+                                        )}
+                                        <div className="flex items-center gap-1.5">
+                                            <span className="text-[13px] md:text-[14px] font-bold">
+                                                {isGenerating ? "Working..." : "Application Pack"}
+                                            </span>
+                                            <span className="text-[11px] text-white/90 hidden lg:inline-block">
+                                                (Resume + Cover Letter + Email)
+                                            </span>
+                                        </div>
                                     </div>
-                                    <ChevronRight className="h-5 w-5 opacity-70 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
+                                    <div className="absolute right-3 flex items-center justify-center">
+                                        <ChevronRight className="h-5 w-5 text-white group-hover:translate-x-1 transition-transform" />
+                                    </div>
                                 </button>
                             </div>
                         </>

@@ -106,6 +106,7 @@ function LinkedInOptimizerContent() {
     // Store latest session and selected master profile in refs for the event listener
     const sessionRef = useRef(session);
     const selectedProfileRef = useRef(selectedMasterProfile);
+    const scrapeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     
     useEffect(() => {
         sessionRef.current = session;
@@ -123,12 +124,29 @@ function LinkedInOptimizerContent() {
                 if (res.ok) {
                     const data = await res.json();
                     if (data.result) {
-                        setResult(data.result);
-                        if (data.result.optimizedContent) {
-                            const parsedOptimized = typeof data.result.optimizedContent === 'string'
-                                ? JSON.parse(data.result.optimizedContent)
-                                : data.result.optimizedContent;
-                            setAiReport(parsedOptimized);
+                        const parsedResult = { ...data.result };
+                        
+                        const deeplyParse = (val: any) => {
+                            let current = val;
+                            while (typeof current === 'string') {
+                                try {
+                                    const parsed = JSON.parse(current);
+                                    if (typeof parsed === 'string' && parsed === current) break;
+                                    current = parsed;
+                                } catch (e) {
+                                    break;
+                                }
+                            }
+                            return current;
+                        };
+
+                        parsedResult.rawProfileData = deeplyParse(parsedResult.rawProfileData);
+                        parsedResult.recommendations = deeplyParse(parsedResult.recommendations);
+                        parsedResult.sectionScores = deeplyParse(parsedResult.sectionScores);
+                        
+                        setResult(parsedResult);
+                        if (parsedResult.optimizedContent) {
+                            setAiReport(deeplyParse(parsedResult.optimizedContent));
                         }
                         setStep("result");
                     }
@@ -177,9 +195,12 @@ function LinkedInOptimizerContent() {
                 setExtensionStatus("ok");
             }
             if (event.data && event.data.type === "VIGNOVA_LINKEDIN_DATA") {
+                if (scrapeTimeoutRef.current) clearTimeout(scrapeTimeoutRef.current);
+                console.log("🔥 [Vignova Debug] Raw data received from extension:", event.data.payload);
                 handleIngestData(event.data.payload);
             }
             if (event.data && event.data.type === "VIGNOVA_LINKEDIN_ERROR") {
+                if (scrapeTimeoutRef.current) clearTimeout(scrapeTimeoutRef.current);
                 setError(event.data.error || "Failed to extract LinkedIn profile.");
                 setStep("setup");
             }
@@ -229,16 +250,22 @@ function LinkedInOptimizerContent() {
             setError("Please enter a valid LinkedIn profile URL.");
             return;
         }
+        let finalUrl = linkedinUrl.trim();
+        if (!finalUrl.startsWith("http://") && !finalUrl.startsWith("https://")) {
+            finalUrl = "https://" + finalUrl;
+        }
+
         setStep("loading");
         
         // Send message to extension to start scraping
         window.postMessage({
             type: "VIGNOVA_ANALYZE_LINKEDIN",
-            payload: { url: linkedinUrl }
+            payload: { url: finalUrl }
         }, "*");
         
+        if (scrapeTimeoutRef.current) clearTimeout(scrapeTimeoutRef.current);
         // Fallback timeout in case extension fails silently
-        setTimeout(() => {
+        scrapeTimeoutRef.current = setTimeout(() => {
             setStep(prev => {
                 if (prev === "loading") {
                     setError("The LinkedIn scraping window did not respond. Please make sure the Vignova extension is installed and active, then try again.");
@@ -246,7 +273,7 @@ function LinkedInOptimizerContent() {
                 }
                 return prev;
             });
-        }, 30000); // 30 seconds max
+        }, 120000); // 120 seconds max to allow for slow backend API
     };
 
     const handleIngestData = async (rawProfileData: any) => {
@@ -490,16 +517,16 @@ function LinkedInOptimizerContent() {
                     {/* LEFT COLUMN: LinkedIn Profile Mock UI */}
                     <div className="lg:col-span-7 space-y-4">
                         {/* View Toggle */}
-                        <div className="bg-white dark:bg-[#1d2226] rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 p-2 flex items-center justify-center gap-2">
+                        <div className="bg-[var(--background)] rounded-xl shadow-sm border border-[var(--border-color)] p-2 flex items-center justify-center gap-2">
                             <button 
                                 onClick={() => setViewMode("current")}
-                                className={`px-4 py-2 rounded-lg text-sm font-bold transition ${viewMode === "current" ? "bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white" : "text-gray-500 hover:text-gray-900 dark:hover:text-white"}`}
+                                className={`px-4 py-2 rounded-lg text-sm font-bold transition ${viewMode === "current" ? "bg-[var(--sidebar-bg)] text-[var(--foreground)]" : "text-[var(--text-secondary)] hover:text-[var(--foreground)]"}`}
                             >
                                 Current Profile
                             </button>
                             <button 
                                 onClick={() => { if (aiReport) setViewMode("optimized"); else handleOptimize(); }}
-                                className={`px-4 py-2 rounded-lg text-sm font-bold transition flex items-center gap-2 ${viewMode === "optimized" ? "bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400" : "text-gray-500 hover:text-indigo-600 dark:hover:text-indigo-400"}`}
+                                className={`px-4 py-2 rounded-lg text-sm font-bold transition flex items-center gap-2 ${viewMode === "optimized" ? "bg-indigo-500/10 text-indigo-400" : "text-[var(--text-secondary)] hover:text-indigo-400"}`}
                             >
                                 {isOptimizing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
                                 Optimized Profile
@@ -507,41 +534,41 @@ function LinkedInOptimizerContent() {
                         </div>
 
                         {/* Top Card (Intro) */}
-                        <div className="bg-white dark:bg-[#1d2226] rounded-xl shadow-sm border border-gray-200 dark:border-gray-800 flex flex-col relative pb-6">
+                        <div className="bg-[var(--background)] rounded-xl shadow-sm border border-[var(--border-color)] flex flex-col relative pb-6">
                             <div className="h-[200px] relative overflow-hidden rounded-t-xl">
                                 {/* Cover/Banner Image */}
                                 {activeProfileData.coverImageUrl ? (
                                     <img src={activeProfileData.coverImageUrl} alt="Cover" className="w-full h-full object-cover" />
                                 ) : (
-                                    <div className="w-full h-full bg-gradient-to-r from-blue-500/30 via-indigo-500/20 to-purple-500/30 dark:from-slate-700 dark:to-slate-800" />
+                                    <div className="w-full h-full bg-gradient-to-r from-[var(--sidebar-bg)] via-[var(--sidebar-bg)] to-[var(--background)] opacity-50" />
                                 )}
                             </div>
                             
                             {/* Profile Image Avatar */}
-                            <div className="absolute top-[100px] left-6 w-[152px] h-[152px] rounded-full border-4 border-white dark:border-[#1d2226] bg-slate-200 dark:bg-slate-600 flex items-center justify-center overflow-hidden">
+                            <div className="absolute top-[100px] left-6 w-[152px] h-[152px] rounded-full border-4 border-[var(--background)] bg-[var(--sidebar-bg)] flex items-center justify-center overflow-hidden">
                                 {activeProfileData.photoUrl ? (
                                     <img src={activeProfileData.photoUrl} alt="Profile" className="w-full h-full object-cover" />
                                 ) : (
-                                    <UserCircle className="w-[152px] h-[152px] text-slate-400" />
+                                    <UserCircle className="w-[152px] h-[152px] text-[var(--text-secondary)]" />
                                 )}
                             </div>
                             
                             <div className="pt-20 px-6">
                                 <div className="flex justify-between items-start">
                                     <div>
-                                        <h2 className="text-2xl font-bold text-gray-900 dark:text-white leading-tight flex items-center gap-1">
+                                        <h2 className="text-2xl font-bold text-[var(--foreground)] leading-tight flex items-center gap-1">
                                             {activeProfileData.name || "Your Name"}
-                                            <svg className="w-5 h-5 text-gray-500" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10 10-4.5 10-10S17.5 2 12 2zm-1.8 14.8L6 12.6l1.4-1.4 2.8 2.8 7.2-7.2 1.4 1.4-8.6 8.6z"/></svg>
+                                            <svg className="w-5 h-5 text-[var(--text-secondary)]" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10 10-4.5 10-10S17.5 2 12 2zm-1.8 14.8L6 12.6l1.4-1.4 2.8 2.8 7.2-7.2 1.4 1.4-8.6 8.6z"/></svg>
                                         </h2>
-                                        <p className="text-base text-gray-900 dark:text-gray-100 mt-1">{activeProfileData.headline || "Your Professional Headline"}</p>
-                                        <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
-                                            {activeProfileData.location || "Location"} <span className="mx-1">·</span> <span className="text-blue-600 dark:text-blue-400 font-semibold hover:underline cursor-pointer">Contact info</span>
+                                        <p className="text-base text-[var(--foreground)] mt-1">{activeProfileData.headline || "Your Professional Headline"}</p>
+                                        <p className="text-sm text-[var(--text-secondary)] mt-2">
+                                            {activeProfileData.location || "Location"} <span className="mx-1">·</span> <span className="text-blue-500 font-semibold hover:underline cursor-pointer">Contact info</span>
                                         </p>
-                                        <p className="text-sm text-blue-600 dark:text-blue-400 font-semibold hover:underline cursor-pointer mt-1">500+ connections</p>
+                                        <p className="text-sm text-blue-500 font-semibold hover:underline cursor-pointer mt-1">500+ connections</p>
                                     </div>
                                     {/* Education quick link mock */}
                                     {activeProfileData.education && activeProfileData.education[0] && (
-                                        <div className="hidden sm:flex items-center gap-2 max-w-[200px] cursor-pointer hover:underline text-gray-900 dark:text-white font-semibold text-sm">
+                                        <div className="hidden sm:flex items-center gap-2 max-w-[200px] cursor-pointer hover:underline text-[var(--foreground)] font-semibold text-sm">
                                             {activeProfileData.education[0].schoolLogoUrl ? (
                                                 <img src={activeProfileData.education[0].schoolLogoUrl} alt="Edu" className="w-8 h-8 object-contain" />
                                             ) : (
@@ -553,105 +580,105 @@ function LinkedInOptimizerContent() {
                                 </div>
 
                                 <div className="flex flex-wrap gap-2 mt-4">
-                                    <button disabled className="opacity-50 cursor-not-allowed bg-[#0a66c2] text-white px-4 py-1.5 rounded-full font-semibold text-base transition">Open to</button>
-                                    <button disabled className="opacity-50 cursor-not-allowed bg-transparent text-[#0a66c2] dark:text-blue-400 border border-[#0a66c2] dark:border-blue-400 px-4 py-1.5 rounded-full font-semibold text-base transition">Add profile section</button>
-                                    <button disabled className="opacity-50 cursor-not-allowed bg-transparent text-[#0a66c2] dark:text-blue-400 border border-[#0a66c2] dark:border-blue-400 px-4 py-1.5 rounded-full font-semibold text-base transition">Enhance profile</button>
-                                    <button disabled className="opacity-50 cursor-not-allowed bg-transparent text-gray-600 dark:text-gray-300 border border-gray-500 dark:border-gray-400 px-4 py-1.5 rounded-full font-semibold text-base transition">Resources</button>
+                                    <button disabled className="opacity-50 cursor-not-allowed bg-[var(--primary)] text-white px-4 py-1.5 rounded-full font-semibold text-base transition">Open to</button>
+                                    <button disabled className="opacity-50 cursor-not-allowed bg-transparent text-[var(--primary)] border border-[var(--primary)] px-4 py-1.5 rounded-full font-semibold text-base transition">Add profile section</button>
+                                    <button disabled className="opacity-50 cursor-not-allowed bg-transparent text-[var(--primary)] border border-[var(--primary)] px-4 py-1.5 rounded-full font-semibold text-base transition">Enhance profile</button>
+                                    <button disabled className="opacity-50 cursor-not-allowed bg-transparent text-[var(--text-secondary)] border border-[var(--border-color)] px-4 py-1.5 rounded-full font-semibold text-base transition">Resources</button>
                                 </div>
                             </div>
                         </div>
 
                         {/* Analytics */}
                         {activeProfileData.analytics && (
-                            <div className="bg-white dark:bg-[#1d2226] rounded-xl shadow-sm border border-gray-200 dark:border-gray-800">
+                            <div className="bg-[var(--background)] rounded-xl shadow-sm border border-[var(--border-color)]">
                                 <div className="p-6">
-                                    <h3 className="text-xl font-bold text-gray-900 dark:text-white">Analytics</h3>
-                                    <div className="flex items-center text-sm text-gray-500 dark:text-gray-400 mt-1 mb-4">
+                                    <h3 className="text-xl font-bold text-[var(--foreground)]">Analytics</h3>
+                                    <div className="flex items-center text-sm text-[var(--text-secondary)] mt-1 mb-4">
                                         <Eye className="w-4 h-4 mr-1" /> Private to you
                                     </div>
                                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                                         <div className="flex gap-3">
-                                            <Users className="w-6 h-6 text-gray-700 dark:text-gray-300 shrink-0" />
+                                            <Users className="w-6 h-6 text-[var(--text-secondary)] shrink-0" />
                                             <div>
-                                                <p className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-1">
+                                                <p className="text-base font-bold text-[var(--foreground)] flex items-center gap-1">
                                                     {activeProfileData.analytics.profileViews || activeProfileData.analytics.profileViewers || "0"} profile views
                                                 </p>
-                                                <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5">Discover who's viewed your profile.</p>
+                                                <p className="text-xs text-[var(--text-secondary)] mt-0.5">Discover who's viewed your profile.</p>
                                             </div>
                                         </div>
                                         <div className="flex gap-3">
-                                            <BarChart3 className="w-6 h-6 text-gray-700 dark:text-gray-300 shrink-0" />
+                                            <BarChart3 className="w-6 h-6 text-[var(--text-secondary)] shrink-0" />
                                             <div>
-                                                <p className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-1">
+                                                <p className="text-base font-bold text-[var(--foreground)] flex items-center gap-1">
                                                     {activeProfileData.analytics.postImpressions || "0"} post impressions
                                                 </p>
-                                                <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5">Check out who's engaging with your posts.</p>
-                                                <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">Past 7 days</p>
+                                                <p className="text-xs text-[var(--text-secondary)] mt-0.5">Check out who's engaging with your posts.</p>
+                                                <p className="text-xs text-[var(--text-secondary)] mt-1">Past 7 days</p>
                                             </div>
                                         </div>
                                         <div className="flex gap-3">
-                                            <Search className="w-6 h-6 text-gray-700 dark:text-gray-300 shrink-0" />
+                                            <Search className="w-6 h-6 text-[var(--text-secondary)] shrink-0" />
                                             <div>
-                                                <p className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-1">
+                                                <p className="text-base font-bold text-[var(--foreground)] flex items-center gap-1">
                                                     {activeProfileData.analytics.searchAppearances || "0"} search appearances
                                                 </p>
-                                                <p className="text-xs text-gray-600 dark:text-gray-400 mt-0.5">See how often you appear in search results.</p>
+                                                <p className="text-xs text-[var(--text-secondary)] mt-0.5">See how often you appear in search results.</p>
                                             </div>
                                         </div>
                                     </div>
                                 </div>
-                                <div className="border-t border-gray-200 dark:border-gray-800 p-3 flex justify-center hover:bg-gray-50 dark:hover:bg-gray-800/50 cursor-pointer rounded-b-xl transition">
-                                    <span className="text-gray-600 dark:text-gray-300 font-semibold text-sm flex items-center gap-1">Show all analytics <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M14 12l-4.6 4.6 1.4 1.4L16.8 12l-6-6-1.4 1.4z"/></svg></span>
+                                <div className="border-t border-[var(--border-color)] p-3 flex justify-center hover:bg-[var(--sidebar-bg)] cursor-pointer rounded-b-xl transition">
+                                    <span className="text-[var(--text-secondary)] font-semibold text-sm flex items-center gap-1">Show all analytics <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M14 12l-4.6 4.6 1.4 1.4L16.8 12l-6-6-1.4 1.4z"/></svg></span>
                                 </div>
                             </div>
                         )}
 
                         {/* About */}
-                        <div className="bg-white dark:bg-[#1d2226] rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-800">
+                        <div className="bg-[var(--background)] rounded-xl p-6 shadow-sm border border-[var(--border-color)]">
                             <div className="flex items-center justify-between mb-4">
-                                <h3 className="text-xl font-bold text-gray-900 dark:text-white">About</h3>
+                                <h3 className="text-xl font-bold text-[var(--foreground)]">About</h3>
                                 {viewMode === "optimized" && (
-                                    <button onClick={() => handleCopy(activeProfileData.about || "")} className="flex items-center gap-1 text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 transition font-semibold bg-indigo-50 dark:bg-indigo-500/10 px-2 py-1 rounded">
+                                    <button onClick={() => handleCopy(activeProfileData.about || "")} className="flex items-center gap-1 text-xs text-indigo-400 hover:text-indigo-300 transition font-semibold bg-indigo-500/10 px-2 py-1 rounded">
                                         {copiedText === activeProfileData.about ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />} Copy
                                     </button>
                                 )}
                             </div>
-                            <p className="text-sm text-gray-900 dark:text-gray-100 whitespace-pre-wrap leading-relaxed">
+                            <p className="text-sm text-[var(--foreground)] whitespace-pre-wrap leading-relaxed">
                                 {activeProfileData.about || "No About section found."}
                             </p>
                         </div>
                         
                         {/* Experience */}
-                        <div className="bg-white dark:bg-[#1d2226] rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-800">
-                            <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-5">Experience</h3>
+                        <div className="bg-[var(--background)] rounded-xl p-6 shadow-sm border border-[var(--border-color)]">
+                            <h3 className="text-xl font-bold text-[var(--foreground)] mb-5">Experience</h3>
                             <div className="space-y-6">
                                 {activeProfileData.experience && activeProfileData.experience.length > 0 ? (
                                     activeProfileData.experience.map((exp: any, i: number) => (
                                         <div key={i} className="flex gap-4">
                                             <div className="w-12 h-12 shrink-0 flex items-center justify-center">
                                                 {exp.companyLogoUrl ? (
-                                                    <img src={exp.companyLogoUrl} alt={exp.company} className="w-full h-full object-contain bg-white" />
+                                                    <img src={exp.companyLogoUrl} alt={exp.company} className="w-full h-full object-contain bg-white rounded" />
                                                 ) : (
-                                                    <div className="w-full h-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center"><Briefcase className="w-6 h-6 text-slate-400" /></div>
+                                                    <div className="w-full h-full bg-[var(--sidebar-bg)] flex items-center justify-center rounded"><Briefcase className="w-6 h-6 text-[var(--text-secondary)]" /></div>
                                                 )}
                                             </div>
-                                            <div className="min-w-0 border-b border-gray-100 dark:border-gray-800 pb-6 flex-1 last:border-0 last:pb-0">
-                                                <h4 className="text-base font-bold text-gray-900 dark:text-white">{exp.title}</h4>
-                                                <p className="text-sm text-gray-900 dark:text-gray-100 mt-0.5">{exp.company}</p>
-                                                <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">{exp.dateRange}</p>
-                                                {exp.location && <p className="text-sm text-gray-500 dark:text-gray-400">{exp.location}</p>}
+                                            <div className="min-w-0 border-b border-[var(--border-color)] pb-6 flex-1 last:border-0 last:pb-0">
+                                                <h4 className="text-base font-bold text-[var(--foreground)]">{exp.title}</h4>
+                                                <p className="text-sm text-[var(--foreground)] mt-0.5">{exp.company}</p>
+                                                <p className="text-sm text-[var(--text-secondary)] mt-0.5">{exp.dateRange}</p>
+                                                {exp.location && <p className="text-sm text-[var(--text-secondary)]">{exp.location}</p>}
                                                 {exp.description && (
                                                     <div className="mt-3 relative group">
-                                                        <p className="text-sm text-gray-900 dark:text-gray-100 whitespace-pre-wrap leading-relaxed">{exp.description}</p>
+                                                        <p className="text-sm text-[var(--foreground)] whitespace-pre-wrap leading-relaxed">{exp.description}</p>
                                                         {viewMode === "optimized" && (
-                                                            <button onClick={() => handleCopy(exp.description)} className="absolute -top-3 right-0 opacity-0 group-hover:opacity-100 flex items-center gap-1 text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 transition font-semibold bg-indigo-50 dark:bg-indigo-500/10 px-2 py-1 rounded shadow-sm">
+                                                            <button onClick={() => handleCopy(exp.description)} className="absolute -top-3 right-0 opacity-0 group-hover:opacity-100 flex items-center gap-1 text-xs text-indigo-400 hover:text-indigo-300 transition font-semibold bg-indigo-500/10 px-2 py-1 rounded shadow-sm">
                                                                 {copiedText === exp.description ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />} Copy
                                                             </button>
                                                         )}
                                                     </div>
                                                 )}
                                                 {exp.associatedSkills && (
-                                                    <p className="text-sm font-semibold text-gray-900 dark:text-gray-100 mt-3 flex items-start gap-2">
+                                                    <p className="text-sm font-semibold text-[var(--foreground)] mt-3 flex items-start gap-2">
                                                         <Sparkles className="w-4 h-4 mt-0.5 shrink-0" />
                                                         <span>{exp.associatedSkills}</span>
                                                     </p>
@@ -660,51 +687,51 @@ function LinkedInOptimizerContent() {
                                         </div>
                                     ))
                                 ) : (
-                                    <p className="text-sm text-gray-500 dark:text-gray-400">No experience found.</p>
+                                    <p className="text-sm text-[var(--text-secondary)]">No experience found.</p>
                                 )}
                             </div>
                         </div>
 
                         {/* Education */}
-                        <div className="bg-white dark:bg-[#1d2226] rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-800">
-                            <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-5">Education</h3>
+                        <div className="bg-[var(--background)] rounded-xl p-6 shadow-sm border border-[var(--border-color)]">
+                            <h3 className="text-xl font-bold text-[var(--foreground)] mb-5">Education</h3>
                             <div className="space-y-6">
                                 {activeProfileData.education && activeProfileData.education.length > 0 ? (
                                     activeProfileData.education.map((edu: any, i: number) => (
                                         <div key={i} className="flex gap-4">
                                             <div className="w-12 h-12 shrink-0 flex items-center justify-center">
                                                 {edu.schoolLogoUrl ? (
-                                                    <img src={edu.schoolLogoUrl} alt={edu.school} className="w-full h-full object-contain bg-white" />
+                                                    <img src={edu.schoolLogoUrl} alt={edu.school} className="w-full h-full object-contain bg-white rounded" />
                                                 ) : (
-                                                    <div className="w-full h-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center"><GraduationCap className="w-6 h-6 text-slate-400" /></div>
+                                                    <div className="w-full h-full bg-[var(--sidebar-bg)] flex items-center justify-center rounded"><GraduationCap className="w-6 h-6 text-[var(--text-secondary)]" /></div>
                                                 )}
                                             </div>
-                                            <div className="min-w-0 border-b border-gray-100 dark:border-gray-800 pb-6 flex-1 last:border-0 last:pb-0">
-                                                <h4 className="text-base font-bold text-gray-900 dark:text-white">{edu.school}</h4>
-                                                {edu.degree && <p className="text-sm text-gray-900 dark:text-gray-100 mt-0.5">{edu.degree}</p>}
-                                                {edu.dateRange && <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">{edu.dateRange}</p>}
+                                            <div className="min-w-0 border-b border-[var(--border-color)] pb-6 flex-1 last:border-0 last:pb-0">
+                                                <h4 className="text-base font-bold text-[var(--foreground)]">{edu.school}</h4>
+                                                {edu.degree && <p className="text-sm text-[var(--foreground)] mt-0.5">{edu.degree}</p>}
+                                                {edu.dateRange && <p className="text-sm text-[var(--text-secondary)] mt-0.5">{edu.dateRange}</p>}
                                             </div>
                                         </div>
                                     ))
                                 ) : (
-                                    <p className="text-sm text-gray-500 dark:text-gray-400">No education found.</p>
+                                    <p className="text-sm text-[var(--text-secondary)]">No education found.</p>
                                 )}
                             </div>
                         </div>
 
                         {/* Skills */}
-                        <div className="bg-white dark:bg-[#1d2226] rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-800">
-                            <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-5">Skills</h3>
+                        <div className="bg-[var(--background)] rounded-xl p-6 shadow-sm border border-[var(--border-color)]">
+                            <h3 className="text-xl font-bold text-[var(--foreground)] mb-5">Skills</h3>
                             {activeProfileData.skills && activeProfileData.skills.length > 0 ? (
                                 <div className="flex flex-col gap-4">
                                     {activeProfileData.skills.map((skill: string, i: number) => (
-                                        <div key={i} className="border-b border-gray-100 dark:border-gray-800 pb-4 last:border-0 last:pb-0">
-                                            <h4 className="text-base font-bold text-gray-900 dark:text-white">{skill}</h4>
+                                        <div key={i} className="border-b border-[var(--border-color)] pb-4 last:border-0 last:pb-0">
+                                            <h4 className="text-base font-bold text-[var(--foreground)]">{skill}</h4>
                                         </div>
                                     ))}
                                 </div>
                             ) : (
-                                <p className="text-sm text-gray-500 dark:text-gray-400">No skills found.</p>
+                                <p className="text-sm text-[var(--text-secondary)]">No skills found.</p>
                             )}
                         </div>
                     </div>
@@ -729,7 +756,7 @@ function LinkedInOptimizerContent() {
                                 </p>
                             </div>
                             
-                            <button onClick={handleOptimize} disabled={isOptimizing} className="w-full mt-4 flex items-center justify-center gap-2 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white px-4 py-2.5 rounded-lg transition shadow-lg text-sm font-bold disabled:opacity-50">
+                            <button onClick={handleOptimize} disabled={isOptimizing} className="w-full mt-4 flex items-center justify-center gap-2 bg-gradient-to-r from-[var(--primary)] to-emerald-600 hover:opacity-90 text-white px-4 py-2.5 rounded-lg transition shadow-lg text-sm font-bold disabled:opacity-50">
                                 {isOptimizing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Wand2 className="w-4 h-4" />} Optimize with AI
                             </button>
                         </div>
