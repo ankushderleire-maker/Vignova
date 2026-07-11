@@ -156,6 +156,8 @@ export default function CoverLetterPage() {
                 onClose={() => setViewingLetter(null)}
                 type="alert"
                 confirmText="Close"
+                className="!max-w-2xl w-full"
+                descriptionClassName="!max-w-none w-full px-2"
             />
         </div>
     );

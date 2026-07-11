@@ -16,6 +16,8 @@ interface DialogProps {
     cancelText?: string;
     loading?: boolean;
     autoCloseMs?: number;
+    className?: string;
+    descriptionClassName?: string;
 }
 
 const variantMap = {
@@ -51,6 +53,8 @@ export function CustomDialog({
     cancelText = "Cancel",
     loading = false,
     autoCloseMs,
+    className = "",
+    descriptionClassName = "",
 }: DialogProps) {
     const [mounted, setMounted] = useState(false);
 
@@ -98,7 +102,7 @@ export function CustomDialog({
                 onClick={!loading ? onClose : undefined}
             />
 
-            <div className="relative w-full max-w-[370px] rounded-2xl border border-black/8 bg-white px-7 pb-7 pt-8 text-center shadow-[0_18px_45px_-20px_rgba(15,23,42,0.25)] dark:border-white/10 dark:bg-[#111418] dark:shadow-[0_20px_50px_-22px_rgba(0,0,0,0.6)]">
+            <div className={`relative w-full max-w-[370px] rounded-2xl border border-black/8 bg-white px-7 pb-7 pt-8 text-center shadow-[0_18px_45px_-20px_rgba(15,23,42,0.25)] dark:border-white/10 dark:bg-[#111418] dark:shadow-[0_20px_50px_-22px_rgba(0,0,0,0.6)] ${className}`}>
                 <button
                     type="button"
                     onClick={onClose}
@@ -116,7 +120,7 @@ export function CustomDialog({
                     {title}
                 </h3>
 
-                <div className="mx-auto mt-3 max-w-[250px] text-sm leading-6 text-slate-600 dark:text-slate-300">
+                <div className={`mx-auto mt-3 max-w-[250px] text-sm leading-6 text-slate-600 dark:text-slate-300 ${descriptionClassName}`}>
                     {description}
                 </div>
 
