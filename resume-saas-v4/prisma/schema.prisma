@@ -35,6 +35,7 @@ model users {
   atsReports              AtsScoreReport[]
   supportTickets          SupportTicket[]
   ticketMessages          TicketMessage[]
+  notificationDismissals  UserNotificationDismissal[]
 }
 
 model Payment {
@@ -178,6 +179,33 @@ model TicketMessage {
 
   @@index([ticketId])
   @@index([senderId])
+}
+
+model AdminNotification {
+  id          String   @id @default(cuid())
+  title       String
+  message     String   @db.Text
+  targetType  String   @default("ALL")   // ALL, PLAN, SPECIFIC
+  targetFilter String?                    // e.g. "PRO", "FREE" for plan filter, or comma-separated user IDs
+  createdAt   DateTime @default(now())
+
+  dismissals  UserNotificationDismissal[]
+
+  @@index([createdAt])
+}
+
+model UserNotificationDismissal {
+  id              String   @id @default(cuid())
+  userId          String   @db.Uuid
+  notificationId  String
+  dismissedAt     DateTime @default(now())
+
+  user            users             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  notification    AdminNotification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, notificationId])
+  @@index([userId])
+  @@index([notificationId])
 }
 
 model plan_configs {

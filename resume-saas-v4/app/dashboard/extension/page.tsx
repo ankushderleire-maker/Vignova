@@ -105,10 +105,16 @@ export default function ExtensionPage() {
                         <br /><span className="text-xs opacity-70">Currently available for Chrome, Brave, and Edge.</span>
                     </p>
                 </div>
-                <button id="tour-download-ext" className="flex items-center gap-2 bg-[var(--primary)] text-white px-6 py-3 rounded-lg font-bold hover:opacity-90 transition-all shadow-lg hover:shadow-[var(--primary)]/20 active:scale-95">
+                <a 
+                    id="tour-download-ext" 
+                    href="https://chromewebstore.google.com/detail/oalpfkabaipgcjimbcapeeaoipeikkha?utm_source=item-share-cb"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2 bg-[var(--primary)] text-white px-6 py-3 rounded-lg font-bold hover:opacity-90 transition-all shadow-lg hover:shadow-[var(--primary)]/20 active:scale-95"
+                >
                     <Download className="w-5 h-5" />
-                    Download Extension
-                </button>
+                    Install Browser Extension
+                </a>
             </section>
 
             {/* Settings Section */}

@@ -98,26 +98,48 @@ interface HeaderProps {
 }
 
 export function Header({ onMenuClick }: HeaderProps) {
-  const { data: session } = useSession();
+  let session: any = null;
+  try {
+    const sessionData = useSession();
+    session = sessionData?.data;
+  } catch {
+    // SessionProvider may not be available during prerender
+  }
   const pathname = usePathname();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const notificationsRef = useRef<HTMLDivElement>(null);
   const [unreadTickets, setUnreadTickets] = useState<any[]>([]);
+  const [pushNotifications, setPushNotifications] = useState<any[]>([]);
+  const [selectedNotification, setSelectedNotification] = useState<any>(null);
   const { theme, setTheme } = useTheme();
 
   useEffect(() => {
-    // Fetch unread tickets on load
+    // Fetch unread tickets and push notifications on load
     if (session?.user) {
       fetch("/api/tickets/unread")
         .then(res => res.json())
-        .then(data => {
-          if (Array.isArray(data)) setUnreadTickets(data);
-        })
+        .then(data => { if (Array.isArray(data)) setUnreadTickets(data); })
         .catch(err => console.error("Failed to fetch unread tickets", err));
+
+      fetch("/api/notifications")
+        .then(res => res.json())
+        .then(data => { if (Array.isArray(data)) setPushNotifications(data); })
+        .catch(err => console.error("Failed to fetch notifications", err));
     }
   }, [session?.user]);
+
+  const dismissNotification = async (notificationId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    try {
+      await fetch(`/api/notifications/${notificationId}/dismiss`, { method: "POST" });
+      setPushNotifications(prev => prev.filter(n => n.id !== notificationId));
+    } catch (err) {
+      console.error("Failed to dismiss notification", err);
+    }
+  };
 
   // Fetch live subscription data
   const [sub, setSub] = useState<{ plan_type: string; credits_remaining: number; has_unlimited_resumes: boolean } | null>(null);
