@@ -11,7 +11,7 @@ interface DialogProps {
     title: string;
     description: string | React.ReactNode;
     type?: "alert" | "confirm";
-    variant?: "default" | "destructive" | "success";
+    variant?: "default" | "destructive" | "success" | "primary";
     confirmText?: string;
     cancelText?: string;
     loading?: boolean;
@@ -38,6 +38,12 @@ const variantMap = {
         iconClass: "text-emerald-500",
         iconWrap: "bg-emerald-50 ring-1 ring-emerald-100",
         confirmClass: "bg-emerald-500 text-white hover:bg-emerald-600 shadow-[inset_0_1px_0_rgba(255,255,255,0.25)]",
+    },
+    primary: {
+        icon: Info,
+        iconClass: "text-[var(--primary)]",
+        iconWrap: "bg-[var(--primary)]/10 ring-1 ring-[var(--primary)]/20",
+        confirmClass: "bg-[var(--primary)] text-white hover:opacity-90 shadow-[inset_0_1px_0_rgba(255,255,255,0.25)]",
     },
 } as const;
 
