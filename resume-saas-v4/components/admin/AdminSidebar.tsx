@@ -14,6 +14,7 @@ import {
     Chrome,
     ScrollText,
     LifeBuoy,
+    Bell,
 } from "lucide-react";
 
 const adminNav = [
@@ -25,6 +26,7 @@ const adminNav = [
     { name: "Scan Controls", href: "/admin/scan-controls", icon: Gauge },
     { name: "Extension",     href: "/admin/extension",     icon: Chrome },
     { name: "Tickets",       href: "/admin/tickets",       icon: LifeBuoy },
+    { name: "Notifications", href: "/admin/notifications", icon: Bell },
     { name: "Audit Log",     href: "/admin/audit-log",     icon: ScrollText },
 ];
 
