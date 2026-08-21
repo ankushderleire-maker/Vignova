@@ -33,7 +33,6 @@ export default function ProfileFlow() {
               [Languages, 'Languages']
             ].map(([Icon, label], i) => (
               <div key={i} className="flex items-center gap-3 px-3 py-2.5 text-gray-500 hover:bg-gray-50 rounded-lg font-medium text-xs">
-                {/* @ts-ignore */}
                 <Icon className="w-4 h-4" /> {label as string}
                 {i < 3 && <div className="absolute right-7 w-1.5 h-1.5 bg-blue-600 rounded-full"></div>}
               </div>

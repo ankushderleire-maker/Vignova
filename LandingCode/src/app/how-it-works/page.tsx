@@ -2,7 +2,7 @@
 
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
-import Testimonials from '@/components/Testimonials';
+import UseCases from '@/components/UseCases';
 import FAQ from '@/components/FAQ';
 import Image from 'next/image';
 import { motion } from 'framer-motion';
@@ -111,7 +111,7 @@ export default function HowItWorks() {
           animate={{ opacity: 1, y: 0 }}
           className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-blue-100/50 border border-blue-200 text-blue-700 text-sm font-bold tracking-wide uppercase mb-8 shadow-sm"
         >
-          <Sparkles className="w-4 h-4" /> Trusted by 10,000+ job seekers
+          <Sparkles className="w-4 h-4" /> From master profile to offer
         </motion.div>
         
         <motion.h1 
@@ -197,7 +197,7 @@ export default function HowItWorks() {
         <div className="max-w-6xl mx-auto px-4 md:px-8">
           <div className="text-center mb-16">
              <h2 className="text-3xl md:text-5xl font-black text-[#0A192F] tracking-tight">See the Difference</h2>
-             <p className="text-lg text-slate-500 mt-4 max-w-2xl mx-auto">Here's what happens when you tailor a generic bullet point to a "Software Engineer at Stripe" job description.</p>
+             <p className="text-lg text-slate-500 mt-4 max-w-2xl mx-auto">Here&apos;s what happens when you tailor a generic bullet point to a &quot;Software Engineer at Stripe&quot; job description.</p>
           </div>
           
           <div className="grid md:grid-cols-2 gap-8">
@@ -205,10 +205,10 @@ export default function HowItWorks() {
               <div className="absolute top-0 right-0 p-6 opacity-20"><XCircle className="w-24 h-24 text-red-500" /></div>
               <div className="inline-flex items-center gap-2 px-3 py-1 bg-red-100 text-red-700 text-sm font-bold rounded-lg mb-6 uppercase tracking-wider">Before Tailoring</div>
               <div className="text-xl text-slate-700 font-medium leading-relaxed italic border-l-4 border-red-200 pl-4 mb-6">
-                "Built backend services for the main product and worked on API improvements with the team."
+                &quot;Built backend services for the main product and worked on API improvements with the team.&quot;
               </div>
               <p className="text-sm text-slate-500 leading-relaxed">
-                <strong className="text-red-700">Why it fails:</strong> Vague, generic, no metrics. Doesn't mention scale or technologies that Stripe is scanning for.
+                <strong className="text-red-700">Why it fails:</strong> Vague, generic, no metrics. Doesn&apos;t mention scale or technologies that Stripe is scanning for.
               </p>
             </motion.div>
             
@@ -216,10 +216,10 @@ export default function HowItWorks() {
               <div className="absolute top-0 right-0 p-6 opacity-10"><CheckCircle2 className="w-32 h-32 text-emerald-500" /></div>
               <div className="inline-flex items-center gap-2 px-3 py-1 bg-emerald-100 text-emerald-800 text-sm font-bold rounded-lg mb-6 uppercase tracking-wider"><Sparkles className="w-4 h-4"/> Vignova Tailored</div>
               <div className="text-xl text-[#0A192F] font-bold leading-relaxed border-l-4 border-emerald-400 pl-4 mb-6 bg-white/50 py-2 relative z-10">
-                "Architected distributed payment-processing services handling <span className="bg-emerald-200/50 px-1 rounded">50M+ daily transactions</span>, cutting partner API integration time from <span className="bg-emerald-200/50 px-1 rounded">3 days to 4 hours</span>."
+                &quot;Architected distributed payment-processing services handling <span className="bg-emerald-200/50 px-1 rounded">50M+ daily transactions</span>, cutting partner API integration time from <span className="bg-emerald-200/50 px-1 rounded">3 days to 4 hours</span>.&quot;
               </div>
               <p className="text-sm text-slate-600 leading-relaxed relative z-10">
-                <strong className="text-emerald-700">Why it gets the interview:</strong> Stripe's JD calls out distributed systems & high throughput. Vignova surfaced your exact metrics to match.
+                <strong className="text-emerald-700">Why it gets the interview:</strong> Stripe&apos;s JD calls out distributed systems & high throughput. Vignova surfaced your exact metrics to match.
               </p>
             </motion.div>
           </div>
@@ -421,8 +421,8 @@ export default function HowItWorks() {
         </div>
       </section>
 
-      {/* Testimonials */}
-      <Testimonials />
+      {/* Who it is for */}
+      <UseCases />
 
       {/* FAQ */}
       <FAQ />

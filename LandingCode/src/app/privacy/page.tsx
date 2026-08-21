@@ -1,6 +1,22 @@
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 
+import type { Metadata } from 'next';
+import { canonical } from '@/lib/seo';
+
+export const metadata: Metadata = {
+  title: 'Privacy Policy',
+  description:
+    'How Vignova collects, stores, encrypts and deletes your resume and personal data. We never sell your data to third parties.',
+  alternates: { canonical: canonical('/privacy') },
+  openGraph: {
+    title: 'Privacy Policy | Vignova',
+    description:
+      'How Vignova collects, stores, encrypts and deletes your resume and personal data. We never sell your data to third parties.',
+    url: canonical('/privacy'),
+  },
+};
+
 export default function PrivacyPolicy() {
   return (
     <main className="min-h-screen bg-[#F5F8FA] overflow-hidden">

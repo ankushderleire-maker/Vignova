@@ -1,6 +1,22 @@
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 
+import type { Metadata } from 'next';
+import { canonical } from '@/lib/seo';
+
+export const metadata: Metadata = {
+  title: 'Terms of Service',
+  description:
+    'The terms governing your use of Vignova, including subscriptions, acceptable use, intellectual property and account termination.',
+  alternates: { canonical: canonical('/terms') },
+  openGraph: {
+    title: 'Terms of Service | Vignova',
+    description:
+      'The terms governing your use of Vignova, including subscriptions, acceptable use, intellectual property and account termination.',
+    url: canonical('/terms'),
+  },
+};
+
 export default function TermsAndConditions() {
   return (
     <main className="min-h-screen bg-[#F5F8FA] overflow-hidden">
@@ -25,7 +41,7 @@ export default function TermsAndConditions() {
               <li>modify or copy the materials;</li>
               <li>use the materials for any commercial purpose, or for any public display;</li>
               <li>attempt to decompile or reverse engineer any software contained on Vignova;</li>
-              <li>transfer the materials to another person or "mirror" the materials on any other server.</li>
+              <li>transfer the materials to another person or &quot;mirror&quot; the materials on any other server.</li>
             </ul>
           </div>
           
@@ -41,7 +57,7 @@ export default function TermsAndConditions() {
 
           <div>
             <h2 className="text-2xl font-bold text-[#0A192F] mb-4">5. Disclaimer</h2>
-            <p>The materials on Vignova's website are provided on an 'as is' basis. Vignova makes no warranties, expressed or implied, and hereby disclaims and negates all other warranties including, without limitation, implied warranties or conditions of merchantability, fitness for a particular purpose, or non-infringement of intellectual property or other violation of rights.</p>
+            <p>The materials on Vignova&apos;s website are provided on an &apos;as is&apos; basis. Vignova makes no warranties, expressed or implied, and hereby disclaims and negates all other warranties including, without limitation, implied warranties or conditions of merchantability, fitness for a particular purpose, or non-infringement of intellectual property or other violation of rights.</p>
           </div>
           
           <div>

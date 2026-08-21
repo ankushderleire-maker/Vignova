@@ -1,3 +1,4 @@
+import Image from 'next/image';
 import Link from 'next/link';
 import { Mail } from 'lucide-react';
 
@@ -10,9 +11,9 @@ export default function Footer() {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-12 mb-20">
           <div className="col-span-1 md:col-span-1">
             <Link href="/" className="flex items-center gap-1.5 mb-6 group w-fit">
-              <img
+              <Image
                 src="/logo.png"
-                alt="Vignova Logo"
+                alt="Vignova logo"
                 width={40}
                 height={40}
                 className="object-contain group-hover:scale-105 transition-transform duration-300"

@@ -2,6 +2,22 @@ import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import { Mail, MapPin } from 'lucide-react';
 
+import type { Metadata } from 'next';
+import { canonical } from '@/lib/seo';
+
+export const metadata: Metadata = {
+  title: 'Contact & Support',
+  description:
+    'Get in touch with the Vignova team. Questions about AI resume tailoring, billing, the Chrome extension or partnerships — we reply within one business day.',
+  alternates: { canonical: canonical('/contact') },
+  openGraph: {
+    title: 'Contact & Support | Vignova',
+    description:
+      'Get in touch with the Vignova team. Questions about AI resume tailoring, billing, the Chrome extension or partnerships — we reply within one business day.',
+    url: canonical('/contact'),
+  },
+};
+
 export default function ContactUs() {
   return (
     <main className="min-h-screen bg-[#F5F8FA] overflow-hidden">
@@ -9,7 +25,7 @@ export default function ContactUs() {
       <section className="pt-32 pb-24 px-4 md:px-8 max-w-4xl mx-auto">
         <div className="mb-12 text-center">
           <h1 className="text-4xl md:text-5xl font-black text-[#0A192F] tracking-tight mb-4">Contact Us</h1>
-          <p className="text-xl text-slate-500">We'd love to hear from you. Here's how you can reach us.</p>
+          <p className="text-xl text-slate-500">We&apos;d love to hear from you. Here&apos;s how you can reach us.</p>
         </div>
         
         <div className="bg-white rounded-3xl shadow-xl shadow-blue-500/5 p-8 md:p-12">
@@ -49,7 +65,7 @@ export default function ContactUs() {
                  Our standard support hours are Monday through Friday, 9am to 5pm EST. 
                </p>
                <p className="text-slate-600 leading-relaxed">
-                 We aim to respond to all inquiries within 24-48 hours. For urgent billing issues, please include "URGENT" in your email subject line.
+                 We aim to respond to all inquiries within 24-48 hours. For urgent billing issues, please include &quot;URGENT&quot; in your email subject line.
                </p>
             </div>
           </div>

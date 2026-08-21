@@ -24,7 +24,7 @@ export function getPostBySlug(slug: string) {
   let fileContents = '';
   try {
     fileContents = fs.readFileSync(fullPath, 'utf8');
-  } catch (e) {
+  } catch {
     // try .md
     const mdPath = path.join(contentDirectory, `${realSlug}.md`);
     fileContents = fs.readFileSync(mdPath, 'utf8');

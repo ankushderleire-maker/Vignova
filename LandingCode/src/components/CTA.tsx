@@ -23,7 +23,7 @@ export default function CTA() {
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-indigo-400">your trajectory?</span>
           </h2>
           <p className="text-xl md:text-2xl text-slate-400 mb-12 max-w-2xl mx-auto font-light tracking-tight">
-            Join thousands of professionals who have already transformed their job search with Vignova's AI copilot.
+            Join thousands of professionals who have already transformed their job search with Vignova&apos;s AI copilot.
           </p>
           <div className="flex flex-col items-center justify-center gap-5">
             <button onClick={() => window.location.href = 'https://app.vignova.io/login'} className="group h-16 px-10 rounded-full bg-white text-[#0A192F] font-bold text-lg hover:bg-gray-100 transition-all duration-300 hover:-translate-y-0.5 active:translate-y-0 flex items-center gap-2 shadow-2xl shadow-blue-500/20 hover:shadow-blue-500/30">

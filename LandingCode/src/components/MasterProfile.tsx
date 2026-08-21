@@ -15,7 +15,6 @@ const features = [
 ];
 
 export default function MasterProfile() {
-  const radius = 220; // Distance from center to each node
 
   return (
     <section className="py-20 bg-[#0A192F] overflow-hidden border-t border-white/5">

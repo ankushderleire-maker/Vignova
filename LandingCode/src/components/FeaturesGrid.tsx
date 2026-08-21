@@ -89,7 +89,7 @@ export default function FeaturesGrid() {
               className="text-4xl md:text-5xl lg:text-6xl font-extrabold tracking-tight text-white"
             >
               Everything you need. <br />
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-indigo-400">Nothing you don't.</span>
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-indigo-400">Nothing you don&apos;t.</span>
             </motion.h2>
           </div>
           <div className="md:w-1/2 flex items-center md:items-end md:pl-10 border-l-0 md:border-l border-white/10">
