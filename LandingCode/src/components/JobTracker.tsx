@@ -2,6 +2,7 @@
 
 import React, { useEffect, useRef } from "react";
 import { Sparkles } from "lucide-react";
+import Image from 'next/image';
 
 // --- Mock Data ---
 const RAW_TEMPLATES = [
@@ -55,7 +56,7 @@ export default function JobTracker() {
         const ctx = canvas.getContext("2d");
         if (!ctx) return;
 
-        let particles: {
+        const particles: {
             x: number; y: number; vx: number; vy: number;
             size: number; alpha: number; life: number; color: string
         }[] = [];
@@ -306,10 +307,12 @@ export default function JobTracker() {
                                 className="layer-image absolute inset-0 bg-white z-10"
                                 style={{ willChange: 'clip-path' }}
                             >
-                                <img
+                                <Image
                                     src={`/templates/${item.id}-thumb.png`}
-                                    alt={item.name}
-                                    loading="eager"
+                                    alt={`${item.name} resume template`}
+                                    fill
+                                    sizes="(max-width: 768px) 100vw, 400px"
+                                    priority
                                     className="w-full h-full object-cover object-top opacity-100"
                                 />
                                 <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-transparent to-transparent pointer-events-none z-10" />

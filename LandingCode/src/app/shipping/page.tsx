@@ -1,6 +1,22 @@
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 
+import type { Metadata } from 'next';
+import { canonical } from '@/lib/seo';
+
+export const metadata: Metadata = {
+  title: 'Shipping & Delivery Policy',
+  description:
+    'Vignova is a digital service. How and when access to your subscription and generated documents is delivered after purchase.',
+  alternates: { canonical: canonical('/shipping') },
+  openGraph: {
+    title: 'Shipping & Delivery Policy | Vignova',
+    description:
+      'Vignova is a digital service. How and when access to your subscription and generated documents is delivered after purchase.',
+    url: canonical('/shipping'),
+  },
+};
+
 export default function ShippingPolicy() {
   return (
     <main className="min-h-screen bg-[#F5F8FA] overflow-hidden">

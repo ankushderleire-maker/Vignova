@@ -4,14 +4,23 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   MousePointer2, CheckCircle2, Sparkles, User,
-  MapPin, TrendingUp, Zap, Star, Search, BarChart3,
+  MapPin, TrendingUp, BarChart3,
 } from 'lucide-react';
 
 /* ─── Typing hook ─────────────────────────────────────────────────── */
 function useTyping(text: string, active: boolean, delay = 0) {
   const [shown, setShown] = useState(0);
+  const [wasActive, setWasActive] = useState(active);
+
+  // Reset while rendering rather than from inside the effect — a synchronous
+  // setState in an effect triggers a second render pass.
+  if (wasActive !== active) {
+    setWasActive(active);
+    setShown(0);
+  }
+
   useEffect(() => {
-    if (!active) { setShown(0); return; }
+    if (!active) return;
     const start = setTimeout(() => {
       const t = setInterval(() => {
         setShown(s => {
@@ -152,7 +161,7 @@ export default function LinkedInOptimizer() {
               <h2 className="text-4xl md:text-5xl lg:text-[3.25rem] font-bold tracking-tighter text-[#0A192F] mb-6 leading-tight">
                 From invisible<br />
                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#0A66C2] to-indigo-600">
-                  to recruiters' top pick.
+                  to recruiters&apos; top pick.
                 </span>
               </h2>
 

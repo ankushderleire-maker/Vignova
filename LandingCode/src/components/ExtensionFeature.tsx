@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Zap, BarChart2, User, CheckCircle2, FileText, Settings, ChevronRight, MousePointer2, Copy, Mail, Phone, LinkIcon, Briefcase, Building2, Globe2, UploadCloud, X, Sparkles } from 'lucide-react';
+import { Zap, BarChart2, User, CheckCircle2, FileText, MousePointer2, Copy, Mail, Phone, Building2, Globe2, UploadCloud, X, Sparkles } from 'lucide-react';
 
 export default function ExtensionFeature() {
   const [phase, setPhase] = useState('job-board-idle');

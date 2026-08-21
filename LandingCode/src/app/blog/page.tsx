@@ -2,10 +2,21 @@ import { getAllPosts } from '@/lib/markdown';
 import Link from 'next/link';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
+import type { Metadata } from 'next';
+import { canonical } from '@/lib/seo';
 
-export const metadata = {
-  title: 'Blog - Vignova AI Career Copilot',
-  description: 'Read the latest insights, strategies, and updates on accelerating your career with AI.',
+export const metadata: Metadata = {
+  title: 'AI Resume & Job Search Blog',
+  description:
+    'Guides on AI resume tailoring, beating applicant tracking systems, keyword optimization and running a faster job search — from the team building Vignova.',
+  alternates: { canonical: canonical('/blog') },
+  openGraph: {
+    title: 'AI Resume & Job Search Blog | Vignova',
+    description:
+      'Guides on AI resume tailoring, beating applicant tracking systems, and running a faster job search.',
+    url: canonical('/blog'),
+    type: 'website',
+  },
 };
 
 export default function BlogIndex() {

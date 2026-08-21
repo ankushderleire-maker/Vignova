@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Menu, X, ArrowRight } from 'lucide-react';
+import Image from 'next/image';
 import Link from 'next/link';
 import { AnimatePresence, motion } from 'framer-motion';
 
@@ -39,9 +40,9 @@ export default function Header() {
 
           {/* Logo */}
           <Link href="/" className="flex items-center gap-1.5 cursor-pointer group w-auto">
-            <img
+            <Image
               src="/logo.png"
-              alt="Vignova Logo"
+              alt="Vignova logo"
               width={40}
               height={40}
               className="object-contain group-hover:scale-105 transition-transform duration-300"

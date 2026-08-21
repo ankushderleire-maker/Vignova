@@ -1,6 +1,22 @@
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 
+import type { Metadata } from 'next';
+import { canonical } from '@/lib/seo';
+
+export const metadata: Metadata = {
+  title: 'Refund Policy',
+  description:
+    'Vignova refund and cancellation policy — eligibility windows, how to request a refund, and how subscription cancellations are processed.',
+  alternates: { canonical: canonical('/refund') },
+  openGraph: {
+    title: 'Refund Policy | Vignova',
+    description:
+      'Vignova refund and cancellation policy — eligibility windows, how to request a refund, and how subscription cancellations are processed.',
+    url: canonical('/refund'),
+  },
+};
+
 export default function RefundPolicy() {
   return (
     <main className="min-h-screen bg-[#F5F8FA] overflow-hidden">
