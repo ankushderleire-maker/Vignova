@@ -2,7 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Zap, BarChart2, User, CheckCircle2, FileText, MousePointer2, Copy, Mail, Phone, Building2, Globe2, UploadCloud, X, Sparkles } from 'lucide-react';
+import { Zap, BarChart2, User, CheckCircle2, FileText, MousePointer2, Copy, Mail, Phone, Building2, Globe2, UploadCloud, X, Sparkles, Puzzle } from 'lucide-react';
+import { EXTENSION_URL } from '@/lib/seo';
+import { trackEvent } from '@/lib/analytics';
 
 export default function ExtensionFeature() {
   const [phase, setPhase] = useState('job-board-idle');
@@ -430,6 +432,20 @@ export default function ExtensionFeature() {
                   <div className="mt-1 w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center shrink-0"><Copy className="w-4 h-4 text-emerald-400" /></div>
                   <div><div className="text-sm font-bold text-white mb-0.5">Copy & Paste Profile</div><div className="text-sm text-slate-500">Instantly copy email, phone, LinkedIn and more from your profile into any form field.</div></div>
                 </motion.div>
+              </div>
+
+              <div className="mt-10 flex flex-col sm:flex-row items-center gap-4 justify-center md:justify-start">
+                <a
+                  href={EXTENSION_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={() => trackEvent('extension_install_click', { location: 'extension_section' })}
+                  className="group h-14 px-8 rounded-xl bg-white text-[#0A192F] font-bold text-base hover:bg-slate-100 transition-all duration-300 shadow-xl shadow-blue-500/10 hover:-translate-y-0.5 active:translate-y-0 flex items-center gap-2.5"
+                >
+                  <Puzzle className="w-5 h-5" />
+                  Add to Chrome — it&apos;s free
+                </a>
+                <span className="text-sm text-slate-500">Works on LinkedIn, Indeed &amp; Workday</span>
               </div>
             </motion.div>
           </div>

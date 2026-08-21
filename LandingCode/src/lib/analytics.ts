@@ -75,3 +75,12 @@ export function trackPageView(url: string) {
     page_title: document.title,
   });
 }
+
+/**
+ * Fires a GA4 event. `location` should say where on the page the click came
+ * from (hero, cta, footer...) so conversions can be attributed to a placement.
+ */
+export function trackEvent(name: string, params: Record<string, unknown> = {}) {
+  if (!gaEnabled) return;
+  gtag('event', name, params);
+}

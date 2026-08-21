@@ -1,6 +1,8 @@
 'use client';
 
 import { Check } from 'lucide-react';
+import { APP_URL } from '@/lib/seo';
+import { trackEvent } from '@/lib/analytics';
 
 export default function Pricing() {
   return (
@@ -35,7 +37,7 @@ export default function Pricing() {
                 </li>
               ))}
             </ul>
-            <button onClick={() => window.location.href = 'https://app.vignova.io/login'} className="w-full h-14 rounded-full border border-gray-200 text-foreground font-medium hover:bg-gray-50 transition-colors shadow-sm">
+            <button onClick={() => { trackEvent('sign_up_click', { location: 'pricing_free' }); window.location.href = APP_URL; }} className="w-full h-14 rounded-full border border-gray-200 text-foreground font-medium hover:bg-gray-50 transition-colors shadow-sm">
               Start Building
             </button>
           </div>
@@ -67,7 +69,7 @@ export default function Pricing() {
                 </li>
               ))}
             </ul>
-            <button onClick={() => window.location.href = 'https://app.vignova.io/login'} className="w-full h-14 rounded-full bg-white text-black font-medium hover:bg-gray-100 transition-colors relative z-10 shadow-xl shadow-white/10">
+            <button onClick={() => { trackEvent('sign_up_click', { location: 'pricing_premium' }); window.location.href = APP_URL; }} className="w-full h-14 rounded-full bg-white text-black font-medium hover:bg-gray-100 transition-colors relative z-10 shadow-xl shadow-white/10">
               Upgrade to Pro
             </button>
           </div>

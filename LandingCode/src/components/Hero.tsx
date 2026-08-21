@@ -2,6 +2,8 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowRight, Check, Zap } from 'lucide-react';
+import { APP_URL } from '@/lib/seo';
+import { trackEvent } from '@/lib/analytics';
 import ResumeFlow from './hero/ResumeFlow';
 import TrackerFlow from './hero/TrackerFlow';
 import JobsFlow from './hero/JobsFlow';
@@ -142,10 +144,10 @@ export default function Hero() {
               </div>
 
               <div className="flex items-center gap-3">
-                <button onClick={() => window.location.href = 'https://app.vignova.io/login'} className="group h-13 px-8 rounded-xl bg-[#0A192F] text-white font-semibold text-sm hover:bg-[#0d2240] transition-all duration-300 shadow-lg shadow-blue-900/20 hover:shadow-xl hover:shadow-blue-900/25 hover:-translate-y-0.5 active:translate-y-0 flex items-center gap-2">
+                <button onClick={() => { trackEvent('sign_up_click', { location: 'hero' }); window.location.href = APP_URL; }} className="group h-13 px-8 rounded-xl bg-[#0A192F] text-white font-semibold text-sm hover:bg-[#0d2240] transition-all duration-300 shadow-lg shadow-blue-900/20 hover:shadow-xl hover:shadow-blue-900/25 hover:-translate-y-0.5 active:translate-y-0 flex items-center gap-2">
                   Get started free <ArrowRight className="w-4 h-4 transition-transform duration-300 group-hover:translate-x-1" />
                 </button>
-                <button onClick={() => window.location.href = 'https://app.vignova.io/login'} className="h-13 px-6 rounded-xl bg-white/80 backdrop-blur-sm border border-gray-200 text-[#0A192F] font-semibold text-sm hover:bg-white hover:border-gray-300 transition-all duration-300 shadow-sm hover:-translate-y-0.5 active:translate-y-0 flex items-center gap-2">
+                <button onClick={() => { trackEvent('sign_up_click', { location: 'hero' }); window.location.href = APP_URL; }} className="h-13 px-6 rounded-xl bg-white/80 backdrop-blur-sm border border-gray-200 text-[#0A192F] font-semibold text-sm hover:bg-white hover:border-gray-300 transition-all duration-300 shadow-sm hover:-translate-y-0.5 active:translate-y-0 flex items-center gap-2">
                   <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="5 3 19 12 5 21 5 3" /></svg>
                   Watch demo
                 </button>

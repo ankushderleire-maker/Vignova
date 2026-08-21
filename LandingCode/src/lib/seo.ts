@@ -7,3 +7,10 @@ export function canonical(path = '/') {
   const clean = path === '/' ? '/' : `/${path.replace(/^\/+|\/+$/g, '')}/`;
   return `${SITE_URL}${clean}`;
 }
+
+export const APP_URL = 'https://app.vignova.io/login';
+
+// utm params let the Chrome Web Store developer dashboard attribute installs
+// back to the website. The placement is tracked separately as a GA4 event.
+export const EXTENSION_URL =
+  'https://chromewebstore.google.com/detail/oalpfkabaipgcjimbcapeeaoipeikkha?utm_source=vignova.io&utm_medium=website';

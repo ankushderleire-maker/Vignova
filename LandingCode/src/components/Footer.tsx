@@ -1,5 +1,7 @@
 import Image from 'next/image';
 import Link from 'next/link';
+import TrackedLink from '@/components/TrackedLink';
+import { APP_URL, EXTENSION_URL } from '@/lib/seo';
 import { Mail } from 'lucide-react';
 
 export default function Footer() {
@@ -33,27 +35,28 @@ export default function Footer() {
             <h4 className="font-semibold text-white tracking-tight mb-6">Product</h4>
             <ul className="space-y-4 text-sm font-light">
               <li><Link href="/#features" className="hover:text-white transition-colors">Features</Link></li>
-              <li><Link href="/how-it-works" className="hover:text-white transition-colors">How It Works</Link></li>
-              <li><a href="https://app.vignova.io/login" className="hover:text-white transition-colors">Get Started</a></li>
+              <li><Link href="/how-it-works/" className="hover:text-white transition-colors">How It Works</Link></li>
+              <li><TrackedLink href={APP_URL} event="sign_up_click" location="footer" className="hover:text-white transition-colors">Get Started</TrackedLink></li>
+              <li><TrackedLink href={EXTENSION_URL} event="extension_install_click" location="footer" external className="hover:text-white transition-colors">Chrome Extension</TrackedLink></li>
             </ul>
           </div>
           
           <div className="md:ml-auto">
             <h4 className="font-semibold text-white tracking-tight mb-6">Company</h4>
             <ul className="space-y-4 text-sm font-light">
-              <li><Link href="/about" className="hover:text-white transition-colors">About Us</Link></li>
-              <li><Link href="/blog" className="hover:text-white transition-colors">Blog</Link></li>
-              <li><Link href="/contact" className="hover:text-white transition-colors">Contact</Link></li>
+              <li><Link href="/about/" className="hover:text-white transition-colors">About Us</Link></li>
+              <li><Link href="/blog/" className="hover:text-white transition-colors">Blog</Link></li>
+              <li><Link href="/contact/" className="hover:text-white transition-colors">Contact</Link></li>
             </ul>
           </div>
           
           <div className="md:ml-auto">
             <h4 className="font-semibold text-white tracking-tight mb-6">Legal</h4>
             <ul className="space-y-4 text-sm font-light">
-              <li><Link href="/privacy" className="hover:text-white transition-colors">Privacy Policy</Link></li>
-              <li><Link href="/terms" className="hover:text-white transition-colors">Terms</Link></li>
-              <li><Link href="/refund" className="hover:text-white transition-colors">Refund Policy</Link></li>
-              <li><Link href="/shipping" className="hover:text-white transition-colors">Shipping Policy</Link></li>
+              <li><Link href="/privacy/" className="hover:text-white transition-colors">Privacy Policy</Link></li>
+              <li><Link href="/terms/" className="hover:text-white transition-colors">Terms</Link></li>
+              <li><Link href="/refund/" className="hover:text-white transition-colors">Refund Policy</Link></li>
+              <li><Link href="/shipping/" className="hover:text-white transition-colors">Shipping Policy</Link></li>
             </ul>
           </div>
         </div>

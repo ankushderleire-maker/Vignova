@@ -4,13 +4,15 @@ import { useState, useEffect } from 'react';
 import { Menu, X, ArrowRight } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
+import { APP_URL } from '@/lib/seo';
+import { trackEvent } from '@/lib/analytics';
 import { AnimatePresence, motion } from 'framer-motion';
 
 const navLinks = [
   { label: 'Features', href: '/#features' },
-  { label: 'How It Works', href: '/how-it-works' },
-  { label: 'Blog', href: '/blog' },
-  { label: 'About Us', href: '/about' },
+  { label: 'How It Works', href: '/how-it-works/' },
+  { label: 'Blog', href: '/blog/' },
+  { label: 'About Us', href: '/about/' },
 ];
 
 export default function Header() {
@@ -68,13 +70,15 @@ export default function Header() {
           {/* CTA - Right */}
           <div className="flex items-center justify-end gap-3 lg:gap-5">
             <a
-              href="https://app.vignova.io/login"
+              href={APP_URL}
+              onClick={() => trackEvent('sign_up_click', { location: 'header' })}
               className="hidden md:block text-[14px] font-semibold text-white/75 hover:text-white transition-colors"
             >
               Log in
             </a>
             <a
-              href="https://app.vignova.io/login"
+              href={APP_URL}
+              onClick={() => trackEvent('sign_up_click', { location: 'header' })}
               className="group hidden sm:inline-flex items-center gap-1.5 pl-5 pr-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white text-[14px] font-semibold rounded-full shadow-[0_0_20px_rgba(37,99,235,0.35)] transition-all duration-300 hover:shadow-[0_0_28px_rgba(37,99,235,0.5)] active:scale-95"
             >
               Get started
@@ -117,13 +121,15 @@ export default function Header() {
               ))}
               <div className="flex items-center gap-3 px-4 pt-3 pb-2">
                 <a
-                  href="https://app.vignova.io/login"
+                  href={APP_URL}
+              onClick={() => trackEvent('sign_up_click', { location: 'header' })}
                   className="flex-1 text-center py-3 rounded-xl border border-white/15 text-white/85 text-[14px] font-semibold hover:bg-white/5 transition-colors"
                 >
                   Log in
                 </a>
                 <a
-                  href="https://app.vignova.io/login"
+                  href={APP_URL}
+              onClick={() => trackEvent('sign_up_click', { location: 'header' })}
                   className="flex-1 text-center py-3 rounded-xl bg-blue-600 text-white text-[14px] font-semibold hover:bg-blue-500 transition-colors"
                 >
                   Get started

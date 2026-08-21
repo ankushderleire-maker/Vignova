@@ -7,6 +7,8 @@ import FAQ from '@/components/FAQ';
 import Image from 'next/image';
 import { motion } from 'framer-motion';
 import { ArrowRight, CheckCircle2, XCircle, Sparkles, UserCircle, Bookmark, Wand2, Pencil, ShieldCheck, LayoutDashboard, Search, Puzzle } from 'lucide-react';
+import { APP_URL, EXTENSION_URL } from '@/lib/seo';
+import { trackEvent } from '@/lib/analytics';
 
 const features = [
   {
@@ -139,7 +141,7 @@ export default function HowItWorks() {
            transition={{ delay: 0.3 }}
            className="flex flex-col sm:flex-row gap-4 items-center justify-center"
         >
-           <button onClick={() => window.location.href = 'https://app.vignova.io/login'} className="h-14 px-10 rounded-full bg-blue-600 text-white font-bold text-lg hover:bg-blue-500 transition-all shadow-xl shadow-blue-500/30 flex items-center gap-2 hover:-translate-y-1">
+           <button onClick={() => { trackEvent('sign_up_click', { location: 'how_it_works' }); window.location.href = APP_URL; }} className="h-14 px-10 rounded-full bg-blue-600 text-white font-bold text-lg hover:bg-blue-500 transition-all shadow-xl shadow-blue-500/30 flex items-center gap-2 hover:-translate-y-1">
              Start Building Free <ArrowRight className="w-5 h-5" />
            </button>
            <span className="text-sm text-slate-400">No credit card required</span>
@@ -442,15 +444,26 @@ export default function HowItWorks() {
             </span>
           </h2>
           <p className="text-xl text-slate-400 mb-12 max-w-2xl mx-auto font-light">
-            Join thousands of job seekers who are bypassing the ATS, doubling their interviews, and landing offers faster.
+            One profile, a resume tailored to every job description, and an ATS score before you apply. Free to start, no credit card.
           </p>
           <button 
-            onClick={() => window.location.href = 'https://app.vignova.io/login'} 
+            onClick={() => { trackEvent('sign_up_click', { location: 'how_it_works' }); window.location.href = APP_URL; }} 
             className="group h-14 px-8 rounded-full bg-white text-[#0A192F] font-bold text-lg hover:scale-105 transition-all shadow-[0_0_40px_rgba(255,255,255,0.1)] hover:shadow-[0_0_60px_rgba(255,255,255,0.2)] flex items-center gap-3 mx-auto"
           >
             Start your free trial 
             <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
           </button>
+
+          <a
+            href={EXTENSION_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={() => trackEvent('extension_install_click', { location: 'how_it_works' })}
+            className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-slate-300 hover:text-white transition-colors underline underline-offset-4 decoration-slate-600 hover:decoration-white"
+          >
+            <Puzzle className="w-4 h-4" />
+            Or add the Chrome extension
+          </a>
         </div>
       </section>
 
