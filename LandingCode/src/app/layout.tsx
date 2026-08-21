@@ -1,7 +1,10 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import JsonLd from "@/components/JsonLd";
+import Analytics from "@/components/Analytics";
+import CookieConsent from "@/components/CookieConsent";
 import { SITE_NAME, SITE_URL, canonical } from "@/lib/seo";
+import { GA_MEASUREMENT_ID, gaEnabled } from "@/lib/analytics";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -116,6 +119,28 @@ const websiteSchema = {
   inLanguage: "en-US",
 };
 
+// Consent Mode v2 defaults, emitted as a plain inline script so it is in the
+// static HTML and runs before gtag.js loads. Everything is denied until the
+// visitor accepts in the banner, so no analytics cookie is written first.
+const consentBootstrap = `
+window.dataLayer = window.dataLayer || [];
+function gtag(){dataLayer.push(arguments);}
+gtag('consent', 'default', {
+  ad_storage: 'denied',
+  ad_user_data: 'denied',
+  ad_personalization: 'denied',
+  analytics_storage: 'denied',
+  wait_for_update: 500
+});
+try {
+  if (localStorage.getItem('vignova.consent.analytics') === 'granted') {
+    gtag('consent', 'update', { analytics_storage: 'granted' });
+  }
+} catch (e) {}
+gtag('js', new Date());
+gtag('config', '${GA_MEASUREMENT_ID}', { send_page_view: false });
+`.trim();
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -128,7 +153,12 @@ export default function RootLayout({
     >
       <body className={`${geistSans.className} min-h-full flex flex-col`}>
         <JsonLd data={[organizationSchema, websiteSchema]} />
+        {gaEnabled && (
+          <script dangerouslySetInnerHTML={{ __html: consentBootstrap }} />
+        )}
+        <Analytics />
         {children}
+        <CookieConsent />
       </body>
     </html>
   );

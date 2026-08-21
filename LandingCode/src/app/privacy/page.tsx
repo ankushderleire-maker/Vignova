@@ -66,7 +66,16 @@ export default function PrivacyPolicy() {
           </div>
           
           <div>
-            <h2 className="text-2xl font-bold text-[#0A192F] mb-4">6. Contact Details</h2>
+            <h2 className="text-2xl font-bold text-[#0A192F] mb-4">6. Cookies and Analytics</h2>
+            <p>We use Google Analytics 4 to understand how visitors find and use our website — which pages are read, which sources bring people here, and roughly where in the world they are. This helps us decide what to build and what to write.</p>
+            <p className="mt-3">Google Analytics sets cookies on your device and processes an anonymised version of your IP address. <strong>We do not load Google Analytics or set any analytics cookie until you accept it</strong> in the banner shown on your first visit. If you reject, or simply ignore the banner, no analytics cookie is written and no usage data is sent.</p>
+            <p className="mt-3">You can change your mind at any time by clearing this site&apos;s data in your browser, which removes the stored preference and shows the banner again. Blocking cookies in your browser, or using an ad blocker, also prevents this collection entirely.</p>
+            <p className="mt-3">Strictly necessary storage — the preference that remembers your cookie choice, and the session information that keeps you signed in to the application — is not used for analytics and does not require consent.</p>
+            <p className="mt-3">Google Analytics is provided by Google Ireland Limited. You can read how Google processes this data in the <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer" className="text-blue-600 font-medium underline underline-offset-2">Google Privacy Policy</a>, and you can opt out across all websites using the <a href="https://tools.google.com/dlpage/gaoptout" target="_blank" rel="noopener noreferrer" className="text-blue-600 font-medium underline underline-offset-2">Google Analytics Opt-out Browser Add-on</a>.</p>
+          </div>
+
+          <div>
+            <h2 className="text-2xl font-bold text-[#0A192F] mb-4">7. Contact Details</h2>
             <p>If you have any questions about this privacy policy or our privacy practices, please contact us in the following ways:</p>
             <p className="mt-2 font-medium text-blue-600">Email address: contact@vignova.io</p>
           </div>
