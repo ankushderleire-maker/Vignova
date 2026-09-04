@@ -21,6 +21,68 @@ def _remove_control_chars(raw: str) -> str:
     return re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f]", "", raw)
 
 
+_VALID_ESCAPES = set('"\\/bfnrt')
+
+
+def _fix_string_bodies(raw: str) -> str:
+    """
+    Repairs the two things models get wrong inside JSON strings.
+
+    1. Backslashes that don't begin a legal escape — "C:\\Users", "\\d+", "100\\%"
+       — which json.loads rejects as `Invalid \\escape`.
+    2. Raw newlines and tabs, which are illegal control characters inside a
+       JSON string and show up whenever a model writes a multi-line value.
+
+    This walks the text instead of using a regex because a legal "\\\\" has to be
+    consumed as a pair; a regex would re-examine the second backslash and
+    double it again, turning valid JSON into invalid JSON.
+    """
+    out: list[str] = []
+    i = 0
+    n = len(raw)
+    in_string = False
+
+    while i < n:
+        ch = raw[i]
+
+        if not in_string:
+            if ch == '"':
+                in_string = True
+            out.append(ch)
+            i += 1
+            continue
+
+        if ch == '"':
+            in_string = False
+            out.append(ch)
+            i += 1
+            continue
+
+        if ch in "\n\r\t":
+            out.append({"\n": "\\n", "\r": "\\r", "\t": "\\t"}[ch])
+            i += 1
+            continue
+
+        if ch != "\\":
+            out.append(ch)
+            i += 1
+            continue
+
+        nxt = raw[i + 1] if i + 1 < n else ""
+        if nxt == "u" and re.fullmatch(r"[0-9a-fA-F]{4}", raw[i + 2 : i + 6] or ""):
+            out.append(raw[i : i + 6])
+            i += 6
+        elif nxt in _VALID_ESCAPES:
+            out.append(ch + nxt)
+            i += 2
+        else:
+            # Not a legal escape — the model meant a literal backslash.
+            out.append("\\\\")
+            i += 1
+
+    return "".join(out)
+
+
 def _extract_json_candidate(text: str) -> str:
     start = text.find("{")
     if start == -1:
@@ -76,6 +138,7 @@ def _repair_common_json_issues(raw: str) -> str:
     raw = _strip_fences(raw)
     raw = _normalize_quotes(raw)
     raw = _remove_control_chars(raw)
+    raw = _fix_string_bodies(raw)
     raw = re.sub(r",(\s*[}\]])", r"\1", raw)
     return raw.strip()
 
