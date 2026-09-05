@@ -1,43 +1,39 @@
 "use client";
 
-/* eslint-disable @next/next/no-img-element */
-
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { signOut } from "next-auth/react";
 import {
-  Briefcase,
-  Chrome,
-  ChevronLeft,
-  ChevronRight,
-  Crown,
-  FileText,
-  History,
   LayoutDashboard,
-  Linkedin,
-  Mic,
-  ScanLine,
+  Briefcase,
   Search,
-  Sparkles,
+  Settings,
+  LogOut,
   UserCircle,
-  X,
   Zap,
-  type LucideIcon,
+  History,
+  Sparkles,
+  Chrome,
+  FileText,
+  ScanLine,
+  Mic,
+  Linkedin,
+  X,
 } from "lucide-react";
 
-const navigationGroups: Array<{
-  label: string;
-  items: Array<{ name: string; href: string; icon: LucideIcon; badge?: "NEW" | "PRO" }>;
-}> = [
+const navigationGroups = [
   {
     label: "Overview",
-    items: [{ name: "Dashboard", href: "/dashboard", icon: LayoutDashboard }],
+    items: [
+      { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+    ],
   },
   {
     label: "Resumes & Profiles",
     items: [
       { name: "Master Profile", href: "/dashboard/profile", icon: UserCircle },
-      { name: "LinkedIn Optimizer", href: "/dashboard/linkedin-optimizer", icon: Linkedin, badge: "NEW" },
-      { name: "Resume Generator", href: "/dashboard/generator", icon: Zap, badge: "PRO" },
+      { name: "LinkedIn Optimizer", href: "/dashboard/linkedin-optimizer", icon: Linkedin, isNew: true },
+      { name: "Resume Generator", href: "/dashboard/generator", icon: Zap, isPro: true },
       { name: "Saved Resumes", href: "/dashboard/resumes", icon: History },
       { name: "Cover Letter", href: "/dashboard/cover-letter", icon: FileText },
     ],
@@ -46,18 +42,22 @@ const navigationGroups: Array<{
     label: "Job Tracking",
     items: [
       { name: "Job Tracker", href: "/dashboard/jobs", icon: Briefcase },
-      { name: "ATS Score", href: "/dashboard/ats-score", icon: ScanLine, badge: "NEW" },
-      { name: "Find Jobs", href: "/dashboard/find-jobs", icon: Search, badge: "NEW" },
-      { name: "Job Scrapper", href: "/dashboard/job-scrapper", icon: Sparkles, badge: "NEW" },
+      { name: "ATS Score", href: "/dashboard/ats-score", icon: ScanLine, isNew: true },
+      { name: "Find Jobs", href: "/dashboard/find-jobs", icon: Search, isNew: true },
+      { name: "Job Scrapper", href: "/dashboard/job-scrapper", icon: Sparkles, isNew: true },
     ],
   },
   {
     label: "Interview",
-    items: [{ name: "Interview Prep", href: "/dashboard/interview-prep", icon: Mic, badge: "PRO" }],
+    items: [
+      { name: "Interview Prep", href: "/dashboard/interview-prep", icon: Mic, isPro: true },
+    ],
   },
   {
     label: "Apps & Tools",
-    items: [{ name: "Extension", href: "/dashboard/extension", icon: Chrome }],
+    items: [
+      { name: "Extension", href: "/dashboard/extension", icon: Chrome },
+    ],
   },
 ];
 
@@ -69,88 +69,96 @@ export function Sidebar({ onClose }: SidebarProps) {
   const pathname = usePathname();
 
   return (
-    <aside className="flex h-full w-full flex-col overflow-hidden border-r border-[#dde7f5] bg-white text-[#081432]">
-      <div className="flex h-[92px] items-center justify-between px-8">
-        <Link href="/dashboard" onClick={onClose} className="flex items-center gap-3">
-          <img src="/logo.png" alt="Vignova Logo" className="h-12 w-12 object-contain" />
-          <div className="leading-tight">
-            <p className="text-2xl font-extrabold tracking-tight text-[#12204a]">VIGNOVA</p>
-            <p className="text-xs font-medium text-[#667894]">Build Tomorrow, Faster</p>
-          </div>
-        </Link>
+    <div className="flex h-full w-full flex-col bg-[var(--sidebar-bg)] border-r border-[var(--border-color)] relative overflow-hidden transition-colors duration-300">
+      {/* Subtle glow */}
+      <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-[var(--primary)]/10 to-transparent pointer-events-none" />
 
-        {onClose ? (
+      {/* Logo Area */}
+      <div className="flex h-16 items-center justify-between px-6 bg-[#000000] border-b border-white/10 z-10">
+        <div className="flex items-end">
+          <img src="/logo.png" alt="Vignova Logo" width={40} height={40} className="w-10 h-10 object-contain" />
+          <span className="text-lg font-bold text-white tracking-tight -ml-1.5 mb-0.5">VIGNOVA</span>
+        </div>
+        {/* Close button — only visible in mobile drawer */}
+        {onClose && (
           <button
             onClick={onClose}
-            className="rounded-lg border border-[#d7e2f2] p-2 text-[#62708d] transition hover:bg-blue-50 hover:text-blue-700"
+            className="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 transition-colors"
             aria-label="Close menu"
           >
             <X className="h-5 w-5" />
           </button>
-        ) : (
-          <button
-            className="rounded-lg border border-[#d7e2f2] bg-[#f5f8fd] p-2 text-[#48617f] transition hover:bg-blue-50 hover:text-blue-700"
-            aria-label="Collapse sidebar"
-            type="button"
-          >
-            <ChevronLeft className="h-5 w-5" />
-          </button>
         )}
       </div>
 
-      <nav className="flex-1 overflow-y-auto px-4 pb-4">
+      {/* Navigation Links */}
+      <nav className="flex-1 px-3 py-4 z-10 overflow-y-auto flex flex-col gap-4">
         {navigationGroups.map((group, groupIndex) => (
-          <div key={group.label} className={groupIndex === 0 ? "" : "border-t border-[#e7edf6] pt-5"}>
-            <p className="mb-3 px-3 text-xs font-extrabold uppercase tracking-[0.14em] text-[#7b8aa6]">{group.label}</p>
-            <div className="mb-5 space-y-1.5">
+          <div key={group.label}>
+            {group.label && (
+              <div className="px-3 mb-2 flex items-center">
+                <span className="text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider opacity-60">
+                  {group.label}
+                </span>
+              </div>
+            )}
+
+            <div className="space-y-1">
               {group.items.map((item) => {
-                const active = pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href));
+                const isActive = pathname === item.href;
+                const isProItem = (item as any).isPro;
+                const isUpcoming = (item as any).isUpcoming;
+                const isNew = (item as any).isNew;
+
                 return (
                   <Link
-                    key={item.href}
+                    key={item.name}
                     href={item.href}
                     onClick={onClose}
-                    className={`flex h-12 items-center gap-3 rounded-xl px-4 text-[15px] font-semibold transition ${
-                      active
-                        ? "bg-blue-50 text-blue-700 shadow-[inset_4px_0_0_#2563eb]"
-                        : "text-[#1f2d4a] hover:bg-[#f4f7fc] hover:text-blue-700"
-                    }`}
+                    className={`group flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-all duration-200 ${isActive
+                      ? "bg-[var(--primary)]/10 text-[var(--primary)] border border-[var(--primary)]/20 shadow-[0_0_15px_rgba(var(--primary),0.05)]"
+                      : "text-[var(--text-secondary)] hover:bg-[var(--foreground)]/5 hover:text-[var(--foreground)] border border-transparent"
+                      } ${isProItem ? "hover:border-[var(--primary)]/30" : ""}`}
                   >
-                    <item.icon className={`h-5 w-5 shrink-0 ${active ? "text-blue-600" : "text-[#283b62]"}`} />
-                    <span className="min-w-0 flex-1 truncate">{item.name}</span>
-                    {item.badge && (
-                      <span className={`rounded-md px-2 py-1 text-[10px] font-extrabold leading-none ${
-                        item.badge === "PRO"
-                          ? "bg-blue-600 text-white"
-                          : "border border-blue-200 bg-blue-100 text-blue-700"
-                      }`}>
-                        {item.badge}
+                    <item.icon
+                      className={`mr-3 h-4 w-4 flex-shrink-0 transition-colors ${isActive
+                        ? "text-[var(--primary)]"
+                        : isProItem
+                          ? "text-[var(--primary)] group-hover:text-[var(--primary)]"
+                          : "text-[var(--text-secondary)] group-hover:text-[var(--foreground)]"
+                        }`}
+                    />
+
+                    <span>{item.name}</span>
+
+                    {isProItem && (
+                      <span className="ml-auto text-[9px] font-bold bg-[var(--primary)] text-white px-1.5 py-0.5 rounded border border-[var(--primary)]/50 shadow-[0_0_10px_rgba(var(--primary),0.2)]">
+                        PRO
+                      </span>
+                    )}
+
+                    {isNew && (
+                      <span className="ml-auto text-[9px] font-bold bg-blue-500/10 text-blue-500 px-1.5 py-0.5 rounded border border-blue-500/20">
+                        NEW
+                      </span>
+                    )}
+
+                    {isUpcoming && (
+                      <span className="ml-auto text-[9px] font-bold bg-amber-500/10 text-amber-500 px-1.5 py-0.5 rounded border border-amber-500/20">
+                        Soon
                       </span>
                     )}
                   </Link>
                 );
               })}
             </div>
+
+            {groupIndex < navigationGroups.length - 1 && (
+              <hr className="mt-4 border-[var(--border-color)]/30" />
+            )}
           </div>
         ))}
       </nav>
-
-      <div className="p-4">
-        <Link
-          href="/dashboard/billing"
-          onClick={onClose}
-          className="flex items-center justify-between rounded-xl border border-blue-100 bg-blue-50 px-4 py-4 text-blue-700 shadow-[0_12px_26px_rgba(37,99,235,0.12)] transition hover:bg-blue-100"
-        >
-          <div className="flex items-center gap-3">
-            <Crown className="h-5 w-5 fill-blue-600 text-blue-600" />
-            <div>
-              <p className="text-sm font-extrabold">Upgrade to Pro</p>
-              <p className="text-xs font-medium text-[#62708d]">Unlock all premium features</p>
-            </div>
-          </div>
-          <ChevronRight className="h-5 w-5" />
-        </Link>
-      </div>
-    </aside>
+    </div>
   );
 }

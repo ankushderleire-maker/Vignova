@@ -16,18 +16,15 @@ export default function DashboardLayoutContent({
 
     // Close drawer on route change
     useEffect(() => {
-        if (!isMobileSidebarOpen) return;
-
-        const timeout = window.setTimeout(() => setIsMobileSidebarOpen(false), 0);
-        return () => window.clearTimeout(timeout);
-    }, [isMobileSidebarOpen, pathname]);
+        setIsMobileSidebarOpen(false);
+    }, [pathname]);
 
     const isStudio = pathname.startsWith("/dashboard/jobs/") && pathname.split("/").length > 3;
 
     if (isStudio) {
         return (
-            <div className="flex h-screen overflow-hidden bg-[#f4f8ff] font-sans text-[#081432]">
-                <main className="relative h-full flex-1 overflow-y-auto bg-[#f4f8ff]">
+            <div className="flex h-screen bg-[var(--background)] text-[var(--foreground)] overflow-hidden font-sans">
+                <main className="flex-1 relative overflow-y-auto bg-[var(--background)] h-full">
                     <div className="absolute inset-0 z-0 pointer-events-none fixed" />
                     <div className="relative z-10 h-full">
                         {children}
@@ -38,9 +35,9 @@ export default function DashboardLayoutContent({
     }
 
     return (
-        <div className="flex h-screen overflow-hidden bg-[#f4f8ff] font-sans text-[#081432] transition-colors duration-300">
+        <div className="flex h-screen bg-[var(--background)] text-[var(--foreground)] overflow-hidden font-sans transition-colors duration-300">
             {/* Desktop Sidebar (fixed, hidden on mobile) */}
-            <div className="fixed inset-y-0 z-50 hidden md:flex md:w-72 md:flex-col transition-colors duration-300">
+            <div className="hidden md:flex md:w-64 md:flex-col fixed inset-y-0 z-50 transition-colors duration-300">
                 <Sidebar />
             </div>
 
@@ -60,12 +57,12 @@ export default function DashboardLayoutContent({
             )}
 
             {/* Main Content Area */}
-            <div className="flex h-full min-w-0 flex-1 flex-col md:pl-72">
+            <div className="flex flex-1 flex-col md:pl-64 h-full min-w-0">
                 <Header onMenuClick={() => setIsMobileSidebarOpen(true)} />
 
-                <main id="dashboard-main-scroll" className="relative flex-1 overflow-y-auto overflow-x-hidden bg-[#f4f8ff] transition-colors duration-300">
+                <main id="dashboard-main-scroll" className="flex-1 relative overflow-y-auto overflow-x-hidden bg-[var(--background)] transition-colors duration-300">
                     <div className="absolute inset-0 z-0 pointer-events-none fixed" />
-                    <div className="relative z-10 w-full max-w-full px-4 pb-6 pt-2 md:px-8 md:pb-8 md:pt-0">
+                    <div className="relative z-10 p-4 md:p-8 w-full max-w-full">
                         {children}
                     </div>
                 </main>
