@@ -1,4 +1,5 @@
 "use client";
+import { BrandLockup } from "@/components/BrandLockup";
 
 import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -72,18 +73,17 @@ function ResetPasswordForm() {
         <div className="relative flex min-h-screen w-full items-center justify-center bg-black font-ui selection:bg-white/20">
             {/* THEME BACKGROUND */}
             <div className="absolute inset-0 z-0">
-                <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,#059669_0%,#000000_60%)] opacity-80" />
+                <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,#5141f5_0%,#0a0a0f_60%)] opacity-80" />
                 <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20" />
                 <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px]" />
             </div>
 
             {/* CARD CONTENT */}
-            <div className="relative z-10 w-full max-w-[500px] rounded-[24px] bg-black/20 p-6 sm:p-8 backdrop-blur-[32px] border border-white/10 shadow-[0_0_40px_rgba(0,0,0,0.5)] my-auto flex flex-col">
+            <div className="relative z-10 w-full max-w-[500px] rounded-[24px] bg-[#262149]/90 p-6 sm:p-8 backdrop-blur-[32px] border border-white/15 shadow-[0_0_40px_rgba(0,0,0,0.5)] my-auto flex flex-col">
                 
                 {/* Logo & Brand */}
-                <div className="flex items-end justify-center mb-5">
-                     <img src="/logo.png" alt="Vignova Logo" className="w-10 h-10 object-contain" />
-                     <span className="text-2xl font-bold text-white tracking-tight -ml-1">VIGNOVA</span>
+                <div className="flex items-center justify-center mb-5">
+                    <BrandLockup size={56} wordmarkClassName="text-3xl" tone="on-dark" />
                 </div>
 
                 {!success ? (

@@ -133,7 +133,7 @@ export const InteractivePreviewPanel: React.FC<InteractivePreviewPanelProps> = (
                 }
                 [contenteditable="true"] { outline: none; }
                 [contenteditable="true"]:focus {
-                    outline: 2px solid #10b981 !important;
+                    outline: 2px solid #8b5cf6 !important;
                     outline-offset: 2px;
                 }
                 [data-editable]:not([contenteditable="true"]) { user-select: none; }

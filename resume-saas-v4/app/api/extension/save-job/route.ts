@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getExtensionUser } from "@/lib/extensionAuth";
 import { db } from "@/lib/db";
 import { withCors, handleCorsOptions } from "@/lib/extensionCors";
+import { queueJdFormat } from "@/lib/jdFormatQueue";
 
 export const OPTIONS = handleCorsOptions;
 
@@ -50,6 +51,10 @@ export async function POST(req: Request) {
                 }
             });
 
+            // The extension sends raw page text; structuring it happens after
+            // the response so the popup closes immediately.
+            queueJdFormat(existingJob.id, description);
+
             return withCors(NextResponse.json({
                 success: true,
                 jobId: existingJob.id,
@@ -71,6 +76,8 @@ export async function POST(req: Request) {
                 status: "SAVED",
             },
         });
+
+        queueJdFormat(job.id, description);
 
         return withCors(NextResponse.json({
             success: true,

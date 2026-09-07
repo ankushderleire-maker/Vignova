@@ -1,0 +1,23 @@
+{
+  "name": "Vignova \u2014 AI Resume & Job Search Tools",
+  "short_name": "Vignova",
+  "start_url": "/",
+  "scope": "/",
+  "display": "browser",
+  "theme_color": "#7155ed",
+  "background_color": "#ffffff",
+  "icons": [
+    {
+      "src": "/android-chrome-192x192.png?v=purple-blue-20260907",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/android-chrome-512x512.png?v=purple-blue-20260907",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}

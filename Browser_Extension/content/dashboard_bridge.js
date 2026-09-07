@@ -1,7 +1,7 @@
 /**
  * dashboard_bridge.js
- * Runs on the Vignova dashboard (app.vignova.io) and bridges
- * window.postMessage ↔ chrome.runtime messaging.
+ * Runs on the Vignova dashboard (app.vignova.io) and answers the
+ * page's extension-detection ping over window.postMessage.
  *
  * The extension context can become invalid when the extension is
  * reloaded or updated while the dashboard tab is open. Every
@@ -45,17 +45,6 @@ function onWindowMessage(event) {
                 window.location.origin   // tighter than "*"
             );
         }
-
-        if (event.data.type === "VIGNOVA_ANALYZE_LINKEDIN") {
-            const url = event.data.payload?.url;
-            if (url && typeof url === "string" && url.includes("linkedin.com/in/")) {
-                chrome.runtime.sendMessage(
-                    { action: "SCRAPE_LINKEDIN_PROFILE", url },
-                    // Optional response callback — swallow any error
-                    () => { if (chrome.runtime.lastError) { /* expected when bg not ready */ } }
-                );
-            }
-        }
     } catch (err) {
         // Most likely "Extension context invalidated" — clean up and move on
         if (err.message && err.message.includes("Extension context invalidated")) {
@@ -66,27 +55,3 @@ function onWindowMessage(event) {
 }
 
 window.addEventListener("message", onWindowMessage);
-
-// ── extension → window bridge ────────────────────────────────────────
-// onMessage listener automatically becomes no-op when context is invalid,
-// but we still wrap to be safe.
-chrome.runtime.onMessage.addListener((message, _sender, _sendResponse) => {
-    if (!isContextValid()) return;
-
-    try {
-        if (message.type === "LINKEDIN_PROFILE_DATA") {
-            window.postMessage(
-                { type: "VIGNOVA_LINKEDIN_DATA", payload: message.payload },
-                window.location.origin
-            );
-        }
-        if (message.type === "LINKEDIN_SCRAPE_ERROR") {
-            window.postMessage(
-                { type: "VIGNOVA_LINKEDIN_ERROR", error: message.error },
-                window.location.origin
-            );
-        }
-    } catch (err) {
-        // Swallow — page may have navigated
-    }
-});

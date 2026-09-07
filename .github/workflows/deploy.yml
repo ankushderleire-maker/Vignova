@@ -35,20 +35,17 @@ jobs:
 
             CHANGED=$(git diff --name-only $PREV_COMMIT $NEW_COMMIT)
 
-            REBUILD_LANDING=false
             REBUILD_DASHBOARD=false
             REBUILD_BACKEND=false
 
-            echo "$CHANGED" | grep -q "LandingCode" && REBUILD_LANDING=true
             echo "$CHANGED" | grep -q "resume-saas-v4" && REBUILD_DASHBOARD=true
             echo "$CHANGED" | grep -q "Backend" && REBUILD_BACKEND=true
 
             echo "Changes detected:"
-            echo "Landing: $REBUILD_LANDING"
             echo "Dashboard: $REBUILD_DASHBOARD"
             echo "Backend: $REBUILD_BACKEND"
 
-            if [ "$REBUILD_LANDING" = false ] && [ "$REBUILD_DASHBOARD" = false ] && [ "$REBUILD_BACKEND" = false ]; then
+            if [ "$REBUILD_DASHBOARD" = false ] && [ "$REBUILD_BACKEND" = false ]; then
               echo "⚠️ No service directories changed — nothing to rebuild."
               echo "Changed files were:"
               echo "$CHANGED"
@@ -56,10 +53,6 @@ jobs:
             fi
 
             echo "Deploying..."
-
-            if [ "$REBUILD_LANDING" = true ]; then
-              docker compose up -d --build landing
-            fi
 
             if [ "$REBUILD_DASHBOARD" = true ]; then
               docker compose up -d --build dashboard

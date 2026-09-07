@@ -9,27 +9,27 @@ export default function SettingsPage() {
     const themes = [
         {
             id: "light",
-            name: "White (Day)",
-            description: "Clean, ATS-friendly light mode.",
+            name: "Vignova Light",
+            description: "Brand purple and blue, matching vignova.io.",
             icon: Sun,
-            bgClass: "bg-white",
-            borderClass: "border-gray-200"
+            bgClass: "bg-gradient-to-br from-[#f3ecff] via-white to-[#e6f0ff]",
+            borderClass: "border-[#e9e6f0]"
         },
         {
             id: "dark",
             name: "Dark (Default)",
-            description: "Sleek dark mode for focus.",
+            description: "The same brand palette, inverted for low light.",
             icon: Moon,
-            bgClass: "bg-[#0a0a0a]",
+            bgClass: "bg-[#0a0a0f]",
             borderClass: "border-white/10"
         },
         {
             id: "wine-dark",
-            name: "Red Wine (Black)",
-            description: "Burgundy accents on black.",
+            name: "Merlot (Dark)",
+            description: "Deep plum — warmer than the default dark.",
             icon: Wine,
-            bgClass: "bg-[#0f0505]",
-            borderClass: "border-rose-900/30"
+            bgClass: "bg-[#120616]",
+            borderClass: "border-fuchsia-900/30"
         }
     ] as const;
 
@@ -46,7 +46,6 @@ export default function SettingsPage() {
                             ? "border-[var(--primary)] shadow-[0_0_20px_rgba(0,0,0,0.3)] ring-2 ring-[var(--primary)]/20"
                             : "border-transparent hover:border-[var(--border-color)] shadow-none"
                             } ${t.bgClass}`}
-                        style={{ backgroundColor: t.id.includes('light') && theme !== t.id ? '#f5f5f5' : undefined }} // Contrast for light preview
                     >
                         {theme === t.id && (
                             <div className="absolute top-3 right-3 bg-[var(--primary)] text-white rounded-full p-1 shadow-lg">
@@ -72,14 +71,20 @@ export default function SettingsPage() {
             <div className="mt-12 p-6 rounded-xl border border-[var(--border-color)] bg-[var(--sidebar-bg)] shadow-md">
                 <h3 className="font-bold text-lg mb-4 text-[var(--foreground)]">Preview</h3>
                 <div className="flex gap-4">
-                    <div className="w-1/3 h-32 rounded-lg bg-[var(--background)] border border-[var(--border-color)] flex items-center justify-center">
+                    <div className="w-1/4 h-32 rounded-lg bg-[var(--background)] border border-[var(--border-color)] flex items-center justify-center">
                         <span className="text-sm font-medium">Background</span>
                     </div>
-                    <div className="w-1/3 h-32 rounded-lg bg-[var(--primary)] flex items-center justify-center text-white shadow-lg">
+                    <div className="w-1/4 h-32 rounded-lg bg-[var(--primary)] flex items-center justify-center text-white shadow-lg">
                         <span className="text-sm font-bold">Primary</span>
                     </div>
-                    <div className="w-1/3 h-32 rounded-lg bg-[var(--sidebar-bg)] border border-[var(--border-color)] flex items-center justify-center">
+                    <div className="w-1/4 h-32 rounded-lg bg-[var(--sidebar-bg)] border border-[var(--border-color)] flex items-center justify-center">
                         <span className="text-sm font-medium">Sidebar</span>
+                    </div>
+                    <div
+                        className="w-1/4 h-32 rounded-lg flex items-center justify-center text-white shadow-lg"
+                        style={{ background: "var(--brand-gradient)" }}
+                    >
+                        <span className="text-sm font-bold">Gradient</span>
                     </div>
                 </div>
             </div>

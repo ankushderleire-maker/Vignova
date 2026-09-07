@@ -25,10 +25,10 @@ export default async function CompleteProfilePage() {
   return (
     <div className="relative flex min-h-screen w-full items-center justify-center bg-black font-ui selection:bg-white/20">
       <div className="absolute inset-0 z-0">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,#059669_0%,#000000_60%)] opacity-80" />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,#5141f5_0%,#0a0a0f_60%)] opacity-80" />
           <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20" />
       </div>
-      <div className="relative z-10 w-full max-w-[500px] rounded-[24px] bg-black/20 p-6 sm:p-8 backdrop-blur-[32px] border border-white/10 shadow-[0_0_40px_rgba(0,0,0,0.5)] my-auto flex flex-col">
+      <div className="relative z-10 w-full max-w-[500px] rounded-[24px] bg-[#262149]/90 p-6 sm:p-8 backdrop-blur-[32px] border border-white/15 shadow-[0_0_40px_rgba(0,0,0,0.5)] my-auto flex flex-col">
           <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-white mb-2 text-center">
               Complete your profile
           </h2>

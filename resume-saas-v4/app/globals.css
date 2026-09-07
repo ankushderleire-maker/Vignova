@@ -1,5 +1,17 @@
 @import "tailwindcss";
 
+/**
+ * Make `dark:` follow the theme the user picked, not the operating system.
+ *
+ * Tailwind v4 compiles `dark:` to `@media (prefers-color-scheme: dark)` by
+ * default. ThemeProvider puts a `.dark` class on <html> for the dark and
+ * merlot themes, and every `dark:` utility in this app was written against
+ * that class — so without this the two disagreed whenever the OS setting
+ * differed from the in-app theme (e.g. the cover letter panel stayed
+ * `bg-white` while the text was the dark theme's near-white foreground).
+ */
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
   --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, monospace;
@@ -7,63 +19,94 @@
 
 :root {
   /* DEFAULT (DARK) COLORS - Fallback */
-  --background: #0a0a0a;
-  --foreground: #ededed;
-  --primary: #22c55e;
-  /* Green-500 */
-  --grid-color: rgba(255, 255, 255, 0.03);
+  --background: #0a0a0f;
+  --foreground: #ececf2;
+  --primary: #8b5cf6;
+  /* Violet-500 — the landing site's --color-brand-500 */
+  --primary-dark: #7c3aed;
+  --primary-soft: rgba(139, 92, 246, 0.16);
+  --brand-gradient: linear-gradient(110deg, #a855f7 0%, #6f7bff 45%, #38b6ff 100%);
+  --grid-color: rgba(139, 92, 246, 0.05);
   --card-border-bg: rgba(255, 255, 255, 0.05);
   --card-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.2);
   --card-hover-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5);
 }
 
-/* THEME: DARK (Default) */
-[data-theme='dark'] {
-  --background: #0a0a0a;
-  --foreground: #ededed;
-  --text-secondary: #a1a1aa;
-  /* Zinc-400 */
-  --sidebar-bg: #111;
-  --border-color: rgba(255, 255, 255, 0.1);
-  --primary: #22c55e;
-  --grid-color: rgba(255, 255, 255, 0.03);
-  --card-border-bg: rgba(255, 255, 255, 0.05);
-  --card-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.2);
-  --card-hover-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5);
+/* The logo lockup keeps the brand's purple-to-blue in every theme, because the
+   mark beside the wordmark is a fixed-colour asset. Deliberately defined once
+   and never overridden per theme, unlike --brand-gradient which follows the
+   theme's accent. The dark variant only lifts the purple end for legibility. */
+:root {
+  --logo-gradient: linear-gradient(110deg, #861cf6 0%, #5141f5 45%, #157bdc 100%);
 }
 
-/* THEME: LIGHT (White) */
-[data-theme='light'] {
-  --background: #ffffff;
-  /* Pure white background instead of blueish off-white */
-  --foreground: #0f172a;
-  --text-secondary: #475569;
-  --sidebar-bg: #ffffff;
-  --border-color: #cbd5e1;
-  --primary: #2563eb;
-  --grid-color: rgba(37, 99, 235, 0.08);
-  /* Blue grid effect */
-  --card-border-bg: rgba(0, 0, 0, 0.05);
-  --card-shadow: 0 4px 15px -2px rgba(50, 50, 93, 0.05), 0 2px 8px -2px rgba(0, 0, 0, 0.025);
-  --card-hover-shadow: 0 10px 25px -5px rgba(50, 50, 93, 0.1), 0 8px 10px -5px rgba(0, 0, 0, 0.05);
-}
-
-/* THEME: RED WINE BLACK */
+[data-theme='dark'],
 [data-theme='wine-dark'] {
-  --background: #0f0505;
-  /* Very dark red/black */
-  --foreground: #ffe4e6;
-  /* Rose-100 */
-  --sidebar-bg: #1a0808;
-  /* Dark Red Wine */
-  --border-color: rgba(255, 255, 255, 0.1);
-  --primary: #e11d48;
-  /* Rose-600 */
-  --grid-color: rgba(225, 29, 72, 0.05);
-  /* Rose grid */
+  /* Lifted so the wordmark still reads against a near-black panel. */
+  --logo-gradient: linear-gradient(110deg, #a855f7 0%, #6f7bff 45%, #38b6ff 100%);
+}
+
+/* THEME: DARK (Default) — the same brand as light, inverted. The greys carry a
+   faint violet cast so the dark and light themes read as one product rather
+   than two unrelated palettes, and the accent is violet-500 lifted off black
+   (4.7:1) rather than the light theme's #6c4bea, which is too dark here. */
+[data-theme='dark'] {
+  --background: #0a0a0f;
+  --foreground: #ececf2;
+  --text-secondary: #a5a1b3;
+  /* Raised a long way off the page ground: the logo's deep-violet end has
+     nothing to separate against on a near-black panel. */
+  --sidebar-bg: #1a1726;
+  --border-color: rgba(178, 160, 245, 0.16);
+  --primary: #8b5cf6;
+  --primary-dark: #7c3aed;
+  --primary-soft: rgba(139, 92, 246, 0.16);
+  --brand-gradient: linear-gradient(110deg, #a855f7 0%, #6f7bff 45%, #38b6ff 100%);
+  --grid-color: rgba(139, 92, 246, 0.05);
   --card-border-bg: rgba(255, 255, 255, 0.05);
-  --card-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.3);
-  --card-hover-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.6);
+  --card-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.35);
+  --card-hover-shadow: 0 14px 34px -10px rgba(88, 44, 180, 0.45);
+}
+
+/* THEME: LIGHT — the vignova.io palette, so the app and the marketing site
+   read as one product. Values are lifted from new_landing/styles.css:
+   --ink #202033, --muted #6f6d80, --purple #6c4bea, --line #e9e6f0, and the
+   brand gradient purple -> indigo -> blue. */
+[data-theme='light'] {
+  --background: #fbfaff;
+  /* Lavender-white, not pure white: panels sit on it as raised surfaces. */
+  --foreground: #202033;
+  --text-secondary: #6f6d80;
+  --sidebar-bg: #ffffff;
+  --border-color: #e9e6f0;
+  --primary: #6c4bea;
+  --primary-dark: #5133cc;
+  --primary-soft: #f0ebff;
+  --brand-gradient: linear-gradient(110deg, #861cf6 0%, #5141f5 45%, #157bdc 100%);
+  --grid-color: rgba(108, 75, 234, 0.07);
+  --card-border-bg: rgba(108, 75, 234, 0.06);
+  --card-shadow: 0 4px 16px -6px rgba(52, 37, 100, 0.10), 0 1px 3px rgba(52, 37, 100, 0.05);
+  --card-hover-shadow: 0 18px 45px -20px rgba(52, 37, 100, 0.28);
+}
+
+/* THEME: MERLOT — a warmer, deeper alternative to the default dark that still
+   belongs to the brand. The old rose accent (#e11d48) fought the purple-blue
+   logo; wine is a purple-red anyway, so this reads truer to the name and sits
+   in the same family as the violet used by dark. */
+[data-theme='wine-dark'] {
+  --background: #120616;
+  --foreground: #f3e8ff;
+  --text-secondary: #b9a3c4;
+  --sidebar-bg: #231032;
+  --border-color: rgba(216, 160, 245, 0.16);
+  --primary: #b84ae0;
+  --primary-dark: #9a2fc4;
+  --primary-soft: rgba(184, 74, 224, 0.16);
+  --brand-gradient: linear-gradient(110deg, #e879f9 0%, #a855f7 50%, #6f7bff 100%);
+  --grid-color: rgba(184, 74, 224, 0.05);
+  --card-border-bg: rgba(255, 255, 255, 0.05);
+  --card-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.35);
+  --card-hover-shadow: 0 14px 34px -10px rgba(120, 40, 160, 0.45);
 }
 
 
@@ -72,6 +115,17 @@ body {
   background: var(--background);
   color: var(--foreground);
   transition: background-color 0.3s, color 0.3s;
+}
+
+/* The landing page's purple-to-blue wash, as two corner glows over the base
+   colour. Fixed so it stays put while the page scrolls. Panels paint their own
+   opaque --background on top, so this reads at the edges of the shell. */
+[data-theme='light'] body {
+  background:
+    radial-gradient(ellipse 80% 55% at 12% -8%, rgba(134, 28, 246, 0.10), transparent 62%),
+    radial-gradient(ellipse 70% 50% at 96% -2%, rgba(21, 123, 220, 0.09), transparent 64%),
+    var(--background);
+  background-attachment: fixed;
 }
 
 /* GLOBAL CURSOR STYLES */
@@ -95,18 +149,31 @@ input[type="reset"] {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(167, 139, 250, 0.22);
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.2);
+  background: rgba(167, 139, 250, 0.38);
 }
 
 /* Firefox Support */
 * {
   scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.1) transparent;
+  scrollbar-color: rgba(167, 139, 250, 0.22) transparent;
+}
+
+/* A white thumb is invisible on a light ground, so light gets its own. */
+[data-theme='light'] ::-webkit-scrollbar-thumb {
+  background: rgba(108, 75, 234, 0.22);
+}
+
+[data-theme='light'] ::-webkit-scrollbar-thumb:hover {
+  background: rgba(108, 75, 234, 0.38);
+}
+
+[data-theme='light'] * {
+  scrollbar-color: rgba(108, 75, 234, 0.22) transparent;
 }
 
 /* --- ANIMATIONS --- */
@@ -118,7 +185,9 @@ input[type="reset"] {
 
   to {
     opacity: 1;
-    transform: translateY(0);
+    /* `none`, not translateY(0): an identity transform would still make
+       this element the containing block for any position:fixed child. */
+    transform: none;
   }
 }
 
@@ -130,7 +199,7 @@ input[type="reset"] {
 
   to {
     opacity: 1;
-    transform: translateX(0);
+    transform: none;
   }
 }
 
@@ -142,7 +211,7 @@ input[type="reset"] {
 
   to {
     opacity: 1;
-    transform: translateX(0);
+    transform: none;
   }
 }
 
@@ -154,24 +223,24 @@ input[type="reset"] {
 
   to {
     opacity: 1;
-    transform: scale(1);
+    transform: none;
   }
 }
 
 .animate-fade-in {
-  animation: fadeIn 0.4s ease-out forwards;
+  animation: fadeIn 0.4s ease-out backwards;
 }
 
 .animate-slide-in-right {
-  animation: slideInRight 0.4s ease-out forwards;
+  animation: slideInRight 0.4s ease-out backwards;
 }
 
 .animate-slide-in-left {
-  animation: slideInLeft 0.4s ease-out forwards;
+  animation: slideInLeft 0.4s ease-out backwards;
 }
 
 .animate-scale-in {
-  animation: scaleIn 0.3s ease-out forwards;
+  animation: scaleIn 0.3s ease-out backwards;
 }
 
 @keyframes slideDown {
@@ -182,12 +251,14 @@ input[type="reset"] {
 
   to {
     opacity: 1;
-    transform: translateY(0);
+    /* `none`, not translateY(0): an identity transform would still make
+       this element the containing block for any position:fixed child. */
+    transform: none;
   }
 }
 
 .animate-slide-down {
-  animation: slideDown 0.5s ease-out forwards;
+  animation: slideDown 0.5s ease-out backwards;
 }
 
 .delay-100 {
@@ -204,9 +275,9 @@ input[type="reset"] {
 
 @keyframes drawerSlideIn {
   from { transform: translateX(-100%); }
-  to   { transform: translateX(0); }
+  to   { transform: none; }
 }
 
 .animate-drawer-slide-in {
-  animation: drawerSlideIn 0.25s ease-out forwards;
+  animation: drawerSlideIn 0.25s ease-out backwards;
 }

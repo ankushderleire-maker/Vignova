@@ -35,6 +35,13 @@ export type ContactInfo = {
   website: string;
 };
 
+/** A section the user invented, e.g. Publications or Conferences. */
+export type CustomSection = {
+  id: string;
+  title: string;
+  content: string;
+};
+
 // This is the formatted data structure the Frontend/PDF Engine expects
 export type ResumeData = {
   fullName: string;
@@ -47,5 +54,8 @@ export type ResumeData = {
   projects: Project[];
   certifications?: string[];
   languages?: string[];
+  customSections?: CustomSection[];
+  /** Section ids in the order the user arranged them. Absent means the default. */
+  sectionOrder?: string[];
   [key: string]: any; // Allow dynamic fields (e.g. awards, custom sections)
 };

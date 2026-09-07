@@ -1,17 +1,20 @@
 "use client";
 
-import { useEffect, useState, Suspense } from "react";
+import { useEffect, useRef, useState, Suspense } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import dynamic from "next/dynamic";
 import {
     ArrowLeft, Wand2, Loader2, User, Briefcase,
     Trash2, LayoutTemplate, Zap, History, FileText, Save,
-    Bold, Italic, Target, Copy, Mail, Sparkles, ChevronRight, Send, ArrowRight, Rocket
+    Bold, Italic, Target, Copy, Mail, Sparkles, ChevronRight, Send, ArrowRight, Rocket,
+    ExternalLink, MapPin, CalendarDays, Repeat, BarChart3, Search, SlidersHorizontal,
+    X, Plus, RefreshCw, GraduationCap, Wrench, LayoutGrid, Globe, FolderKanban, Check,
+    Award, Users, Link as LinkIcon
 } from "lucide-react";
 import { AIPreparationAnimation } from "@/components/resume-engine/AIPreparationAnimation";
 
 // --- TYPES ---
-import { ResumeData } from "@/types/resume";
+import { ResumeData, type CustomSection } from "@/types/resume";
 import SaveDialog from "@/components/resume-engine/SaveDialog";
 
 // --- TEMPLATES ---
@@ -24,6 +27,14 @@ import { DesignSettings } from "@/components/resume-engine/DesignControls";
 import { useResumeStore, TEMPLATES } from '@/lib/stores/resumeStore';
 import type { TemplateId } from '@/lib/stores/resumeStore';
 import { CustomDialog } from "@/components/ui/CustomDialog";
+import { ImproveWithAIDialog, type SummaryVariant } from "@/components/resume-engine/ImproveWithAIDialog";
+import { SectionAccordion, type EditorSection } from "@/components/resume-engine/SectionAccordion";
+import {
+    JobDescriptionBody,
+    SkillChips,
+    relativeDay,
+    useFormattedJd,
+} from "@/components/jobs/JobDetails";
 
 const PdfDownloadButton = dynamic(
     () => import("@/components/resume-engine/HtmlPreviewPanel").then((mod) => mod.PdfDownloadButton),
@@ -40,7 +51,20 @@ function getTemplateName(id: TemplateId): string {
 }
 
 // --- LOCAL TYPES ---
-type Job = { id: string; company: string; jobTitle: string; description: string; };
+type Job = {
+    id: string;
+    company: string;
+    jobTitle: string;
+    description: string;
+    location?: string | null;
+    salary?: string | null;
+    jobUrl?: string | null;
+    sourceUrl?: string | null;
+    source?: string;
+    createdAt?: string;
+    coverLetter?: string | null;
+    formattedJd?: any;
+};
 type MasterProfile = any;
 
 function ResumeStudioPageContent() {
@@ -96,6 +120,15 @@ function ResumeStudioPageContent() {
     // Sidebar Tab State (Canva-style)
     const [activeSidebarTab, setActiveSidebarTab] = useState<SidebarTab>('content');
 
+    // "Improve with AI" — options are offered, never applied silently.
+    const [aiDialogOpen, setAiDialogOpen] = useState(false);
+    const [aiVariants, setAiVariants] = useState<SummaryVariant[]>([]);
+    const [aiLoading, setAiLoading] = useState(false);
+    const [aiError, setAiError] = useState<string | null>(null);
+    const [skillsLoading, setSkillsLoading] = useState(false);
+    const [newSkill, setNewSkill] = useState("");
+
+
     // No longer need activeTemplate state - use zustandTemplateId directly
 
     const [loading, setLoading] = useState(true);
@@ -103,11 +136,64 @@ function ResumeStudioPageContent() {
     const [generatingType, setGeneratingType] = useState<"resume" | "cover-letter" | "email" | "all" | null>(null);
     const [hasGenerated, setHasGenerated] = useState(false);
     const [activeDocument, setActiveDocument] = useState<"resume" | "cover-letter" | "email">("resume");
+
+    // ?doc=cover-letter lets other pages (the Cover Letter list) deep-link into
+    // the right editor instead of dropping the user on the resume tab.
+    useEffect(() => {
+        const doc = searchParams.get("doc");
+        if (doc === "cover-letter" || doc === "email") {
+            setActiveDocument(doc);
+            setMobilePanelView("preview");
+        }
+    }, [searchParams]);
     const [coverLetter, setCoverLetter] = useState<string | null>(null);
     const [draftEmail, setDraftEmail] = useState<string | null>(null);
+    const [letterSaveState, setLetterSaveState] = useState<"idle" | "saving" | "saved">("idle");
+    /** What the server currently holds, so an unchanged letter never PATCHes. */
+    const persistedLetter = useRef<string | null>(null);
 
-    const [activeTab, setActiveTab] = useState<"jd" | "profile" | "saved">("jd");
+    const [activeTab, setActiveTab] = useState<"jd" | "profile" | "saved" | "analysis">("jd");
+
+    // The cover letter is a column on the job, so it is saved in place rather
+    // than through the resume Save dialog. Debounced so typing doesn't PATCH
+    // on every keystroke.
+    useEffect(() => {
+        if (coverLetter === null || coverLetter === persistedLetter.current) return;
+        const jobId = params.jobId as string;
+        setLetterSaveState("saving");
+        const timer = setTimeout(async () => {
+            try {
+                const res = await fetch(`/api/jobs/${jobId}`, {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ coverLetter }),
+                });
+                if (!res.ok) throw new Error("save failed");
+                persistedLetter.current = coverLetter;
+                setLetterSaveState("saved");
+            } catch {
+                setLetterSaveState("idle");
+            }
+        }, 900);
+        return () => clearTimeout(timer);
+    }, [coverLetter, params.jobId]);
+
+    // Structured JD from the formatter agent; falls back to the parser while
+    // the agent answers, so this panel is never empty.
+    const { jd: formattedJd, formatting: jdFormatting } = useFormattedJd(job as any);
     const [mobilePanelView, setMobilePanelView] = useState<"editor" | "preview">("editor");
+
+    /**
+     * The "generate this" call to action owns the right panel only while the
+     * selected document is empty. A job can carry a cover letter without a
+     * resume ever having been generated, and that letter must still show.
+     */
+    const activeDocumentHasContent =
+        activeDocument === "resume"
+            ? Boolean(resumeData)
+            : activeDocument === "cover-letter"
+                ? Boolean(coverLetter)
+                : Boolean(draftEmail);
 
     // --- DATA FETCHING ---
     useEffect(() => {
@@ -124,6 +210,13 @@ function ResumeStudioPageContent() {
                 const pList = profilesJson.profiles || [];
                 setMasterProfilesList(pList);
                 setJob(foundJob);
+
+                // The letter lives on the job, so it is here on load — without
+                // this, arriving from the Cover Letter page showed an empty box.
+                if (foundJob) {
+                    setCoverLetter(foundJob.coverLetter ?? null);
+                    persistedLetter.current = foundJob.coverLetter ?? null;
+                }
                 
                 // Set default or first profile as selected
                 let defaultProfileId = pList.find((p: any) => p.is_default)?.id;
@@ -534,12 +627,479 @@ function ResumeStudioPageContent() {
         setResumeData({ ...resumeData, [section]: newList });
     };
 
+    /** Appends a blank entry so a section can be filled in by hand. */
+    const addArrayItem = (section: 'experience' | 'projects' | 'education', blank: any) => {
+        if (!resumeData) return;
+        const current = Array.isArray(resumeData[section]) ? resumeData[section] : [];
+        setResumeData({ ...resumeData, [section]: [...current, blank] });
+    };
+
     // Helper to insert markdown at cursor position in textarea (simple version)
     const insertMarkdown = (marker: string) => {
         // This is a simplified version. A real implementation would need refs to the active textarea.
         // For now, we will just rely on user typing or provide a hint.
         setDialogConfig({ isOpen: true, type: 'alert', title: 'Formatting Hint', description: 'To bold, type **text**. To italicize, type *text*.', variant: 'default', confirmText: 'Got it' });
     };
+
+
+    /** Current skills as a plain string list, whatever shape the AI returned. */
+    const skillList = (): string[] => {
+        const raw = resumeData?.skills;
+        if (Array.isArray(raw)) return raw.filter(Boolean).map(String);
+        if (raw && typeof raw === "object") {
+            return String((raw as any).technical || "")
+                .split(",")
+                .map((v) => v.trim())
+                .filter(Boolean);
+        }
+        return [];
+    };
+
+    const setSkills = (next: string[]) => {
+        if (resumeData) setResumeData({ ...resumeData, skills: next });
+    };
+
+    const experienceLines = (): string[] =>
+        (resumeData?.experience || []).map((e) => [e.role, e.company].filter(Boolean).join(" at "));
+
+    const fetchSummaryVariants = async () => {
+        setAiLoading(true);
+        setAiError(null);
+        try {
+            const res = await fetch("/api/resume/assist", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    action: "summary",
+                    currentSummary: resumeData?.summary || "",
+                    jobTitle: resumeData?.jobTitle || job?.jobTitle || null,
+                    company: job?.company || null,
+                    jobDescription: job?.description || null,
+                    skills: skillList(),
+                    experience: experienceLines(),
+                }),
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(data?.error || "Could not generate summary options.");
+            setAiVariants(data.variants || []);
+        } catch (err: any) {
+            setAiVariants([]);
+            setAiError(err?.message || "Could not generate summary options.");
+        } finally {
+            setAiLoading(false);
+        }
+    };
+
+    const openImproveSummary = () => {
+        setAiVariants([]);
+        setAiDialogOpen(true);
+        fetchSummaryVariants();
+    };
+
+    const handleSuggestSkills = async () => {
+        if (!job?.description) {
+            setDialogConfig({
+                isOpen: true,
+                type: "alert",
+                title: "No job description",
+                description: "Add a job description to this job so AI can spot the skills you are missing.",
+                variant: "default",
+            });
+            return;
+        }
+        setSkillsLoading(true);
+        try {
+            const res = await fetch("/api/resume/assist", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    action: "skills",
+                    currentSkills: skillList(),
+                    jobDescription: job.description,
+                    jobTitle: resumeData?.jobTitle || job.jobTitle || null,
+                }),
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(data?.error || "Could not suggest skills.");
+            const found: string[] = data.skills || [];
+            if (found.length) {
+                setSkills([...skillList(), ...found]);
+            } else {
+                setDialogConfig({
+                    isOpen: true,
+                    type: "alert",
+                    title: "Nothing missing",
+                    description: "Your skills already cover what this job description asks for.",
+                    variant: "success",
+                });
+            }
+        } catch (err: any) {
+            setDialogConfig({
+                isOpen: true,
+                type: "alert",
+                title: "Suggestion failed",
+                description: err?.message || "Could not suggest skills.",
+                variant: "destructive",
+            });
+        } finally {
+            setSkillsLoading(false);
+        }
+    };
+
+    // Escaped newline kept in one place; the editors split/join on it.
+    const NL = "\n";
+
+    // ── Section order and custom sections live on the resume, not in component
+    //    state, so they survive save/reload and travel with the document. ──
+    const DEFAULT_SECTION_ORDER = [
+        "personal", "experience", "education", "profile", "volunteering",
+        "certifications", "skills", "projects", "languages", "references", "links",
+    ];
+
+    const customSections: CustomSection[] = resumeData?.customSections ?? [];
+
+    const sectionOrder: string[] = resumeData?.sectionOrder?.length
+        ? resumeData.sectionOrder
+        : DEFAULT_SECTION_ORDER;
+
+    const setSectionOrder = (next: string[]) => {
+        if (resumeData) setResumeData({ ...resumeData, sectionOrder: next });
+    };
+
+    const setCustomSections = (next: CustomSection[]) => {
+        if (resumeData) setResumeData({ ...resumeData, customSections: next });
+    };
+
+    // Adding and removing touch both `customSections` and `sectionOrder`, so each
+    // writes them in a single update — two setResumeData calls off the same
+    // snapshot would drop whichever field the second one didn't carry.
+    const addCustomSection = () => {
+        if (!resumeData) return;
+        const id = `custom-${crypto.randomUUID().slice(0, 8)}`;
+        setResumeData({
+            ...resumeData,
+            customSections: [...customSections, { id, title: "New section", content: "" }],
+            sectionOrder: [...sectionOrder, id],
+        });
+    };
+
+    const updateCustomSection = (id: string, field: "title" | "content", value: string) =>
+        setCustomSections(customSections.map((c) => (c.id === id ? { ...c, [field]: value } : c)));
+
+    const removeCustomSection = (id: string) => {
+        if (!resumeData) return;
+        setResumeData({
+            ...resumeData,
+            customSections: customSections.filter((c) => c.id !== id),
+            sectionOrder: sectionOrder.filter((s) => s !== id),
+        });
+    };
+
+    const listSection = (key: string, placeholder: string) => (
+        <ListEditor
+            placeholder={placeholder}
+            value={(resumeData as any)?.[key]}
+            onChange={(next) => resumeData && setResumeData({ ...resumeData, [key]: next } as any)}
+        />
+    );
+
+    const editorSections: EditorSection[] = !resumeData ? [] : [
+        {
+            id: "personal",
+            title: "Personal Information",
+            icon: User,
+            body: (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-3">
+                    <Input label="Full Name" value={resumeData.fullName || ""} onChange={(v) => updateField('fullName', v)} />
+                    <Input label="Job Title" value={resumeData.jobTitle || ""} onChange={(v) => updateField('jobTitle', v)} />
+                    <Input label="Email" value={resumeData.contact?.email || ""} onChange={(v) => updateContact('email', v)} />
+                    <Input label="Phone" value={resumeData.contact?.phone || ""} onChange={(v) => updateContact('phone', v)} />
+                    <Input label="Location" value={resumeData.contact?.location || ""} onChange={(v) => updateContact('location', v)} />
+                    <Input label="LinkedIn" value={resumeData.contact?.linkedin || ""} onChange={(v) => updateContact('linkedin', v)} />
+                    <Input label="Website / Portfolio" value={resumeData.contact?.website || ""} onChange={(v) => updateContact('website', v)} />
+                </div>
+            ),
+        },
+        {
+            id: "experience",
+            title: "Experience",
+            icon: Briefcase,
+            action: <AddButton label="Add" onClick={() => addArrayItem('experience', { id: crypto.randomUUID(), company: "", role: "", location: "", startDate: "", endDate: "", description: [] })} />,
+            body: (
+                <>
+                    {(resumeData.experience || []).map((exp, idx) => (
+                        <EntryCard key={idx} onRemove={() => removeArrayItem('experience', idx)}>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-3">
+                                <Input label="Company" value={exp.company || ""} onChange={(v) => updateArrayItem('experience', idx, 'company', v)} />
+                                <Input label="Role" value={exp.role || ""} onChange={(v) => updateArrayItem('experience', idx, 'role', v)} />
+                                <Input label="Location" value={exp.location || ""} onChange={(v) => updateArrayItem('experience', idx, 'location', v)} />
+                                <div className="grid grid-cols-2 gap-2">
+                                    <Input label="Start" value={exp.startDate || ""} onChange={(v) => updateArrayItem('experience', idx, 'startDate', v)} />
+                                    <Input label="End" value={exp.endDate || ""} onChange={(v) => updateArrayItem('experience', idx, 'endDate', v)} />
+                                </div>
+                            </div>
+                            <label className="text-[10px] uppercase text-[var(--text-secondary)] font-bold block mb-1 mt-1">Bullet points (one per line)</label>
+                            <textarea
+                                className="w-full h-28 bg-[var(--background)]/30 border border-[var(--border-color)]/50 text-xs text-[var(--foreground)]/90 focus:border-[var(--primary)] outline-none p-2 rounded resize-none leading-relaxed"
+                                value={Array.isArray(exp.description) ? exp.description.join(NL) : exp.description}
+                                onChange={(e) => updateArrayItem('experience', idx, 'description', e.target.value.split(NL))}
+                            />
+                        </EntryCard>
+                    ))}
+                </>
+            ),
+        },
+        {
+            id: "education",
+            title: "Education",
+            icon: GraduationCap,
+            action: <AddButton label="Add" onClick={() => addArrayItem('education', { id: crypto.randomUUID(), school: "", degree: "", field: "", startDate: "", endDate: "" })} />,
+            body: (
+                <>
+                    {(resumeData.education || []).map((edu, idx) => (
+                        <EntryCard key={idx} onRemove={() => removeArrayItem('education', idx)}>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-3">
+                                <Input label="School" value={edu.school || ""} onChange={(v) => updateArrayItem('education', idx, 'school', v)} />
+                                <Input label="Degree" value={edu.degree || ""} onChange={(v) => updateArrayItem('education', idx, 'degree', v)} />
+                                <Input label="Field of Study" value={edu.field || ""} onChange={(v) => updateArrayItem('education', idx, 'field', v)} />
+                                <div className="grid grid-cols-2 gap-2">
+                                    <Input label="Start" value={edu.startDate || ""} onChange={(v) => updateArrayItem('education', idx, 'startDate', v)} />
+                                    <Input label="End" value={edu.endDate || ""} onChange={(v) => updateArrayItem('education', idx, 'endDate', v)} />
+                                </div>
+                            </div>
+                        </EntryCard>
+                    ))}
+                </>
+            ),
+        },
+        {
+            id: "profile",
+            title: "Profile",
+            icon: FileText,
+            action: (
+                <button
+                    onClick={openImproveSummary}
+                    className="shrink-0 flex items-center gap-1.5 h-7 px-2.5 rounded-lg border border-[var(--primary)]/30 text-[11px] font-semibold text-[var(--primary)] hover:bg-[var(--primary)]/10 transition"
+                >
+                    <Sparkles className="w-3 h-3" /> Improve with AI
+                </button>
+            ),
+            body: (
+                <textarea
+                    className="w-full h-28 bg-[var(--background)]/50 border border-[var(--border-color)] rounded-lg p-3 text-xs text-[var(--foreground)]/90 focus:border-[var(--primary)] outline-none resize-none leading-relaxed"
+                    value={resumeData.summary || ""}
+                    onChange={(e) => updateField('summary', e.target.value)}
+                />
+            ),
+        },
+        {
+            id: "volunteering",
+            title: "Volunteering & Leadership",
+            icon: Users,
+            body: listSection("volunteering", "One role per line, e.g. Coding Mentor - Code Club (2024)"),
+        },
+        {
+            id: "certifications",
+            title: "Certifications",
+            icon: Award,
+            body: listSection("certifications", "One certification per line"),
+        },
+        {
+            id: "skills",
+            title: "Key Skills",
+            icon: Wrench,
+            action: (
+                <button
+                    onClick={handleSuggestSkills}
+                    disabled={skillsLoading}
+                    className="shrink-0 flex items-center gap-1.5 h-7 px-2.5 rounded-lg border border-[var(--primary)]/30 text-[11px] font-semibold text-[var(--primary)] hover:bg-[var(--primary)]/10 transition disabled:opacity-50"
+                >
+                    {skillsLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
+                    Suggest
+                </button>
+            ),
+            body: (
+                <>
+                    <div className="flex flex-wrap gap-1.5">
+                        {skillList().map((skill, idx) => (
+                            <span
+                                key={`${skill}-${idx}`}
+                                className="inline-flex items-center gap-1.5 pl-2.5 pr-1.5 py-1 rounded-md bg-[var(--primary)]/8 border border-[var(--primary)]/20 text-[11px] font-medium text-[var(--primary)]"
+                            >
+                                {skill}
+                                <button
+                                    onClick={() => setSkills(skillList().filter((_, i) => i !== idx))}
+                                    className="hover:text-red-500 transition"
+                                    aria-label={`Remove ${skill}`}
+                                >
+                                    <X className="w-3 h-3" />
+                                </button>
+                            </span>
+                        ))}
+                    </div>
+                    <div className="flex items-center gap-2 mt-2">
+                        <input
+                            value={newSkill}
+                            onChange={(e) => setNewSkill(e.target.value)}
+                            onKeyDown={(e) => {
+                                if (e.key === "Enter" && newSkill.trim()) {
+                                    e.preventDefault();
+                                    setSkills([...skillList(), newSkill.trim()]);
+                                    setNewSkill("");
+                                }
+                            }}
+                            placeholder="Add a skill and press Enter"
+                            className="flex-1 bg-black/5 dark:bg-black/30 border border-[var(--border-color)] rounded px-2 py-1.5 text-xs text-[var(--foreground)] focus:border-[var(--primary)] outline-none"
+                        />
+                        <button
+                            onClick={() => {
+                                if (!newSkill.trim()) return;
+                                setSkills([...skillList(), newSkill.trim()]);
+                                setNewSkill("");
+                            }}
+                            className="h-8 px-3 rounded-lg border border-[var(--border-color)] text-[11px] font-semibold text-[var(--foreground)] hover:bg-black/5 dark:hover:bg-white/5 transition"
+                        >
+                            Add
+                        </button>
+                    </div>
+                </>
+            ),
+        },
+        {
+            id: "projects",
+            title: "Projects",
+            icon: FolderKanban,
+            action: <AddButton label="Add" onClick={() => addArrayItem('projects', { id: crypto.randomUUID(), name: "", techStack: "", link: "", description: [] })} />,
+            body: (
+                <>
+                    {(resumeData.projects || []).map((proj, idx) => (
+                        <EntryCard key={idx} onRemove={() => removeArrayItem('projects', idx)}>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-3">
+                                <Input label="Project Name" value={proj.name || ""} onChange={(v) => updateArrayItem('projects', idx, 'name', v)} />
+                                <Input label="Tech Stack" value={proj.techStack || ""} onChange={(v) => updateArrayItem('projects', idx, 'techStack', v)} />
+                            </div>
+                            <Input label="Link" value={proj.link || ""} onChange={(v) => updateArrayItem('projects', idx, 'link', v)} />
+                            <label className="text-[10px] uppercase text-[var(--text-secondary)] font-bold block mb-1 mt-1">Bullet points (one per line)</label>
+                            <textarea
+                                className="w-full h-24 bg-[var(--background)]/30 border border-[var(--border-color)]/50 text-xs text-[var(--foreground)]/90 focus:border-[var(--primary)] outline-none p-2 rounded resize-none leading-relaxed"
+                                value={Array.isArray(proj.description) ? proj.description.join(NL) : proj.description}
+                                onChange={(e) => updateArrayItem('projects', idx, 'description', e.target.value.split(NL))}
+                            />
+                        </EntryCard>
+                    ))}
+                </>
+            ),
+        },
+        {
+            id: "languages",
+            title: "Languages",
+            icon: Globe,
+            body: listSection("languages", "One language per line, e.g. English - Fluent"),
+        },
+        {
+            id: "references",
+            title: "References",
+            icon: FileText,
+            body: listSection("references", "One reference per line, or 'Available on request'"),
+        },
+        {
+            id: "links",
+            title: "Links",
+            icon: LinkIcon,
+            body: listSection("links", "One link per line, e.g. GitHub - github.com/you"),
+        },
+        ...customSections.map((custom) => ({
+            id: custom.id,
+            title: custom.title || "Untitled section",
+            icon: LayoutGrid,
+            body: (
+                <>
+                    <Input
+                        label="Section title"
+                        value={custom.title}
+                        onChange={(v) => updateCustomSection(custom.id, "title", v)}
+                    />
+                    <textarea
+                        className="w-full h-24 bg-[var(--background)]/50 border border-[var(--border-color)] rounded-lg p-3 text-xs text-[var(--foreground)]/90 focus:border-[var(--primary)] outline-none resize-none leading-relaxed"
+                        placeholder="One line per entry"
+                        value={custom.content}
+                        onChange={(e) => updateCustomSection(custom.id, "content", e.target.value)}
+                    />
+                </>
+            ),
+        })),
+    ];
+
+    // Shared by the job-details Saved tab and the editor's Saved tab, so the
+    // list stays reachable once a document is open.
+    const savedPanel = (
+                    <div className="space-y-6">
+                        <SavedGroup
+                            title="Resumes"
+                            icon={FileText}
+                            count={savedResumes.length}
+                            empty="No saved resumes yet. Generate one to start a version history."
+                        >
+                            {savedResumes.map((resume) => (
+                                <SavedRow
+                                    key={resume.id}
+                                    icon={FileText}
+                                    title={resume.name}
+                                    meta={`${new Date(resume.createdAt).toLocaleString()}${resume.extensionData?.masterProfileName ? ` • Tailored using: ${resume.extensionData.masterProfileName}` : ""}`}
+                                    active={currentResumeId === resume.id && activeDocument === "resume"}
+                                    onClick={() => {
+                                        setResumeData(resume.content);
+                                        setHasGenerated(true);
+                                        setCurrentResumeId(resume.id);
+                                        setCurrentResumeName(resume.name);
+                                        setActiveDocument("resume");
+                                        setMobilePanelView("preview");
+                                    }}
+                                />
+                            ))}
+                        </SavedGroup>
+
+                        <SavedGroup
+                            title="Cover letter"
+                            icon={Mail}
+                            count={coverLetter ? 1 : 0}
+                            empty="No cover letter for this job yet."
+                        >
+                            {coverLetter && (
+                                <SavedRow
+                                    icon={Mail}
+                                    title="Cover letter"
+                                    meta={`${coverLetter.trim().split(/\s+/).length} words${letterSaveState === "saving" ? " • saving…" : ""}`}
+                                    active={activeDocument === "cover-letter"}
+                                    onClick={() => {
+                                        setActiveDocument("cover-letter");
+                                        setMobilePanelView("preview");
+                                    }}
+                                />
+                            )}
+                        </SavedGroup>
+
+                        <SavedGroup
+                            title="Draft email"
+                            icon={Send}
+                            count={draftEmail ? 1 : 0}
+                            empty="No draft email yet. Generate an Application Pack to create one."
+                        >
+                            {draftEmail && (
+                                <SavedRow
+                                    icon={Send}
+                                    title="Draft email"
+                                    meta={`${draftEmail.trim().split(/\s+/).length} words • kept for this session`}
+                                    active={activeDocument === "email"}
+                                    onClick={() => {
+                                        setActiveDocument("email");
+                                        setMobilePanelView("preview");
+                                    }}
+                                />
+                            )}
+                        </SavedGroup>
+                    </div>
+    );
 
     if (loading) return <div className="flex h-screen items-center justify-center text-[var(--primary)] bg-[var(--background)]"><Loader2 className="animate-spin h-8 w-8" /></div>;
     if (!job || !masterProfile) return <div className="p-10 text-[var(--foreground)] bg-[var(--background)]">Data missing.</div>;
@@ -644,64 +1204,102 @@ function ResumeStudioPageContent() {
                     {!hasGenerated ? (
                         <>
                             {/* PRE-GENERATION VIEW */}
-                            <div className="p-5 border-b border-[var(--border-color)] bg-black/5 dark:bg-white/5">
-                                <h2 className="text-lg font-bold text-[var(--foreground)] mb-1">Review Context</h2>
-                                <p className="text-xs text-[var(--text-secondary)]">Ensure your Job Description and Master Profile are correct before generating.</p>
+                            <div className="p-5 border-b border-[var(--border-color)] bg-[var(--background)]">
+                                <div className="flex items-start justify-between gap-3">
+                                    <div className="min-w-0">
+                                        <h2 className="text-lg font-bold text-[var(--foreground)] leading-tight">{job.jobTitle}</h2>
+                                        <p className="text-sm text-[var(--text-secondary)] mt-0.5 flex items-center gap-1.5 truncate">
+                                            {job.company}
+                                            {(job.jobUrl || job.sourceUrl) && (
+                                                <a
+                                                    href={(job.jobUrl || job.sourceUrl) as string}
+                                                    target="_blank"
+                                                    rel="noreferrer noopener"
+                                                    title="View the original posting"
+                                                    className="text-[var(--primary)] hover:opacity-80 shrink-0"
+                                                >
+                                                    <ExternalLink className="w-3.5 h-3.5" />
+                                                </a>
+                                            )}
+                                        </p>
+                                        <div className="flex items-center gap-x-4 gap-y-1 flex-wrap mt-2 text-xs text-[var(--text-secondary)]">
+                                            {(formattedJd?.keyInfo?.location || job.location) && (
+                                                <span className="flex items-center gap-1.5">
+                                                    <MapPin className="w-3.5 h-3.5" /> {formattedJd?.keyInfo?.location || job.location}
+                                                </span>
+                                            )}
+                                            {formattedJd?.keyInfo?.jobType && (
+                                                <span className="flex items-center gap-1.5">
+                                                    <Briefcase className="w-3.5 h-3.5" /> {formattedJd.keyInfo.jobType}
+                                                </span>
+                                            )}
+                                            {relativeDay(job.createdAt) && (
+                                                <span className="flex items-center gap-1.5">
+                                                    <CalendarDays className="w-3.5 h-3.5" /> Saved {relativeDay(job.createdAt)}
+                                                </span>
+                                            )}
+                                            {jdFormatting && (
+                                                <span className="flex items-center gap-1.5 text-[var(--primary)]">
+                                                    <Loader2 className="w-3.5 h-3.5 animate-spin" /> Structuring…
+                                                </span>
+                                            )}
+                                        </div>
+                                    </div>
+                                    <button
+                                        onClick={() => router.push("/dashboard/generator")}
+                                        className="shrink-0 flex items-center gap-1.5 h-9 px-3 rounded-lg border border-[var(--border-color)] text-xs font-semibold text-[var(--foreground)] hover:bg-black/5 dark:hover:bg-white/5 transition"
+                                    >
+                                        <Repeat className="w-3.5 h-3.5" /> Change Job
+                                    </button>
+                                </div>
                             </div>
 
-                            <div className="flex border-b border-[var(--border-color)] bg-[var(--sidebar-bg)]">
-                                <button onClick={() => setActiveTab("jd")} className={`flex-1 py-3 text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 transition-all ${activeTab === "jd" ? "text-[var(--primary)] border-b-2 border-[var(--primary)] bg-black/5 dark:bg-white/[0.02]" : "text-[var(--text-secondary)] hover:text-[var(--foreground)]"}`}>
-                                    <Briefcase className="h-3 w-3" /> Job Description
-                                </button>
-                                <button onClick={() => setActiveTab("profile")} className={`flex-1 py-3 text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 transition-all ${activeTab === "profile" ? "text-[var(--primary)] border-b-2 border-[var(--primary)] bg-black/5 dark:bg-white/[0.02]" : "text-[var(--text-secondary)] hover:text-[var(--foreground)]"}`}>
-                                    <User className="h-3 w-3" /> Master Profile
-                                </button>
-                                <button onClick={() => setActiveTab("saved")} className={`flex-1 py-3 text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 transition-all ${activeTab === "saved" ? "text-[var(--primary)] border-b-2 border-[var(--primary)] bg-black/5 dark:bg-white/[0.02]" : "text-[var(--text-secondary)] hover:text-[var(--foreground)]"}`}>
-                                    <History className="h-3 w-3" /> Saved Resumes
-                                </button>
+                            <div className="flex items-center gap-1 px-3 border-b border-[var(--border-color)] bg-[var(--sidebar-bg)] overflow-x-auto">
+                                {([
+                                    { id: "jd", label: "Job Description", icon: FileText },
+                                    { id: "profile", label: "Master Profile", icon: User },
+                                    { id: "saved", label: "Saved", icon: History },
+                                    { id: "analysis", label: "Analysis", icon: BarChart3 },
+                                ] as const).map((t) => (
+                                    <button
+                                        key={t.id}
+                                        onClick={() => setActiveTab(t.id)}
+                                        className={`flex items-center gap-2 px-3 py-3 text-xs font-semibold whitespace-nowrap border-b-2 -mb-px transition ${
+                                            activeTab === t.id
+                                                ? "border-[var(--primary)] text-[var(--primary)]"
+                                                : "border-transparent text-[var(--text-secondary)] hover:text-[var(--foreground)]"
+                                        }`}
+                                    >
+                                        <t.icon className="h-3.5 w-3.5" /> {t.label}
+                                    </button>
+                                ))}
                             </div>
 
                             <div className="flex-1 overflow-y-auto p-5 scrollbar-thin scrollbar-thumb-black/10 dark:scrollbar-thumb-white/10">
                                 {activeTab === "jd" && (
-                                    <div className="bg-black/5 dark:bg-white/5 p-4 rounded-lg border border-[var(--border-color)] shadow-inner w-full min-w-0">
-                                        <p className="text-[var(--foreground)]/80 whitespace-pre-line text-sm leading-relaxed break-words break-all w-full">{job.description}</p>
+                                    <div className="rounded-xl border border-[var(--border-color)] bg-[var(--background)] p-4 w-full min-w-0">
+                                        <JobDescriptionBody job={job as any} jd={formattedJd} />
                                     </div>
                                 )}
 
-                                {activeTab === "saved" && (
-                                    <div className="space-y-3">
-                                        {savedResumes.length === 0 ? (
-                                            <div className="text-center py-10 text-[var(--text-secondary)] text-xs">No saved resumes yet.</div>
+                                {activeTab === "analysis" && (
+                                    <div className="rounded-xl border border-[var(--border-color)] bg-[var(--background)] p-4">
+                                        <h4 className="text-sm font-bold text-[var(--foreground)] mb-1">Analysis</h4>
+                                        <p className="text-[13px] text-[var(--text-secondary)] mb-4">
+                                            These are the keywords this posting screens for. Generate a resume and the
+                                            ATS report will score your document against them.
+                                        </p>
+                                        {formattedJd && formattedJd.skills.length > 0 ? (
+                                            <SkillChips skills={formattedJd.skills} />
                                         ) : (
-                                            savedResumes.map((resume) => (
-                                                <button
-                                                    key={resume.id}
-                                                    onClick={() => {
-                                                        setResumeData(resume.content);
-                                                        setHasGenerated(true);
-                                                        setCurrentResumeId(resume.id);
-                                                        setCurrentResumeName(resume.name);
-                                                        setMobilePanelView("preview");
-                                                    }}
-                                                    className="w-full text-left bg-black/5 dark:bg-white/5 p-3 rounded-lg border border-[var(--border-color)] hover:border-[var(--primary)]/50 hover:bg-black/10 dark:hover:bg-white/10 transition group"
-                                                >
-                                                    <div className="flex items-center gap-3">
-                                                        <div className="p-2 bg-[var(--primary)]/20 rounded-lg group-hover:bg-[var(--primary)]/30 transition">
-                                                            <FileText className="h-4 w-4 text-[var(--primary)]" />
-                                                        </div>
-                                                        <div>
-                                                            <div className="text-sm font-bold text-[var(--foreground)] group-hover:text-[var(--primary)] transition">{resume.name}</div>
-                                                            <div className="text-[10px] text-[var(--text-secondary)]">
-                                                                {new Date(resume.createdAt).toLocaleString()}
-                                                                {resume.extensionData?.masterProfileName && ` • Tailored using: ${resume.extensionData.masterProfileName}`}
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </button>
-                                            ))
+                                            <p className="text-[13px] text-[var(--text-secondary)]">
+                                                No skills or keywords were named in this posting.
+                                            </p>
                                         )}
                                     </div>
                                 )}
+
+                                {activeTab === "saved" && savedPanel}
 
                                 {activeTab === "profile" && (
                                     <div className="space-y-4">
@@ -772,78 +1370,6 @@ function ResumeStudioPageContent() {
                                 )}
                             </div>
 
-                            <div className="p-3 md:p-4 border-t border-[var(--border-color)] bg-[var(--sidebar-bg)] space-y-3 shrink-0">
-                                {/* Individual Generation Cards */}
-                                <div className="grid grid-cols-3 gap-2">
-                                    
-                                    {/* Card 1: Resume */}
-                                    <button 
-                                        disabled={isGenerating} 
-                                        onClick={() => handleGenerateResumeOnly()} 
-                                        className="group flex flex-row items-center justify-center p-2 rounded-lg bg-[var(--background)] border border-[var(--border-color)] border-b-[2px] border-b-blue-500 shadow-sm hover:shadow-md transition-all duration-300 hover:-translate-y-0.5 disabled:opacity-50 w-full cursor-pointer gap-1.5 md:gap-2"
-                                    >
-                                        <FileText className="h-3.5 w-3.5 md:h-4 md:w-4 text-blue-500 shrink-0" strokeWidth={2.5} />
-                                        <h4 className="text-[10px] md:text-[11px] font-bold text-[var(--foreground)] leading-tight truncate">Resume</h4>
-                                    </button>
-
-                                    {/* Card 2: Cover Letter */}
-                                    <button 
-                                        disabled={isGenerating} 
-                                        onClick={() => handleGenerateCoverLetter()} 
-                                        className="group flex flex-row items-center justify-center p-2 rounded-lg bg-[var(--background)] border border-[var(--border-color)] border-b-[2px] border-b-purple-500 shadow-sm hover:shadow-md transition-all duration-300 hover:-translate-y-0.5 disabled:opacity-50 w-full cursor-pointer gap-1.5 md:gap-2"
-                                    >
-                                        <Mail className="h-3.5 w-3.5 md:h-4 md:w-4 text-purple-500 shrink-0" strokeWidth={2.5} />
-                                        <h4 className="text-[10px] md:text-[11px] font-bold text-[var(--foreground)] leading-tight truncate">Cover Letter</h4>
-                                    </button>
-
-                                    {/* Card 3: Draft Email */}
-                                    <button 
-                                        disabled={isGenerating} 
-                                        onClick={() => handleGenerateEmail()} 
-                                        className="group flex flex-row items-center justify-center p-2 rounded-lg bg-[var(--background)] border border-[var(--border-color)] border-b-[2px] border-b-emerald-500 shadow-sm hover:shadow-md transition-all duration-300 hover:-translate-y-0.5 disabled:opacity-50 w-full cursor-pointer gap-1.5 md:gap-2"
-                                    >
-                                        <Send className="h-3.5 w-3.5 md:h-4 md:w-4 text-emerald-500 shrink-0" strokeWidth={2.5} />
-                                        <h4 className="text-[10px] md:text-[11px] font-bold text-[var(--foreground)] leading-tight truncate">Draft Email</h4>
-                                    </button>
-                                </div>
-
-                                {/* Divider Section */}
-                                <div className="flex items-center gap-2 py-0 max-w-sm mx-auto">
-                                    <div className="h-px bg-[var(--border-color)] flex-1"></div>
-                                    <span className="text-[10px] text-[var(--text-secondary)] font-medium uppercase tracking-wider">Or Generate All</span>
-                                    <div className="h-px bg-[var(--border-color)] flex-1"></div>
-                                </div>
-
-                                {/* Bottom CTA Button */}
-                                <button
-                                    onClick={() => handleGenerateResume()}
-                                    disabled={isGenerating}
-                                    style={{
-                                        backgroundImage: "linear-gradient(to right, #3B82F6, #2563EB)",
-                                    }}
-                                    className="w-full flex items-center justify-center p-3 md:p-3.5 rounded-xl text-white transition-all duration-300 hover:scale-[1.01] hover:shadow-md disabled:opacity-50 group relative cursor-pointer"
-                                >
-                                    <div className="flex items-center gap-2 relative z-10">
-                                        {isGenerating ? <Loader2 className="animate-spin h-4 w-4 text-white" /> : (
-                                            <div className="flex items-center gap-1.5">
-                                                <Wand2 className="h-4 w-4 text-white" />
-                                                <Rocket className="h-4 w-4 text-white" />
-                                            </div>
-                                        )}
-                                        <div className="flex items-center gap-1.5">
-                                            <span className="text-[13px] md:text-[14px] font-bold">
-                                                {isGenerating ? "Working..." : "Application Pack"}
-                                            </span>
-                                            <span className="text-[11px] text-white/90 hidden lg:inline-block">
-                                                (Resume + Cover Letter + Email)
-                                            </span>
-                                        </div>
-                                    </div>
-                                    <div className="absolute right-3 flex items-center justify-center">
-                                        <ChevronRight className="h-5 w-5 text-white group-hover:translate-x-1 transition-transform" />
-                                    </div>
-                                </button>
-                            </div>
                         </>
                     ) : (
                         <>
@@ -855,96 +1381,78 @@ function ResumeStudioPageContent() {
 
                             {/* CONTENT TAB */}
                             {activeSidebarTab === 'content' && activeDocument === 'resume' && (
-                                <div className="flex-1 overflow-y-auto p-4 space-y-6 scrollbar-thin scrollbar-thumb-black/10 dark:scrollbar-thumb-white/10 animate-slide-down">
-                                    <div className="flex items-center justify-between mb-2">
-                                        <h2 className="text-sm font-bold text-[var(--primary)] flex items-center gap-2">
-                                            <Wand2 className="h-3 w-3" /> AI Generated Content
-                                        </h2>
-                                        <div className="flex gap-2">
-                                            <button onClick={() => insertMarkdown('**')} title="Bold (**text**)" className="p-1 hover:bg-black/10 dark:hover:bg-white/10 rounded text-[var(--text-secondary)] hover:text-[var(--foreground)]">
-                                                <Bold className="w-3 h-3" />
-                                            </button>
-                                            <button onClick={() => insertMarkdown('*')} title="Italic (*text*)" className="p-1 hover:bg-black/10 dark:hover:bg-white/10 rounded text-[var(--text-secondary)] hover:text-[var(--foreground)]">
-                                                <Italic className="w-3 h-3" />
-                                            </button>
-                                            <div className="w-[1px] h-4 bg-[var(--border-color)] mx-1"></div>
-                                            <button onClick={() => setHasGenerated(false)} className="text-xs text-[var(--text-secondary)] hover:text-[var(--foreground)] underline transition">Regenerate</button>
+                                <div className="flex-1 overflow-y-auto p-4 scrollbar-thin scrollbar-thumb-black/10 dark:scrollbar-thumb-white/10">
+                                    {/* Banner */}
+                                    <div className="flex items-start justify-between gap-3 rounded-xl border border-[var(--primary)]/20 bg-[var(--primary)]/5 p-3.5 mb-4">
+                                        <div className="flex gap-2.5 min-w-0">
+                                            <Sparkles className="w-4 h-4 text-[var(--primary)] shrink-0 mt-0.5" />
+                                            <div className="min-w-0">
+                                                <p className="text-sm font-bold text-[var(--foreground)]">AI Generated Content</p>
+                                                <p className="text-[11px] text-[var(--text-secondary)] mt-0.5">
+                                                    Review and edit the content before downloading.
+                                                </p>
+                                            </div>
                                         </div>
+                                        <button
+                                            onClick={() => setHasGenerated(false)}
+                                            className="shrink-0 flex items-center gap-1.5 h-8 px-3 rounded-lg border border-[var(--border-color)] bg-[var(--background)] text-[11px] font-semibold text-[var(--foreground)] hover:bg-black/5 dark:hover:bg-white/5 transition"
+                                        >
+                                            <RefreshCw className="w-3.5 h-3.5" /> Regenerate
+                                        </button>
                                     </div>
 
-                                    <Section title="Header & Contact">
-                                        <Input label="Full Name" value={resumeData?.fullName || ""} onChange={(v) => updateField('fullName', v)} />
-                                        <Input label="Job Title" value={resumeData?.jobTitle || ""} onChange={(v) => updateField('jobTitle', v)} />
-                                        <div className="grid grid-cols-2 gap-3">
-                                            <Input label="Email" value={resumeData?.contact.email || ""} onChange={(v) => updateContact('email', v)} />
-                                            <Input label="Phone" value={resumeData?.contact.phone || ""} onChange={(v) => updateContact('phone', v)} />
-                                            <Input label="Location" value={resumeData?.contact.location || ""} onChange={(v) => updateContact('location', v)} />
-                                            <Input label="LinkedIn" value={resumeData?.contact.linkedin || ""} onChange={(v) => updateContact('linkedin', v)} />
+                                    <SectionAccordion
+                                        sections={editorSections}
+                                        order={sectionOrder}
+                                        onOrderChange={setSectionOrder}
+                                    />
+
+                                    {/* Custom sections manager */}
+                                    <div className="mt-6 pt-5 border-t border-[var(--border-color)]">
+                                        <div className="flex items-center justify-between gap-3 mb-2">
+                                            <h3 className="text-sm font-bold text-[var(--foreground)] flex items-center gap-2">
+                                                <LayoutGrid className="w-4 h-4 text-[var(--primary)]" /> Custom Sections
+                                            </h3>
+                                            <AddButton label="Add Section" onClick={addCustomSection} />
                                         </div>
-                                    </Section>
-                                    <Section title="Summary">
-                                        <textarea className="w-full h-32 bg-[var(--background)]/50 border border-[var(--border-color)] rounded-lg p-3 text-xs text-[var(--foreground)]/90 focus:border-[var(--primary)] outline-none resize-none leading-relaxed" value={resumeData?.summary} onChange={(e) => updateField('summary', e.target.value)} />
-                                    </Section>
-                                    <Section title="Skills">
-                                        <textarea className="w-full h-24 bg-[var(--background)]/50 border border-[var(--border-color)] rounded-lg p-3 text-xs text-[var(--foreground)]/90 focus:border-[var(--primary)] outline-none resize-none leading-relaxed" value={Array.isArray(resumeData?.skills) ? resumeData.skills.join(", ") : ""} onChange={(e) => updateField('skills', e.target.value.split(", "))} />
-                                    </Section>
-                                    <Section title="Experience">
-                                        {resumeData?.experience?.map((exp, idx) => (
-                                            <div key={idx} className="bg-black/5 dark:bg-white/5 p-3 rounded-lg border border-[var(--border-color)] mb-3 relative group hover:border-[var(--foreground)]/20 transition-colors">
-                                                <button onClick={() => removeArrayItem('experience', idx)} className="absolute top-3 right-3 text-[var(--text-secondary)] hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 className="h-3 w-3" /></button>
-                                                <Input label="Company" value={exp.company || ""} onChange={(v) => updateArrayItem('experience', idx, 'company', v)} />
-                                                <Input label="Role" value={exp.role || ""} onChange={(v) => updateArrayItem('experience', idx, 'role', v)} />
-                                                <Input label="Location" value={exp.location || ""} onChange={(v) => updateArrayItem('experience', idx, 'location', v)} />
-                                                <div className="grid grid-cols-2 gap-2">
-                                                    <Input label="Start Date" value={exp.startDate || ""} onChange={(v) => updateArrayItem('experience', idx, 'startDate', v)} />
-                                                    <Input label="End Date" value={exp.endDate || ""} onChange={(v) => updateArrayItem('experience', idx, 'endDate', v)} />
-                                                </div>
-                                                <textarea className="w-full h-32 bg-[var(--background)]/30 border border-[var(--border-color)]/50 text-xs text-[var(--foreground)]/90 focus:border-[var(--primary)] outline-none p-2 rounded resize-none leading-relaxed mt-2" value={Array.isArray(exp.description) ? exp.description.join('\n') : exp.description} onChange={(e) => updateArrayItem('experience', idx, 'description', e.target.value.split('\n'))} placeholder="Description..." />
-                                            </div>
-                                        ))}
-                                    </Section>
+                                        <p className="text-[11px] text-[var(--text-secondary)] leading-relaxed mb-3">
+                                            Create your own sections (e.g. Publications, Hobbies, Conferences). They appear
+                                            in your resume preview and in the reorder list above.
+                                        </p>
 
-                                    <Section title="Projects">
-                                        {resumeData?.projects?.map((proj, idx) => (
-                                            <div key={idx} className="bg-black/5 dark:bg-white/5 p-3 rounded-lg border border-[var(--border-color)] mb-3 relative group hover:border-[var(--foreground)]/20 transition-colors">
-                                                <button onClick={() => removeArrayItem('projects', idx)} className="absolute top-3 right-3 text-[var(--text-secondary)] hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 className="h-3 w-3" /></button>
-                                                <Input label="Project Name" value={proj.name || ""} onChange={(v) => updateArrayItem('projects', idx, 'name', v)} />
-                                                <Input label="Tech Stack" value={proj.techStack || ""} onChange={(v) => updateArrayItem('projects', idx, 'techStack', v)} />
-                                                <Input label="Link" value={proj.link || ""} onChange={(v) => updateArrayItem('projects', idx, 'link', v)} />
-                                                <textarea className="w-full h-24 bg-[var(--background)]/30 border border-[var(--border-color)]/50 text-xs text-[var(--foreground)]/90 focus:border-[var(--primary)] outline-none p-2 rounded resize-none leading-relaxed mt-2" value={Array.isArray(proj.description) ? proj.description.join('\n') : proj.description} onChange={(e) => updateArrayItem('projects', idx, 'description', e.target.value.split('\n'))} placeholder="Description..." />
+                                        {customSections.length === 0 ? (
+                                            <div className="rounded-lg border border-dashed border-[var(--border-color)] py-6 text-center">
+                                                <p className="text-[11px] text-[var(--text-secondary)]">
+                                                    No custom sections yet. Click &ldquo;Add Section&rdquo; to create one.
+                                                </p>
                                             </div>
-                                        ))}
-                                    </Section>
-
-                                    <Section title="Education">
-                                        {resumeData?.education?.map((edu, idx) => (
-                                            <div key={idx} className="bg-black/5 dark:bg-white/5 p-3 rounded-lg border border-[var(--border-color)] mb-3 relative group hover:border-[var(--foreground)]/20 transition-colors">
-                                                <button onClick={() => removeArrayItem('education', idx)} className="absolute top-3 right-3 text-[var(--text-secondary)] hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 className="h-3 w-3" /></button>
-                                                <Input label="School" value={edu.school || ""} onChange={(v) => updateArrayItem('education', idx, 'school', v)} />
-                                                <Input label="Degree" value={edu.degree || ""} onChange={(v) => updateArrayItem('education', idx, 'degree', v)} />
-                                                <Input label="Field of Study" value={edu.field || ""} onChange={(v) => updateArrayItem('education', idx, 'field', v)} />
-                                                <div className="grid grid-cols-2 gap-2">
-                                                    <Input label="Start Date" value={edu.startDate || ""} onChange={(v) => updateArrayItem('education', idx, 'startDate', v)} />
-                                                    <Input label="End Date" value={edu.endDate || ""} onChange={(v) => updateArrayItem('education', idx, 'endDate', v)} />
-                                                </div>
+                                        ) : (
+                                            <div className="space-y-2">
+                                                {customSections.map((custom) => (
+                                                    <div
+                                                        key={custom.id}
+                                                        className="flex items-center gap-2 rounded-lg border border-[var(--border-color)] bg-black/5 dark:bg-white/5 px-3 py-2"
+                                                    >
+                                                        <input
+                                                            value={custom.title}
+                                                            onChange={(e) => updateCustomSection(custom.id, "title", e.target.value)}
+                                                            className="flex-1 min-w-0 bg-transparent text-xs font-semibold text-[var(--foreground)] outline-none"
+                                                            placeholder="Section title"
+                                                        />
+                                                        <button
+                                                            onClick={() => removeCustomSection(custom.id)}
+                                                            aria-label={`Remove ${custom.title || "section"}`}
+                                                            className="shrink-0 text-[var(--text-secondary)] hover:text-red-500 transition"
+                                                        >
+                                                            <Trash2 className="w-3.5 h-3.5" />
+                                                        </button>
+                                                    </div>
+                                                ))}
                                             </div>
-                                        ))}
-                                    </Section>
+                                        )}
+                                    </div>
 
-                                    <Section title="Certifications">
-                                        <div className="bg-black/5 dark:bg-white/5 p-3 rounded-lg border border-[var(--border-color)]">
-                                            <textarea
-                                                className="w-full h-32 bg-[var(--background)]/30 border border-[var(--border-color)]/50 text-xs text-[var(--foreground)]/90 focus:border-[var(--primary)] outline-none p-2 rounded resize-none leading-relaxed"
-                                                value={Array.isArray(resumeData?.certifications) ? resumeData.certifications.join('\n') : (resumeData?.certifications || "")}
-                                                onChange={(e) => {
-                                                    if (resumeData) {
-                                                        setResumeData({ ...resumeData, certifications: e.target.value.split('\n') });
-                                                    }
-                                                }}
-                                                placeholder="List certifications (one per line)..."
-                                            />
-                                        </div>
-                                    </Section>
+                                    <div className="h-6" />
                                 </div>
                             )}
 
@@ -969,6 +1477,12 @@ function ResumeStudioPageContent() {
                                 <TemplatesTabContent />
                             )}
 
+                            {activeSidebarTab === 'saved' && (
+                                <div className="flex-1 overflow-y-auto p-4 scrollbar-thin scrollbar-thumb-black/10 dark:scrollbar-thumb-white/10">
+                                    {savedPanel}
+                                </div>
+                            )}
+
                             {/* STYLES TAB */}
 
                         </>
@@ -977,7 +1491,7 @@ function ResumeStudioPageContent() {
 
                 {/* === RIGHT PANEL (PDF PREVIEW / IS GENERATING VIEW) === */}
                 <div className={`${mobilePanelView === "preview" ? "flex" : "hidden"} md:flex flex-1 min-w-0 bg-black/5 dark:bg-[#525659] relative flex-col h-full border-l border-[var(--border-color)] overflow-hidden`}>
-                    {hasGenerated && !isGenerating && (
+                    {(hasGenerated || coverLetter || draftEmail) && !isGenerating && (
                         <div className="flex items-center justify-center gap-4 py-3 bg-[var(--background)] border-b border-[var(--border-color)] shadow-sm z-10">
                             <button 
                                 onClick={() => setActiveDocument('resume')} 
@@ -1007,7 +1521,7 @@ function ResumeStudioPageContent() {
                                 <AIPreparationAnimation />
                             </div>
 
-                            <h2 className="text-3xl font-bold text-[var(--foreground)] mb-3 tracking-tight z-10 bg-clip-text text-transparent bg-gradient-to-r from-[var(--foreground)] to-[var(--text-secondary)]">
+                            <h2 className="text-3xl font-bold text-[var(--foreground)] mb-3 tracking-tight z-10">
                                 {generatingType === "cover-letter" ? "Generating Cover Letter..." :
                                  generatingType === "email" ? "Generating Draft Email..." :
                                  generatingType === "all" ? "Generating Application Pack..." :
@@ -1018,12 +1532,167 @@ function ResumeStudioPageContent() {
                                 <span>AI is analyzing the job description and matching your profile</span>
                             </div>
                         </div>
-                    ) : !hasGenerated ? (
-                        <div className="flex-1 flex flex-col items-center justify-center p-10 text-center text-[var(--foreground)] relative overflow-hidden bg-[var(--background)]">
-                            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-[var(--primary)]/5 rounded-full blur-3xl animate-pulse"></div>
-                            <Wand2 className="h-16 w-16 text-[var(--primary)] relative z-10 mb-4" />
-                            <h2 className="text-3xl font-bold text-[var(--foreground)] mb-3 tracking-tight z-10">Ready to Tailor</h2>
-                            <p className="text-[var(--text-secondary)] max-w-md text-sm leading-relaxed z-10">AI Agent ready to analyze.</p>
+                    ) : !hasGenerated && !activeDocumentHasContent ? (
+                        <div className="flex-1 overflow-y-auto bg-[var(--background)]">
+                            <div className="max-w-3xl mx-auto px-6 py-10 flex flex-col items-center text-center">
+                                {/* Drawn rather than shipped as an asset, so it recolours with the
+                                    theme: a resume sheet flanked by a document and a sparkle tile. */}
+                                <div className="relative w-[320px] h-[248px] mb-7 shrink-0" aria-hidden="true">
+                                    <div className="absolute inset-x-8 inset-y-3 rounded-[3rem] bg-[var(--primary)]/[0.07]" />
+
+                                    <div className="absolute left-1/2 -translate-x-1/2 top-1 w-[176px] h-[224px] rounded-2xl bg-[var(--background)] border border-[var(--border-color)] shadow-[0_12px_32px_-12px_rgba(15,23,42,0.25)] p-4">
+                                        {/* avatar + name lines */}
+                                        <div className="flex items-center gap-2.5 mb-3.5">
+                                            <div className="w-8 h-8 rounded-full bg-[var(--border-color)] shrink-0" />
+                                            <div className="flex-1 space-y-1.5">
+                                                <div className="h-1.5 rounded-full bg-[var(--border-color)]" style={{ width: "100%" }} />
+                                                <div className="h-1.5 rounded-full bg-[var(--border-color)]" style={{ width: "62%" }} />
+                                            </div>
+                                        </div>
+
+                                        <div className="h-1.5 rounded-full bg-[var(--border-color)] mb-4" style={{ width: "86%" }} />
+
+                                        {/* bulleted sections */}
+                                        <div className="space-y-[7px]">
+                                            {["100%", "72%", "88%"].map((w, i) => (
+                                                <div key={`a${i}`} className="flex items-center gap-2">
+                                                    <span className="w-1.5 h-1.5 rounded-full bg-[var(--primary)]/70 shrink-0" />
+                                                    <div className="h-1.5 rounded-full bg-[var(--border-color)]" style={{ width: w }} />
+                                                </div>
+                                            ))}
+                                        </div>
+
+                                        <div className="h-3" />
+
+                                        <div className="space-y-[7px]">
+                                            {["92%", "66%", "80%"].map((w, i) => (
+                                                <div key={`b${i}`} className="flex items-center gap-2">
+                                                    <span className="w-1.5 h-1.5 rounded-full bg-[var(--primary)]/70 shrink-0" />
+                                                    <div className="h-1.5 rounded-full bg-[var(--border-color)]" style={{ width: w }} />
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    <div className="absolute left-1 top-[38%] w-12 h-12 rounded-2xl bg-[var(--background)] border border-[var(--border-color)] shadow-[0_8px_20px_-8px_rgba(15,23,42,0.3)] flex items-center justify-center">
+                                        <FileText className="w-5 h-5 text-blue-500" strokeWidth={2} />
+                                    </div>
+
+                                    <div className="absolute right-1 top-[44%] w-12 h-12 rounded-2xl bg-[var(--background)] border border-[var(--border-color)] shadow-[0_8px_20px_-8px_rgba(15,23,42,0.3)] flex items-center justify-center">
+                                        <Sparkles className="w-5 h-5 text-violet-500" strokeWidth={2} />
+                                    </div>
+                                </div>
+
+                                <h2 className="text-2xl font-bold text-[var(--foreground)] tracking-tight">
+                                    Your Job Details are Ready
+                                </h2>
+                                <p className="text-sm text-[var(--text-secondary)] mt-2 max-w-md leading-relaxed">
+                                    Use the details from this job post and your Master Profile to generate a tailored,
+                                    ATS-optimised resume.
+                                </p>
+
+                                {/* What happens next */}
+                                <div className="w-full mt-8 rounded-xl border border-[var(--border-color)] bg-[var(--sidebar-bg)]/60 p-5 text-left">
+                                    <p className="text-xs font-bold text-[var(--foreground)] mb-4">What will happen next?</p>
+                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                        {[
+                                            { icon: Search, title: "AI Analysis", body: "We analyse the job description and match it with your profile." },
+                                            { icon: FileText, title: "Generate Resume", body: "Get a tailored, ATS-optimised resume." },
+                                            { icon: SlidersHorizontal, title: "Review & Refine", body: "Edit, fine-tune and download your resume." },
+                                        ].map((step, i) => (
+                                            <div key={step.title} className="relative">
+                                                <div className="flex items-center gap-2 mb-2">
+                                                    <span className="w-8 h-8 rounded-lg bg-[var(--primary)]/10 text-[var(--primary)] flex items-center justify-center shrink-0">
+                                                        <step.icon className="w-4 h-4" />
+                                                    </span>
+                                                    <span className="w-6 h-6 rounded-full bg-[var(--background)] border border-[var(--border-color)] text-[11px] font-bold text-[var(--text-secondary)] flex items-center justify-center">
+                                                        {i + 1}
+                                                    </span>
+                                                    {i < 2 && (
+                                                        <ChevronRight className="hidden sm:block w-4 h-4 text-[var(--text-secondary)] absolute -right-2.5 top-2" />
+                                                    )}
+                                                </div>
+                                                <p className="text-xs font-bold text-[var(--foreground)]">{step.title}</p>
+                                                <p className="text-[11px] text-[var(--text-secondary)] mt-1 leading-relaxed">{step.body}</p>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* Generation actions — three outlined documents on the left,
+                                    the combined pack on the right, split by a divider. */}
+                                <div className="w-full mt-6 flex flex-col xl:flex-row gap-4">
+                                    <div className="flex-1 min-w-0 flex flex-col">
+                                        <div className="flex items-center gap-2 mb-2.5">
+                                            <div className="h-px bg-[var(--border-color)] flex-1 min-w-4" />
+                                            <span className="text-[11px] text-[var(--text-secondary)] whitespace-nowrap shrink-0">
+                                                Generate individual documents
+                                            </span>
+                                            <div className="h-px bg-[var(--border-color)] flex-1" />
+                                        </div>
+
+                                        <div className="grid grid-cols-3 gap-3 flex-1">
+                                            <button
+                                                disabled={isGenerating}
+                                                onClick={() => handleGenerateResumeOnly()}
+                                                className="min-h-[52px] rounded-xl bg-[var(--background)] border-2 border-blue-500/60 hover:border-blue-500 text-[13px] font-bold text-[var(--foreground)] flex items-center justify-center gap-2 hover:shadow-md transition disabled:opacity-50"
+                                            >
+                                                <FileText className="w-4 h-4 text-blue-500 shrink-0" strokeWidth={2.5} />
+                                                <span className="whitespace-nowrap">Resume</span>
+                                            </button>
+                                            <button
+                                                disabled={isGenerating}
+                                                onClick={() => handleGenerateCoverLetter()}
+                                                className="min-h-[52px] rounded-xl bg-[var(--background)] border-2 border-fuchsia-500/60 hover:border-fuchsia-500 text-[13px] font-bold text-[var(--foreground)] flex items-center justify-center gap-2 hover:shadow-md transition disabled:opacity-50"
+                                            >
+                                                <Mail className="w-4 h-4 text-fuchsia-500 shrink-0" strokeWidth={2.5} />
+                                                <span className="whitespace-nowrap">Cover Letter</span>
+                                            </button>
+                                            <button
+                                                disabled={isGenerating}
+                                                onClick={() => handleGenerateEmail()}
+                                                className="min-h-[52px] rounded-xl bg-[var(--background)] border-2 border-emerald-500/60 hover:border-emerald-500 text-[13px] font-bold text-[var(--foreground)] flex items-center justify-center gap-2 hover:shadow-md transition disabled:opacity-50"
+                                            >
+                                                <Send className="w-4 h-4 text-emerald-500 shrink-0" strokeWidth={2.5} />
+                                                <span className="whitespace-nowrap">Draft Email</span>
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <div className="hidden xl:block w-px bg-[var(--border-color)] self-stretch shrink-0" />
+
+                                    <button
+                                        onClick={() => handleGenerateResume()}
+                                        disabled={isGenerating}
+                                        style={{ backgroundImage: "linear-gradient(to right, #3B82F6, #2563EB)" }}
+                                        className="group w-full xl:w-[40%] shrink-0 min-h-[84px] rounded-xl text-white flex items-center gap-3 px-4 hover:shadow-lg transition disabled:opacity-50"
+                                    >
+                                        <span className="flex items-center gap-1 shrink-0">
+                                            {isGenerating ? (
+                                                <Loader2 className="w-5 h-5 animate-spin" />
+                                            ) : (
+                                                <>
+                                                    <Wand2 className="w-5 h-5" />
+                                                    <Rocket className="w-5 h-5" />
+                                                </>
+                                            )}
+                                        </span>
+                                        <span className="min-w-0 flex-1 text-left">
+                                            <span className="block text-[15px] font-bold leading-tight whitespace-nowrap">
+                                                {isGenerating ? "Working…" : "Application Pack"}
+                                            </span>
+                                            <span className="block text-[11px] text-white/85 leading-tight mt-0.5">
+                                                Resume + Cover Letter + Email
+                                            </span>
+                                        </span>
+                                        <ChevronRight className="w-5 h-5 shrink-0 group-hover:translate-x-0.5 transition-transform" />
+                                    </button>
+                                </div>
+
+                                <p className="w-full text-[11px] text-[var(--text-secondary)] mt-3 text-center">
+                                    1 credit is used per generation.
+                                </p>
+                            </div>
                         </div>
                     ) : activeDocument === "resume" ? (
                         resumeData ? (
@@ -1057,6 +1726,15 @@ function ResumeStudioPageContent() {
                                     onChange={(e) => setCoverLetter(e.target.value)}
                                     placeholder="Your Cover Letter will appear here..."
                                 />
+                                {letterSaveState !== "idle" && (
+                                    <span className="absolute top-4 left-4 flex items-center gap-1.5 text-[11px] font-semibold text-[var(--text-secondary)]">
+                                        {letterSaveState === "saving" ? (
+                                            <><Loader2 className="w-3 h-3 animate-spin" /> Saving…</>
+                                        ) : (
+                                            <><Check className="w-3 h-3 text-emerald-500" /> Saved</>
+                                        )}
+                                    </span>
+                                )}
                             </div>
                         </div>
                     ) : (
@@ -1080,6 +1758,35 @@ function ResumeStudioPageContent() {
                     )}
                 </div>
 
+                <ImproveWithAIDialog
+
+                    open={aiDialogOpen}
+
+                    title="Improve Summary with AI"
+
+                    subtitle="Choose one of the AI-generated summary options for this role."
+
+                    variants={aiVariants}
+
+                    loading={aiLoading}
+
+                    error={aiError}
+
+                    onRegenerate={fetchSummaryVariants}
+
+                    onApply={(text) => {
+
+                        updateField('summary', text);
+
+                        setAiDialogOpen(false);
+
+                    }}
+
+                    onClose={() => setAiDialogOpen(false)}
+
+                />
+
+
                 <CustomDialog
                     {...dialogConfig}
                     onClose={() => setDialogConfig(s => ({ ...s, isOpen: false }))}
@@ -1098,9 +1805,123 @@ export default function ResumeStudioPage() {
 }
 
 // Helpers
-function Section({ title, children, action }: { title: string, children: React.ReactNode, action?: React.ReactNode }) {
-    return <div className="space-y-3"><div className="flex items-center justify-between border-b border-[var(--border-color)] pb-1 mt-4"><h3 className="text-xs font-bold uppercase text-[var(--primary)] tracking-wider">{title}</h3>{action}</div>{children}</div>
+
+/** One labelled group in the Saved tab, with its own empty state. */
+function SavedGroup({
+    title,
+    icon: Icon,
+    count,
+    empty,
+    children,
+}: {
+    title: string;
+    icon: React.ElementType;
+    count: number;
+    empty: string;
+    children: React.ReactNode;
+}) {
+    return (
+        <section>
+            <div className="flex items-center gap-2 mb-2">
+                <Icon className="h-3.5 w-3.5 text-[var(--primary)]" />
+                <h4 className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-secondary)]">{title}</h4>
+                <span className="text-[10px] font-bold text-[var(--text-secondary)] opacity-70">{count}</span>
+            </div>
+            {count === 0 ? (
+                <p className="rounded-lg border border-dashed border-[var(--border-color)] px-3 py-4 text-center text-[11px] text-[var(--text-secondary)]">
+                    {empty}
+                </p>
+            ) : (
+                <div className="space-y-2">{children}</div>
+            )}
+        </section>
+    );
 }
+
+function SavedRow({
+    icon: Icon,
+    title,
+    meta,
+    active,
+    onClick,
+}: {
+    icon: React.ElementType;
+    title: string;
+    meta: string;
+    active?: boolean;
+    onClick: () => void;
+}) {
+    return (
+        <button
+            onClick={onClick}
+            aria-current={active ? "true" : undefined}
+            className={`group w-full text-left rounded-lg border p-3 transition ${active
+                ? "border-[var(--primary)] bg-[var(--primary)]/8"
+                : "border-[var(--border-color)] bg-black/5 dark:bg-white/5 hover:border-[var(--primary)]/50 hover:bg-black/10 dark:hover:bg-white/10"
+                }`}
+        >
+            <div className="flex items-center gap-3 min-w-0">
+                <span className="grid place-items-center h-9 w-9 shrink-0 rounded-lg bg-[var(--primary)]/15 text-[var(--primary)] transition group-hover:bg-[var(--primary)]/25">
+                    <Icon className="h-4 w-4" />
+                </span>
+                <span className="min-w-0">
+                    <span className="block truncate text-sm font-bold text-[var(--foreground)] transition group-hover:text-[var(--primary)]">
+                        {title}
+                    </span>
+                    <span className="block truncate text-[10px] text-[var(--text-secondary)]">{meta}</span>
+                </span>
+            </div>
+        </button>
+    );
+}
+
 function Input({ label, value, onChange }: { label: string, value: string, onChange: (v: string) => void }) {
     return <div className="mb-2 w-full"><label className="text-[10px] uppercase text-[var(--text-secondary)] font-bold block mb-1">{label}</label><input type="text" className="w-full bg-black/5 dark:bg-black/30 border border-[var(--border-color)] rounded px-2 py-1.5 text-xs text-[var(--foreground)] focus:border-[var(--primary)] outline-none transition-colors" value={value} onChange={(e) => onChange(e.target.value)} /></div>
+}
+
+function AddButton({ label, onClick }: { label: string; onClick: () => void }) {
+    return (
+        <button
+            onClick={onClick}
+            className="flex items-center gap-1.5 h-7 px-2.5 rounded-lg border border-[var(--border-color)] text-[11px] font-semibold text-[var(--foreground)] hover:bg-black/5 dark:hover:bg-white/5 transition"
+        >
+            <Plus className="w-3 h-3" /> {label}
+        </button>
+    );
+}
+
+function EntryCard({ children, onRemove }: { children: React.ReactNode; onRemove: () => void }) {
+    return (
+        <div className="relative group rounded-lg border border-[var(--border-color)] bg-black/5 dark:bg-white/5 p-3 mb-3 hover:border-[var(--foreground)]/20 transition-colors">
+            <button
+                onClick={onRemove}
+                aria-label="Remove entry"
+                className="absolute top-2.5 right-2.5 text-[var(--text-secondary)] hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+            >
+                <Trash2 className="h-3.5 w-3.5" />
+            </button>
+            {children}
+        </div>
+    );
+}
+
+/** Simple newline-per-item list, for sections that are just strings. */
+function ListEditor({
+    value,
+    onChange,
+    placeholder,
+}: {
+    value?: string[] | string;
+    onChange: (next: string[]) => void;
+    placeholder: string;
+}) {
+    const text = Array.isArray(value) ? value.join("\n") : value || "";
+    return (
+        <textarea
+            className="w-full h-24 bg-[var(--background)]/50 border border-[var(--border-color)] rounded-lg p-3 text-xs text-[var(--foreground)]/90 focus:border-[var(--primary)] outline-none resize-none leading-relaxed"
+            value={text}
+            placeholder={placeholder}
+            onChange={(e) => onChange(e.target.value.split("\n").map((v) => v.trimStart()))}
+        />
+    );
 }

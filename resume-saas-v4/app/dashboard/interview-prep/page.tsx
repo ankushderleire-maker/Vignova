@@ -1,4 +1,5 @@
 "use client";
+import { BrandLockup } from "@/components/BrandLockup";
 
 import { useState, useEffect, useRef } from "react";
 import { Loader2, Briefcase, User, Lightbulb, AlertCircle, ArrowLeft, Download, History, Plus, Sparkles } from "lucide-react";
@@ -162,10 +163,8 @@ export default function InterviewPrepPage() {
 
       <div ref={printRef} className="space-y-5 print:p-8 print:text-black print:bg-white">
         {/* PDF Header with Logo */}
-        <div className="hidden print:flex items-end mb-8 pb-4 border-b border-gray-200">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo.png" alt="Vignova Logo" width={40} height={40} className="w-10 h-10 object-contain" />
-          <span className="text-xl font-bold text-black tracking-tight -ml-1.5 mb-0.5">VIGNOVA</span>
+        <div className="hidden print:flex items-center mb-8 pb-4 border-b border-gray-200">
+          <BrandLockup size={40} wordmarkClassName="text-xl" tone="print" />
         </div>
         <h1 className="hidden print:block text-2xl font-bold mb-6">Interview Prep Questions</h1>
         

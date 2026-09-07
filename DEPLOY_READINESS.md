@@ -1,4 +1,12 @@
 # GitHub Deploy Readiness Report — UPDATED
+
+> **Current hosting update:** The landing page is moving to separate Hostinger
+> web hosting. `docker-compose.yml` now contains dashboard, backend, Postgres
+> and Ollama; aaPanel manages the host nginx. Older nginx-container and landing
+> instructions below are historical. See [VPS landing retirement](ops/VPS-LANDING-RETIREMENT.md)
+> before changing live services. Keep the old landing container running until
+> the new Hostinger website is uploaded and its DNS transition is complete.
+
 _Vignova — resume-saas-v4 (Next.js) + Full_Backend (FastAPI) + Postgres + Ollama_
 
 **Status:** All three previous blockers have been addressed in-code. There is a short **manual checklist** (rotating leaked keys, deleting scratch files, removing `.git/index.lock`) that must run on your laptop before the first `git push`. After that, this tree is clean enough for `main` → merge to `Deploy`.
@@ -72,6 +80,8 @@ Anything that was ever committed should be assumed public.
 - Gemini API key  (console.cloud.google.com → APIs → Credentials)
 - Sarvam API key
 - Adzuna App ID + Key  (developer.adzuna.com)
+- Apify API token  (console.apify.com → Settings → Integrations) — powers the
+  LinkedIn Optimizer profile fetch; goes in `Backend/Full_Backend/.env` only
 - Google OAuth client + secret
 - LinkedIn OAuth client + secret
 - SMTP password

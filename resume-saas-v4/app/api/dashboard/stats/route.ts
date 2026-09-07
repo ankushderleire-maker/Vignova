@@ -45,8 +45,50 @@ export async function GET(req: Request) {
             if (status === 'offer') jobStats.offer = item._count.status;
         });
 
-        // Get time-series data for graphs
+        // Month-over-month movement, so the cards can say "+9 from last month"
+        // rather than showing a bare total with no sense of direction.
         const now = new Date();
+        const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+        const previousMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        const weekStart = new Date(now.getTime() - 7 * 24 * 3_600_000);
+        const previousWeekStart = new Date(now.getTime() - 14 * 24 * 3_600_000);
+
+        const [
+            resumesThisMonth,
+            resumesLastMonth,
+            extensionThisMonth,
+            extensionLastMonth,
+            jobsThisMonth,
+            jobsLastMonth,
+            resumesThisWeek,
+            resumesLastWeek,
+            appliedThisWeek,
+            appliedLastWeek,
+            interviewsBooked,
+        ] = await Promise.all([
+            db.generatedResume.count({ where: { userId, createdAt: { gte: monthStart } } }),
+            db.generatedResume.count({ where: { userId, createdAt: { gte: previousMonthStart, lt: monthStart } } }),
+            db.generatedResume.count({ where: { userId, source: { in: ["extension", "EXTENSION"] }, createdAt: { gte: monthStart } } }),
+            db.generatedResume.count({ where: { userId, source: { in: ["extension", "EXTENSION"] }, createdAt: { gte: previousMonthStart, lt: monthStart } } }),
+            db.jobApplication.count({ where: { userId, createdAt: { gte: monthStart } } }),
+            db.jobApplication.count({ where: { userId, createdAt: { gte: previousMonthStart, lt: monthStart } } }),
+            db.generatedResume.count({ where: { userId, createdAt: { gte: weekStart } } }),
+            db.generatedResume.count({ where: { userId, createdAt: { gte: previousWeekStart, lt: weekStart } } }),
+            // updatedAt is the only timestamp a status change touches, so this
+            // counts applications *moved* to APPLIED in the window.
+            db.jobApplication.count({ where: { userId, status: "APPLIED", updatedAt: { gte: weekStart } } }),
+            db.jobApplication.count({ where: { userId, status: "APPLIED", updatedAt: { gte: previousWeekStart, lt: weekStart } } }),
+            db.jobApplication.count({ where: { userId, interviewAt: { gte: now } } }),
+        ]);
+
+        const trend = (current: number, previous: number) => ({
+            current,
+            previous,
+            change: current - previous,
+            percent: previous === 0 ? (current > 0 ? 100 : 0) : Math.round(((current - previous) / previous) * 100),
+        });
+
+        // Get time-series data for graphs
         const daysAgo = period === "month" ? 30 : period === "week" ? 7 : 30; // Always get 30 days for daily view
         const startDate = new Date(now);
         startDate.setDate(startDate.getDate() - daysAgo);
@@ -136,6 +178,16 @@ export async function GET(req: Request) {
             jobStats,
             period,
             stats: dailyStats,
+            trends: {
+                resumes: trend(resumesThisMonth, resumesLastMonth),
+                extensionResumes: trend(extensionThisMonth, extensionLastMonth),
+                jobs: trend(jobsThisMonth, jobsLastMonth),
+            },
+            thisWeek: {
+                applicationsSent: trend(appliedThisWeek, appliedLastWeek),
+                resumesCreated: trend(resumesThisWeek, resumesLastWeek),
+                interviewsBooked,
+            },
         });
     } catch (error) {
         console.error("[DASHBOARD_STATS]", error);
