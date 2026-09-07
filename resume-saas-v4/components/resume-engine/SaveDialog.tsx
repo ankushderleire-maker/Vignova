@@ -36,7 +36,7 @@ export default function SaveDialog({ isOpen, onClose, onSavePromise, isExisting,
             <div className="bg-[#111] border border-white/10 rounded-xl p-6 w-full max-w-md shadow-2xl">
                 <div className="flex justify-between items-center mb-6">
                     <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                        <Save className="h-5 w-5 text-green-500" /> Save Resume
+                        <Save className="h-5 w-5 text-[var(--primary)]" /> Save Resume
                     </h3>
                     <button onClick={onClose} className="text-gray-500 hover:text-white transition">
                         <X className="h-5 w-5" />

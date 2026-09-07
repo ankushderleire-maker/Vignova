@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { db } from "@/lib/db";
+import { queueJdFormat } from "@/lib/jdFormatQueue";
 
 export const dynamic = 'force-dynamic';
 
@@ -47,6 +48,9 @@ export async function POST(req: Request) {
         status: "SAVED", // Default column
       },
     });
+
+    // Pasted descriptions get the same treatment as scraped ones.
+    queueJdFormat(job.id, description);
 
     return NextResponse.json({ data: job });
   } catch (error) {

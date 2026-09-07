@@ -57,3 +57,10 @@ Browser_Extension/
 # ---------- Let's Encrypt / certbot ----------
 letsencrypt/
 certbot-webroot/
+
+# Machine-local Claude Code permissions (launch.json is shared, this is not)
+.claude/settings.local.json
+
+# new_landing build artefacts — regenerate with build.py / prepare-seo.py
+new_landing/hostinger-upload.zip
+new_landing/*.tmp.json

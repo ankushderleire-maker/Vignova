@@ -43,7 +43,7 @@ const pageInfo: Record<string, { title: string; description: string; icon: Lucid
   },
   "/dashboard/generator": {
     title: "Resume Generator",
-    description: "Select a saved job to instantly generate a tailored resume. Uses 1 Credit per generation",
+    description: "Choose a saved job description and launch AI Studio to create a tailored resume from your Master Profile. Uses 1 credit per generation",
     icon: Zap,
   },
   "/dashboard/resumes": {
@@ -158,8 +158,8 @@ export function Header({ onMenuClick }: HeaderProps) {
   const planColor = sub?.plan_type === "PREMIUM" ? "text-amber-600 dark:text-amber-400 bg-amber-500/10 border-amber-500/30" : sub?.plan_type === "PRO" ? "text-blue-600 dark:text-blue-400 bg-blue-500/10 border-blue-500/30" : "text-gray-600 dark:text-gray-400 bg-gray-500/10 border-gray-500/30";
   const credits = sub?.credits_remaining ?? 3;
   const isUnlimited = sub?.has_unlimited_resumes || false;
-  const badgeBg = sub?.plan_type === "PREMIUM" ? "bg-amber-500/10 border-amber-500/30" : sub?.plan_type === "PRO" ? "bg-blue-500/10 border-blue-500/30" : "bg-white/10 border-white/20";
-  const badgeText = sub?.plan_type === "PREMIUM" ? "text-amber-400" : sub?.plan_type === "PRO" ? "text-blue-400" : "text-gray-300";
+  const badgeBg = sub?.plan_type === "PREMIUM" ? "bg-amber-500/10 border-amber-500/30" : sub?.plan_type === "PRO" ? "bg-blue-500/10 border-blue-500/30" : "bg-[var(--primary)]/10 border-[var(--primary)]/25";
+  const badgeText = sub?.plan_type === "PREMIUM" ? "text-amber-500 dark:text-amber-400" : sub?.plan_type === "PRO" ? "text-blue-600 dark:text-blue-400" : "text-[var(--primary)]";
   const planLabelColor = badgeText;
 
   // Close dropdown when clicking outside
@@ -195,24 +195,24 @@ export function Header({ onMenuClick }: HeaderProps) {
   const Icon = currentPage.icon;
 
   return (
-    <header className="flex h-16 items-center justify-between border-b border-white/10 bg-[#000000] px-4 md:px-8 relative z-20">
+    <header className="flex h-16 items-center justify-between border-b border-[var(--border-color)] bg-[var(--sidebar-bg)] px-4 md:px-8 relative z-20">
       {/* Left side: Hamburger (mobile) + Icon + Page Title + Description */}
       <div className="flex items-center gap-2 md:gap-4 min-w-0 pr-2 md:pr-4">
         {/* Hamburger — mobile only */}
         <button
           onClick={onMenuClick}
-          className="md:hidden p-2 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 transition-colors shrink-0"
+          className="md:hidden p-2 rounded-lg text-[var(--text-secondary)] hover:text-[var(--foreground)] hover:bg-black/5 dark:hover:bg-white/10 transition-colors shrink-0"
           aria-label="Open menu"
         >
           <Menu className="h-5 w-5" />
         </button>
 
-        <div className="p-2 md:p-2.5 bg-blue-500/10 rounded-xl shrink-0 border border-blue-500/20">
-          <Icon className="h-5 w-5 md:h-6 md:w-6 text-blue-400" />
+        <div className="p-2 md:p-2.5 bg-[var(--primary)]/10 rounded-xl shrink-0 border border-[var(--primary)]/20">
+          <Icon className="h-5 w-5 md:h-6 md:w-6 text-[var(--primary)]" />
         </div>
         <div className="min-w-0 flex flex-col justify-center">
-          <h1 className="text-base md:text-xl font-bold text-white leading-tight tracking-tight truncate">{currentPage.title}</h1>
-          <p className="text-xs text-gray-400 hidden md:block truncate mt-0.5">
+          <h1 className="text-base md:text-xl font-bold text-[var(--foreground)] leading-tight tracking-tight truncate">{currentPage.title}</h1>
+          <p className="text-xs text-[var(--text-secondary)] hidden md:block truncate mt-0.5">
             {currentPage.description.includes("1 Credit") ? (
               <>
                 {currentPage.description.split("1 Credit")[0]}
@@ -233,11 +233,11 @@ export function Header({ onMenuClick }: HeaderProps) {
         <div className="relative" ref={notificationsRef}>
           <button
             onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
-            className="relative p-2 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 transition-colors"
+            className="relative p-2 rounded-lg text-[var(--text-secondary)] hover:text-[var(--foreground)] hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
           >
             <Bell className="w-5 h-5" />
             {unreadTickets.length > 0 && (
-              <span className="absolute top-1.5 right-2 w-2 h-2 rounded-full bg-red-500 ring-2 ring-[#000000]" />
+              <span className="absolute top-1.5 right-2 w-2 h-2 rounded-full bg-red-500 ring-2 ring-[var(--sidebar-bg)]" />
             )}
           </button>
 
@@ -299,16 +299,19 @@ export function Header({ onMenuClick }: HeaderProps) {
         <div className="relative" ref={dropdownRef}>
           <button
             onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-            className="flex items-center gap-2 md:gap-3 pl-3 md:pl-6 border-l border-white/10 outline-none group"
+            className="flex items-center gap-2 md:gap-3 pl-3 md:pl-6 border-l border-[var(--border-color)] outline-none group"
           >
             <div className="text-right hidden sm:block group-hover:opacity-80 transition-opacity">
-              <p className="text-sm font-medium text-white truncate max-w-[100px] md:max-w-none">
+              <p className="text-sm font-medium text-[var(--foreground)] truncate max-w-[100px] md:max-w-none">
                 {session?.user?.name || "User"}
               </p>
               <p className={`text-xs font-medium ${planLabelColor}`}>{planName} Plan</p>
             </div>
             <div className="relative">
-              <div className="h-9 w-9 rounded-full bg-gradient-to-tr from-[var(--primary)] to-[var(--primary)]/80 p-[2px] transition-transform group-hover:scale-105">
+              <div
+                className="h-9 w-9 rounded-full p-[2px] transition-transform group-hover:scale-105"
+                style={{ backgroundImage: "var(--brand-gradient)" }}
+              >
                 <div className="h-full w-full rounded-full bg-[var(--background)] flex items-center justify-center overflow-hidden">
                   {session?.user?.image ? (
                     <img src={session.user.image} alt="Profile" className="h-full w-full object-cover" />

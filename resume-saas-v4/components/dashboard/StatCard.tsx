@@ -17,9 +17,11 @@ interface StatCardProps {
         interviewing: number;
         offer: number;
     };
+    /** Rendered under the count, e.g. "+9 from last month". */
+    footer?: React.ReactNode;
 }
 
-export function StatCard({ title, count, icon: Icon, trend, color = "var(--primary)", jobStats }: StatCardProps) {
+export function StatCard({ title, count, icon: Icon, trend, color = "var(--primary)", jobStats, footer }: StatCardProps) {
     const animatedCount = useCountUp(count, 1500);
 
     return (
@@ -30,7 +32,7 @@ export function StatCard({ title, count, icon: Icon, trend, color = "var(--prima
                     <div className="relative">
                         <div
                             className="relative p-3 rounded-xl"
-                            style={{ backgroundColor: `${color}15` }}
+                            style={{ backgroundColor: `color-mix(in srgb, ${color} 12%, transparent)` }}
                         >
                             <Icon className="w-6 h-6" style={{ color }} />
                         </div>
@@ -51,6 +53,7 @@ export function StatCard({ title, count, icon: Icon, trend, color = "var(--prima
                         <p className="text-[1.75rem] sm:text-[2.5rem] leading-none font-bold text-[var(--foreground)] tracking-tight">
                             {animatedCount}
                         </p>
+                        {footer}
                     </div>
 
                     {/* Optional Job Stats Breakdown */}

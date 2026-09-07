@@ -28,6 +28,8 @@ type Job = {
   status: string;
   description?: string; // Added description
   jobUrl?: string; // Added jobUrl
+  interviewAt?: string | null;
+  deadlineAt?: string | null;
   createdAt: string;
 };
 
@@ -518,13 +520,28 @@ export default function JobTrackerPage() {
 
 /* ------------------ JOB MODAL (ADD / EDIT) ------------------ */
 
+/**
+ * A `datetime-local` input wants "YYYY-MM-DDTHH:mm" in *local* time, while the
+ * API speaks ISO/UTC. Slicing the ISO string would silently shift the time by
+ * the user's offset, so convert through the local getters.
+ */
+function toLocalInput(value?: string | null): string {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
 function JobModal({ jobToEdit, onClose, onSuccess }: { jobToEdit: Job | null; onClose: () => void; onSuccess: () => void; }) {
   const [form, setForm] = useState({
     company: "",
     jobTitle: "",
     location: "",
     description: "", // Added Description
-    jobUrl: "" // Added Job URL
+    jobUrl: "", // Added Job URL
+    interviewAt: "", // datetime-local, empty means "not scheduled"
+    deadlineAt: "",
   });
   const [loading, setLoading] = useState(false);
 
@@ -536,7 +553,9 @@ function JobModal({ jobToEdit, onClose, onSuccess }: { jobToEdit: Job | null; on
         jobTitle: jobToEdit.jobTitle,
         location: jobToEdit.location || "",
         description: jobToEdit.description || "",
-        jobUrl: jobToEdit.jobUrl || ""
+        jobUrl: jobToEdit.jobUrl || "",
+        interviewAt: toLocalInput(jobToEdit.interviewAt),
+        deadlineAt: toLocalInput(jobToEdit.deadlineAt),
       });
     }
   }, [jobToEdit]);
@@ -553,7 +572,11 @@ function JobModal({ jobToEdit, onClose, onSuccess }: { jobToEdit: Job | null; on
       const res = await fetch(url, {
         method,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form)
+        body: JSON.stringify({
+          ...form,
+          interviewAt: form.interviewAt ? new Date(form.interviewAt).toISOString() : null,
+          deadlineAt: form.deadlineAt ? new Date(form.deadlineAt).toISOString() : null,
+        })
       });
       if (res.ok) onSuccess();
     } finally {
@@ -596,6 +619,27 @@ function JobModal({ jobToEdit, onClose, onSuccess }: { jobToEdit: Job | null; on
             <div>
               <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1.5 uppercase">Job URL</label>
               <input className="w-full p-3 bg-black/5 dark:bg-white/5 border border-[var(--border-color)] rounded-lg text-[var(--foreground)] focus:border-[var(--primary)]/50 outline-none transition text-sm mb-4" placeholder="e.g. https://linkedin.com/jobs/view/..." value={form.jobUrl} onChange={(e) => setForm({ ...form, jobUrl: e.target.value })} />
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+                <div>
+                  <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1.5 uppercase">Interview</label>
+                  <input
+                    type="datetime-local"
+                    className="w-full p-3 bg-black/5 dark:bg-white/5 border border-[var(--border-color)] rounded-lg text-[var(--foreground)] focus:border-[var(--primary)]/50 outline-none transition text-sm"
+                    value={form.interviewAt}
+                    onChange={(e) => setForm({ ...form, interviewAt: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1.5 uppercase">Application deadline</label>
+                  <input
+                    type="datetime-local"
+                    className="w-full p-3 bg-black/5 dark:bg-white/5 border border-[var(--border-color)] rounded-lg text-[var(--foreground)] focus:border-[var(--primary)]/50 outline-none transition text-sm"
+                    value={form.deadlineAt}
+                    onChange={(e) => setForm({ ...form, deadlineAt: e.target.value })}
+                  />
+                </div>
+              </div>
 
               <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1.5 uppercase">Job Description</label>
               <textarea

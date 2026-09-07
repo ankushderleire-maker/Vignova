@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { BrandLockup } from "@/components/BrandLockup";
 import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
 import {
@@ -74,16 +75,16 @@ export function Sidebar({ onClose }: SidebarProps) {
       <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-[var(--primary)]/10 to-transparent pointer-events-none" />
 
       {/* Logo Area */}
-      <div className="flex h-16 items-center justify-between px-6 bg-[#000000] border-b border-white/10 z-10">
-        <div className="flex items-end">
-          <img src="/logo.png" alt="Vignova Logo" width={40} height={40} className="w-10 h-10 object-contain" />
-          <span className="text-lg font-bold text-white tracking-tight -ml-1.5 mb-0.5">VIGNOVA</span>
-        </div>
-        {/* Close button — only visible in mobile drawer */}
+      <div className="relative flex h-16 items-center justify-center px-6 bg-[var(--sidebar-bg)] border-b border-[var(--border-color)] z-10">
+        <Link href="/dashboard" aria-label="Vignova home" className="flex items-center">
+          <BrandLockup size={44} wordmarkClassName="text-xl" />
+        </Link>
+        {/* Close button — only visible in mobile drawer, pinned so the lockup
+            stays centred whether or not it is there. */}
         {onClose && (
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 transition-colors"
+            className="absolute right-4 p-1.5 rounded-lg text-[var(--text-secondary)] hover:text-[var(--foreground)] hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
             aria-label="Close menu"
           >
             <X className="h-5 w-5" />

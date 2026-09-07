@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1" name="viewport"/>
+<meta content="#7155ed" name="theme-color"/>
+<title>ATS Resume Checker: How Resume Scoring Actually Works | Vignova</title>
+<meta content="What an ATS resume checker measures, what the six scoring dimensions mean, what a good score is worth, and where resume scores mislead people. A practical guide to using an ATS score properly." name="description"/>
+<meta content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" name="robots"/>
+<link href="https://vignova.io/blog/ats-resume-checker-how-scoring-works/" rel="canonical"/>
+<meta content="Vignova" property="og:site_name"/>
+<meta content="article" property="og:type"/>
+<meta content="ATS Resume Checker: How Resume Scoring Actually Works | Vignova" property="og:title"/>
+<meta content="What an ATS resume checker measures, what the six scoring dimensions mean, what a good score is worth, and where resume scores mislead people. A practical guide to using an ATS score properly." property="og:description"/>
+<meta content="https://vignova.io/blog/ats-resume-checker-how-scoring-works/" property="og:url"/>
+<meta content="https://vignova.io/og-image.png?v=purple-blue-20260907" property="og:image"/>
+<meta content="Vignova — AI resume and job search tools" property="og:image:alt"/>
+<meta content="summary_large_image" name="twitter:card"/>
+<meta content="ATS Resume Checker: How Resume Scoring Actually Works | Vignova" name="twitter:title"/>
+<meta content="What an ATS resume checker measures, what the six scoring dimensions mean, what a good score is worth, and where resume scores mislead people. A practical guide to using an ATS score properly." name="twitter:description"/>
+<meta content="https://vignova.io/og-image.png?v=purple-blue-20260907" name="twitter:image"/>
+<meta content="2026-08-21T00:00:00.000Z" property="article:published_time"/>
+<link href="/favicon-48x48.png?v=purple-blue-20260907" rel="icon" sizes="48x48" type="image/png"/>
+<link as="font" crossorigin="" href="/assets/geist-latin.woff2" rel="preload" type="font/woff2"/>
+<link href="/blog.css?v=1" rel="stylesheet"/>
+<link href="/analytics.css" rel="stylesheet"/>
+<script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://vignova.io/#organization","name":"Vignova","url":"https://vignova.io/","logo":{"@type":"ImageObject","url":"https://vignova.io/assets/vignova-purple-blue.png"}},{"@type":"BlogPosting","@id":"https://vignova.io/blog/ats-resume-checker-how-scoring-works/#article","headline":"ATS Resume Checker: How Resume Scoring Actually Works","description":"What an ATS resume checker measures, what the six scoring dimensions mean, what a good score is worth, and where resume scores mislead people. A practical guide to using an ATS score properly.","datePublished":"2026-08-21T00:00:00.000Z","dateModified":"2026-08-21T00:00:00.000Z","image":"https://vignova.io/og-image.png","mainEntityOfPage":{"@type":"WebPage","@id":"https://vignova.io/blog/ats-resume-checker-how-scoring-works/"},"author":{"@type":"Organization","name":"Vignova","url":"https://vignova.io/"},"publisher":{"@id":"https://vignova.io/#organization"},"inLanguage":"en","isPartOf":{"@id":"https://vignova.io/blog/#blog"}},{"@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://vignova.io/"},{"@type":"ListItem","position":2,"name":"Blog","item":"https://vignova.io/blog/"},{"@type":"ListItem","position":3,"name":"ATS Resume Checker: How Resume Scoring Actually Works","item":"https://vignova.io/blog/ats-resume-checker-how-scoring-works/"}]}]}</script>
+<meta content="Vignova" name="application-name"/><meta content="en_US" property="og:locale"/><meta content="1200" property="og:image:width"/><meta content="630" property="og:image:height"/><meta content="Vignova — Tailor your resume. Apply with confidence." name="twitter:image:alt"/><link href="/apple-touch-icon.png?v=purple-blue-20260907" rel="apple-touch-icon" sizes="180x180"/><link href="/site.webmanifest?v=purple-blue-20260907" rel="manifest"/><script defer="" src="/analytics.js"></script><script id="site-identity-schema" type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "Organization", "@id": "https://vignova.io/#organization", "name": "Vignova", "url": "https://vignova.io/", "logo": "https://vignova.io/assets/vignova-purple-blue.png", "founder": {"@type": "Person", "name": "Ankush Derle"}, "description": "AI resume tailoring, ATS match analysis and job application tracking.", "contactPoint": {"@type": "ContactPoint", "contactType": "customer support", "email": "contact@vignova.io", "url": "https://vignova.io/contact/"}}, {"@type": "WebSite", "@id": "https://vignova.io/#website", "name": "Vignova", "url": "https://vignova.io/", "inLanguage": "en-US", "publisher": {"@id": "https://vignova.io/#organization"}}, {"@type": "WebPage", "@id": "https://vignova.io/blog/ats-resume-checker-how-scoring-works/#webpage", "url": "https://vignova.io/blog/ats-resume-checker-how-scoring-works/", "name": "ATS Resume Checker: How Resume Scoring Actually Works | Vignova", "description": "What an ATS resume checker measures, what the six scoring dimensions mean, what a good score is worth, and where resume scores mislead people. A practical guide to using an ATS score properly.", "inLanguage": "en-US", "isPartOf": {"@id": "https://vignova.io/#website"}}]}</script></head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+<header class="blog-site-header"><div class="shell nav-wrap"><a aria-label="Vignova home" class="brand" href="/"><span class="logo-crop"><img alt="" height="48" src="/assets/vignova-purple-blue.png" width="48"/></span><span>VIGNOVA</span></a>
+<nav aria-label="Main navigation" class="desktop-nav"><a href="/#extension">Chrome extension</a><a href="/#features">Features</a><a href="/#plans">Pricing</a><a aria-current="true" href="/blog/">Blog</a></nav>
+<a class="button nav-cta" href="https://app.vignova.io/register">Get started free <span aria-hidden="true">↗</span></a>
+<details class="mobile-menu"><summary aria-label="Open navigation"><span></span><span></span></summary><nav aria-label="Mobile navigation"><a href="/#extension">Chrome extension</a><a href="/#features">Features</a><a href="/#plans">Pricing</a><a href="/blog/">Blog</a><a href="https://app.vignova.io/login">Log in</a><a href="https://app.vignova.io/register">Get started free ↗</a></nav></details>
+</div></header>
+<main id="main"><div class="shell"><nav aria-label="Breadcrumb" class="breadcrumbs"><a href="/">Home</a><span aria-hidden="true">/</span><a href="/blog/">Blog</a><span aria-hidden="true">/</span><span aria-current="page">ATS Resume Checker: How Resume Scoring Actually Works</span></nav></div>
+<article><header class="article-header shell"><span class="eyebrow">ATS resume checks</span><h1>ATS Resume Checker: How Resume Scoring Actually Works</h1><p class="article-description">What an ATS resume checker measures, what the six scoring dimensions mean, what a good score is worth, and where resume scores mislead people. A practical guide to using an ATS score properly.</p><div class="article-meta"><span class="author-mark"><img alt="" height="32" src="/assets/vignova-purple-blue.png" width="32"/></span><span>By <a href="/about/">Vignova</a></span><span aria-hidden="true" class="meta-dot">·</span><time datetime="2026-08-21">August 21, 2026</time><span aria-hidden="true" class="meta-dot">·</span><span>6 min read</span></div></header>
+<div class="shell article-layout"><aside aria-label="Article navigation" class="article-sidebar"><details class="table-of-contents" open=""><summary>In this article</summary><ol><li><a href="#article-1-first-what-an-ats-score-is-not">First, what an ATS score is not</a></li><li><a href="#article-2-the-six-dimensions-worth-scoring">The six dimensions worth scoring</a></li><li><a href="#article-3-what-a-good-score-looks-like">What a good score looks like</a></li><li><a href="#article-4-how-to-act-on-a-low-score">How to act on a low score</a></li><li><a href="#article-5-when-a-low-score-means-do-not-apply">When a low score means "do not apply"</a></li><li><a href="#article-6-frequently-asked-questions">Frequently asked questions</a></li><li><a href="#article-7-the-short-version">The short version</a></li></ol></details><div class="sidebar-cta"><span class="eyebrow">PUT IT INTO PRACTICE</span><h2>Build a resume for your next role.</h2><a class="button" href="https://app.vignova.io/register">Try Vignova free ↗</a><p>3 introductory credits. No card needed.</p></div></aside><div class="article-body"><p>An ATS resume checker takes your resume and a job description and returns a number. That number is useful — but only if you understand what it does and does not represent.</p>
+<p>This is a guide to what resume scoring actually measures, how to act on a low score, and why chasing 100% is a bad idea.</p>
+<h2 id="article-1-first-what-an-ats-score-is-not">First, what an ATS score is not</h2>
+<p>It is not a prediction of whether an applicant tracking system will let your resume through. As covered in detail in <a href="/blog/the-75-percent-ats-rejection-myth/">the 75% rejection myth</a>, recruiters overwhelmingly report that their ATS does not auto-reject resume documents. There is no gate for a score to unlock.</p>
+<p>What a score measures is <strong>how closely this document matches what this employer said they wanted, and how cleanly a machine and a human can read it.</strong> That correlates with whether a recruiter finds you in a search and whether they keep reading once they open the file — which is the part that actually decides your outcome.</p>
+<p>Used that way, the number is genuinely useful. Used as a pass mark, it produces worse resumes.</p>
+<h2 id="article-2-the-six-dimensions-worth-scoring">The six dimensions worth scoring</h2>
+<p>Vignova's <a href="/">ATS analysis</a> scores across six dimensions. Most credible checkers measure some version of the same things, so this is a reasonable map regardless of the tool.</p>
+<h3>1. Keywords</h3>
+<p>The most literal measure: which terms from the job description appear in your resume, and where.</p>
+<p>This matters because recruiters search their ATS by keyword. If a posting emphasises "incident response" and your resume says "handled outages", you will not appear in that search. Keyword scoring identifies exactly which terms are missing so you can add the ones that are honestly yours.</p>
+<p>Placement counts as well as presence. A term in your work experience carries more weight than the same term dumped in a skills list, because it comes with evidence attached.</p>
+<h3>2. Semantics</h3>
+<p>Keyword matching alone rewards parroting. Semantic scoring looks at whether your resume demonstrates the <em>concepts</em> the role needs, even where the vocabulary differs.</p>
+<p>If a posting asks for "experience leading distributed teams" and your resume describes coordinating engineers across three time zones, that is a semantic match a naive keyword checker would miss. A good score here means the substance is right; a low score means you are describing different work from what the role requires — which is worth knowing before you spend an hour tailoring.</p>
+<h3>3. Sections</h3>
+<p>Whether the expected structural pieces exist and are labelled conventionally: contact details, a summary, work experience with dates, education, skills.</p>
+<p>This is unglamorous and matters more than people expect. Parsers look for recognisable headings. Renaming Experience to "My Journey" makes a machine work harder and gives a skimming human one more small obstacle.</p>
+<h3>4. Impact</h3>
+<p>Whether your bullets describe outcomes or duties, and whether they are quantified.</p>
+<p>"Responsible for social media" is a duty. "Grew organic social referrals 3x in eight months by shifting to a weekly publishing cadence" is an outcome. Impact scoring flags bullets that stop at responsibility, because those are the lines that make a recruiter's eyes slide off the page.</p>
+<p>This is usually where the largest realistic gain lives, and it is the one dimension AI genuinely cannot fix for you — the numbers have to come from your memory.</p>
+<h3>5. Format</h3>
+<p>Parsing safety: single-column layout, no text trapped inside images, nothing critical in headers or footers, real selectable text rather than a scan, standard fonts, consistent date formats.</p>
+<p>A quick manual version of this test: copy your resume, paste it into a plain text editor, and read it. If the order is scrambled or chunks are missing, a parser will see the same mess.</p>
+<h3>6. Readability</h3>
+<p>Sentence length, bullet density, white space, and whether the top third of page one carries the most relevant material.</p>
+<p>This dimension is aimed squarely at the human. Recruiters spend seconds on a first pass. A resume that is technically perfect and visually exhausting still loses.</p>
+<h2 id="article-3-what-a-good-score-looks-like">What a good score looks like</h2>
+<p>Broadly:</p>
+<ul>
+<li><strong>Below 60%</strong> — the resume is generic relative to this posting. Usually the summary and skills sections have not been touched at all.</li>
+<li><strong>60–75%</strong> — some tailoring done, with clear gaps. Typically missing keywords that are genuinely true of you, or bullets that describe duties rather than outcomes.</li>
+<li><strong>75–90%</strong> — well matched. This is the realistic target for a role you are qualified for.</li>
+<li><strong>Above 90%</strong> — check for keyword stuffing. Occasionally legitimate for a role that maps almost exactly to your last job; more often a sign that terms have been crammed in unnaturally.</li>
+</ul>
+<p>That last point deserves emphasis. A resume optimised to score 100% frequently reads badly to a person, and a person is who decides. Keyword stuffing also actively hurts on many matching algorithms, which penalise unnatural term density.</p>
+<h2 id="article-4-how-to-act-on-a-low-score">How to act on a low score</h2>
+<p>Work in this order, because the effort-to-payoff ratio drops as you go down:</p>
+<ol>
+<li><strong>Fix format problems first.</strong> They are quick, mechanical, and they cap everything else.</li>
+<li><strong>Add missing keywords that are genuinely true of you.</strong> This is usually the biggest single jump. If you cannot honestly claim the term, leave it out and accept the lower score — a high score on a resume that misrepresents you is worthless.</li>
+<li><strong>Rewrite the weakest three bullets into outcomes with numbers.</strong> Not all of them. The three the recruiter will actually read.</li>
+<li><strong>Rewrite the summary last,</strong> once you know which keywords survived. Three to five priority terms, in a sentence a human would say.</li>
+<li><strong>Re-score, then stop.</strong> Diminishing returns arrive quickly, and there is usually another application waiting.</li>
+</ol>
+<h2 id="article-5-when-a-low-score-means-do-not-apply">When a low score means "do not apply"</h2>
+<p>Sometimes the useful answer from a checker is that this is not your role.</p>
+<p>If the semantic score is low and the missing keywords are all things you have genuinely never done, no amount of rewriting fixes that. The resume is not the problem. Recognising this in two minutes rather than after forty minutes of tailoring is one of the more underrated uses of a scoring tool — it redirects your time to the roles where you are actually competitive.</p>
+<h2 id="article-6-frequently-asked-questions">Frequently asked questions</h2>
+<p><strong>Do different ATS resume checkers give different scores?</strong>
+Yes, sometimes very different, because each weights the dimensions differently and uses its own matching model. Use one tool consistently and treat the trend as the signal, not the absolute number.</p>
+<p><strong>Does a high score guarantee an interview?</strong>
+No. It means you are findable in a search and legible on a skim. Everything after that is competition, timing, and fit.</p>
+<p><strong>Should I run a check on every application?</strong>
+For roles you care about, yes — it takes seconds once your history is stored. For a scattergun application, the check is not the bottleneck; your targeting is.</p>
+<p><strong>Can I just paste the job description into my resume in white text?</strong>
+No. Recruiters open the file, the text is trivially visible on selection or in plain-text parsing, and it reads as an attempt to cheat.</p>
+<h2 id="article-7-the-short-version">The short version</h2>
+<p>An ATS score is a match-and-legibility measure, not a gate. Read the six dimensions separately, fix format and honest keyword gaps first, quantify a few bullets, and stop well short of 100%. If the semantic score stays low, believe it and move to a better-fitting role.</p>
+<p><a href="/">Run your resume against a specific job description with Vignova</a> and see the six-dimension breakdown before you apply.</p></div></div></article>
+<section aria-labelledby="related-title" class="related shell"><div class="section-title"><div><span class="eyebrow">KEEP EXPLORING</span><h2 id="related-title">More for your job search.</h2></div><a class="text-link" href="/blog/">All articles ↗</a></div><div class="related-grid"><article class="blog-card accent-0"><a href="/blog/the-75-percent-ats-rejection-myth/"><div class="card-top"><span class="topic">ATS explained</span><span aria-hidden="true" class="card-arrow">↗</span></div><h3>The 75% ATS Rejection Myth: What Actually Happens to Your Resume</h3><p>The claim that applicant tracking systems reject 75% of resumes traces back to a 2012 sales pitch from a company that no longer exists. Here is what recruiters say really happens — and why resume optimization still matters.</p><div class="card-meta"><time datetime="2026-08-21">August 21, 2026</time><span>5 min read</span></div></a></article><article class="blog-card accent-1"><a href="/blog/resume-keywords-how-to-find-and-use-them/"><div class="card-top"><span class="topic">Resume keywords</span><span aria-hidden="true" class="card-arrow">↗</span></div><h3>Resume Keywords: How to Find the Right Ones and Use Them Properly</h3><p>Where resume keywords come from, which ones are worth including, where to place them so they count, and how to avoid keyword stuffing that makes a recruiter close the file.</p><div class="card-meta"><time datetime="2026-08-21">August 21, 2026</time><span>6 min read</span></div></a></article><article class="blog-card accent-2"><a href="/blog/how-to-tailor-your-resume-to-a-job-description/"><div class="card-top"><span class="topic">Resume tailoring</span><span aria-hidden="true" class="card-arrow">↗</span></div><h3>How to Tailor Your Resume to a Job Description (2026 Step-by-Step Guide)</h3><p>A repeatable process for tailoring your resume to any job description — how to pull the right keywords, rewrite bullet points without lying, and cut the job from 45 minutes to under 5.</p><div class="card-meta"><time datetime="2026-08-21">August 21, 2026</time><span>7 min read</span></div></a></article></div></section></main><footer class="blog-site-footer"><div class="shell footer-grid"><div><a aria-label="Vignova home" class="brand" href="/"><span class="logo-crop"><img alt="" height="48" src="/assets/vignova-purple-blue.png" width="48"/></span><span>VIGNOVA</span></a><p>AI tools for your next application.</p><a href="mailto:contact@vignova.io">contact@vignova.io</a></div><nav aria-label="Explore Vignova"><h2>Explore</h2><a href="/#features">Features</a><a href="/#extension">Chrome extension</a><a href="/#plans">Plans</a><a href="/blog/">Blog</a><a href="/about/">About Vignova</a><a href="/contact/">Contact &amp; support</a></nav><nav aria-label="Legal links"><h2>The details</h2><a href="/privacy/">Privacy policy</a><a href="/terms/">Terms of service</a><a href="/refund/">Refund policy</a><a href="https://app.vignova.io/login">Log in</a></nav></div><div class="shell footer-bottom"><span>© 2026 Vignova. All rights reserved.</span><a href="#main">Back to top ↑</a></div></footer></body></html>
+

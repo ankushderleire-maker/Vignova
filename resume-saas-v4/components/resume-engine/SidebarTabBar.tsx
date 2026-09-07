@@ -1,9 +1,9 @@
 'use client';
 
 import React from 'react';
-import { FileText, LayoutTemplate, Palette } from 'lucide-react';
+import { FileText, History, LayoutTemplate, Palette } from 'lucide-react';
 
-export type SidebarTab = 'content' | 'templates';
+export type SidebarTab = 'content' | 'templates' | 'saved';
 
 interface SidebarTabBarProps {
     activeTab: SidebarTab;
@@ -24,6 +24,12 @@ export function SidebarTabBar({ activeTab, onTabChange }: SidebarTabBarProps) {
                 onClick={() => onTabChange('templates')}
                 icon={<LayoutTemplate className="h-4 w-4" />}
                 label="Templates"
+            />
+            <TabButton
+                active={activeTab === 'saved'}
+                onClick={() => onTabChange('saved')}
+                icon={<History className="h-4 w-4" />}
+                label="Saved"
             />
         </div>
     );

@@ -3,28 +3,23 @@
     "name": "Vignova - Your Career AI Assistant",
     "short_name": "Vignova",
     "version": "1.2.2",
-    "description": "AI career copilot: tailor resumes, auto-fill applications, track jobs with Kanban, and optimize your LinkedIn profile.",
-
+    "description": "AI career copilot: tailor resumes, auto-fill applications, and track jobs with Kanban.",
     "minimum_chrome_version": "116",
-
     "icons": {
-        "16":  "icons/icon16.png",
-        "48":  "icons/icon48.png",
+        "16": "icons/icon16.png",
+        "48": "icons/icon48.png",
         "128": "icons/icon128.png"
     },
-
     "action": {
-        "default_title": "Vignova – Career AI",
+        "default_title": "Vignova \u2013 Career AI",
         "default_icon": {
             "16": "icons/icon16.png",
             "48": "icons/icon48.png"
         }
     },
-
     "background": {
         "service_worker": "background/service-worker.js"
     },
-
     "content_scripts": [
         {
             "matches": [
@@ -40,20 +35,6 @@
             "css": [
                 "styles/button.css",
                 "content/overlay.css"
-            ],
-            "run_at": "document_idle"
-        },
-        {
-            "matches": [
-                "*://*.linkedin.com/in/*",
-                "*://linkedin.com/in/*",
-                "*://*.linkedin.com/details/skills/*",
-                "*://linkedin.com/details/skills/*",
-                "*://*.linkedin.com/dashboard/*",
-                "*://linkedin.com/dashboard/*"
-            ],
-            "js": [
-                "content/linkedin_scraper.js"
             ],
             "run_at": "document_idle"
         },
@@ -94,7 +75,6 @@
             "match_about_blank": true
         }
     ],
-
     "permissions": [
         "storage",
         "activeTab",
@@ -103,7 +83,6 @@
         "cookies",
         "clipboardWrite"
     ],
-
     "host_permissions": [
         "https://app.vignova.io/*",
         "https://api.vignova.io/*",
@@ -114,7 +93,6 @@
         "https://*.lever.co/*",
         "https://*.ashbyhq.com/*"
     ],
-
     "web_accessible_resources": [
         {
             "resources": [

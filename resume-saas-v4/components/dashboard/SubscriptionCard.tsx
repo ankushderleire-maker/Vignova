@@ -8,14 +8,20 @@ import styles from "./DashboardCard.module.css";
 interface SubscriptionCardProps {
     plan: string;
     creditsRemaining: number;
+    /** From /api/subscription; falls back to the plan's published allowance. */
+    creditsTotal?: number;
 }
 
-export function SubscriptionCard({ plan, creditsRemaining }: SubscriptionCardProps) {
+export function SubscriptionCard({ plan, creditsRemaining, creditsTotal }: SubscriptionCardProps) {
     const router = useRouter();
     const isPremium = plan?.toUpperCase() === "PREMIUM";
     const isPro = plan?.toUpperCase() === "PRO";
     const isPaid = isPremium || isPro;
     const color = isPremium ? "#F59E0B" : isPro ? "#3B82F6" : "#6B7280"; // Amber for Premium, Blue for Pro, Gray for Free
+
+    const total = creditsTotal ?? (isPremium ? 150 : isPro ? 40 : 3);
+    const remainingPercent = total > 0 ? Math.min(Math.max((creditsRemaining / total) * 100, 0), 100) : 0;
+    const usedPercent = Math.round(100 - remainingPercent);
 
     return (
         <div className={styles.cardWrapper} style={{ "--border-color": color } as React.CSSProperties}>
@@ -44,14 +50,14 @@ export function SubscriptionCard({ plan, creditsRemaining }: SubscriptionCardPro
                         <span className="text-[var(--text-secondary)] text-sm mb-1">credits left</span>
                     </div>
 
-                    <div className="w-full bg-white/5 rounded-full h-1.5 overflow-hidden mb-4">
-                        <div
-                            className="h-full transition-all duration-500"
-                            style={{
-                                width: `${Math.min((creditsRemaining / (isPremium ? 150 : isPro ? 50 : 3)) * 100, 100)}%`,
-                                backgroundColor: color
-                            }}
-                        />
+                    <div className="flex items-center gap-2 mb-4">
+                        <div className="flex-1 bg-[var(--foreground)]/10 rounded-full h-1.5 overflow-hidden">
+                            <div
+                                className="h-full transition-all duration-500"
+                                style={{ width: `${remainingPercent}%`, backgroundColor: color }}
+                            />
+                        </div>
+                        <span className="shrink-0 text-[10px] text-[var(--text-secondary)]">{usedPercent}% used</span>
                     </div>
 
                     <button

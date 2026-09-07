@@ -153,7 +153,7 @@ export const TemplateSidebar: React.FC<TemplateSidebarProps> = ({ onTemplateSele
           position: absolute;
           top: 6px;
           right: 6px;
-          background: #10b981;
+          background: var(--primary);
           color: white;
           border-radius: 50%;
           width: 24px;

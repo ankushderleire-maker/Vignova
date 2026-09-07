@@ -103,6 +103,13 @@ model JobApplication {
   coverLetter      String?
   atsReport        Json?
   aiReport         Json?
+  /// Structured job description produced by the JD formatter agent.
+  /// Envelope: { status, version, source, model, formattedAt, data, error }
+  formattedJd      Json?
+  /// When the interview for this application is scheduled.
+  interviewAt      DateTime?
+  /// When the application itself closes.
+  deadlineAt       DateTime?
   generatedResumes GeneratedResume[]
   atsReports       AtsScoreReport[]
   user             users             @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -110,6 +117,8 @@ model JobApplication {
   @@index([userId])
   @@index([source])
   @@index([status])
+  @@index([interviewAt])
+  @@index([deadlineAt])
 }
 
 model AtsScoreReport {

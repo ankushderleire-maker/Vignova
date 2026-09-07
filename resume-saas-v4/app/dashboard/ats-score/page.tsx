@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect, useMemo, Suspense } from "react";
 import {
     Loader2,
     UploadCloud,
@@ -28,6 +28,10 @@ import {
     Star,
     ChevronRight,
     Repeat,
+    Search,
+    MapPin,
+    CalendarDays,
+    ArrowRight,
     Eye,
     Wand2,
 } from "lucide-react";
@@ -51,8 +55,19 @@ type Job = {
     company: string;
     jobTitle: string;
     description?: string;
+    location?: string;
     createdAt: string;
 };
+
+/** Company initials get a rotating tint, so a list of jobs is scannable. */
+const LOGO_TINTS = [
+    "bg-violet-500/12 text-violet-600 dark:text-violet-400",
+    "bg-blue-500/12 text-blue-600 dark:text-blue-400",
+    "bg-emerald-500/12 text-emerald-600 dark:text-emerald-400",
+    "bg-amber-500/12 text-amber-600 dark:text-amber-400",
+    "bg-rose-500/12 text-rose-600 dark:text-rose-400",
+    "bg-cyan-500/12 text-cyan-600 dark:text-cyan-400",
+];
 
 interface KeywordItem {
     keyword: string;
@@ -166,6 +181,7 @@ function AtsScoreContent() {
     const [step, setStep] = useState<"setup" | "loading" | "result">("setup");
     const [jobs, setJobs] = useState<Job[]>([]);
     const [selectedJobId, setSelectedJobId] = useState("");
+    const [jdSearch, setJdSearch] = useState("");
     const [isFetchingJobs, setIsFetchingJobs] = useState(true);
     const [resumeSource, setResumeSource] = useState<"saved" | "upload">("saved");
     const [uploadFile, setUploadFile] = useState<File | null>(null);
@@ -226,6 +242,17 @@ function AtsScoreContent() {
             setPreviousReports([]);
         }
     }, [selectedJobId]);
+
+    const visibleJobs = useMemo(() => {
+        const needle = jdSearch.trim().toLowerCase();
+        if (!needle) return jobs;
+        return jobs.filter(
+            (job) =>
+                job.jobTitle.toLowerCase().includes(needle) ||
+                job.company.toLowerCase().includes(needle) ||
+                (job.description || "").toLowerCase().includes(needle)
+        );
+    }, [jobs, jdSearch]);
 
     const fetchSubscription = async () => {
         try { const r = await fetch("/api/subscription"); setSubscription(await r.json()); } catch (e) { console.error(e); }
@@ -584,107 +611,238 @@ function AtsScoreContent() {
             {/* ─── SETUP STEP ─── */}
             {
                 step === "setup" && (
-                    <div id="tour-ats-setup" className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                        {/* LEFT: JD Selection */}
-                        <div className="bg-[var(--sidebar-bg)]/50 border border-[var(--border-color)] rounded-xl p-6 shadow-xl space-y-5">
-                            <div>
-                                <h2 className="text-sm font-bold text-[var(--foreground)] uppercase tracking-wider mb-1">1. Select Job Description</h2>
-                                <p className="text-xs text-[var(--text-secondary)]">Choose from your saved jobs in the Job Tracker.</p>
-                            </div>
-                            {error && (<div className="p-3 rounded-md bg-red-500/10 border border-red-500/20 text-red-500 text-sm">{error}</div>)}
-                            {isFetchingJobs ? (
-                                <div className="flex items-center justify-center h-32"><Loader2 className="h-5 w-5 animate-spin text-[var(--primary)]" /></div>
-                            ) : jobs.length === 0 ? (
-                                <div className="flex flex-col items-center justify-center h-32 text-[var(--text-secondary)]">
-                                    <Briefcase className="h-8 w-8 mb-2 opacity-20" />
-                                    <p className="text-sm">No jobs with descriptions found.</p>
-                                    <p className="text-xs mt-1">Add a job with a description in the Job Tracker first.</p>
+                    <>
+                        <div id="tour-ats-setup" className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                            {/* LEFT: JD Selection */}
+                            <div className="rounded-2xl border border-[var(--border-color)] bg-[var(--sidebar-bg)] p-5">
+                                <div className="flex items-start gap-3 mb-4">
+                                    <span className="grid place-items-center h-11 w-11 shrink-0 rounded-xl bg-[var(--primary)]/10 text-[var(--primary)]">
+                                        <FileText className="h-5 w-5" />
+                                    </span>
+                                    <div className="min-w-0">
+                                        <h2 className="text-[17px] font-bold text-[var(--foreground)] leading-tight">1. Select Job Description</h2>
+                                        <p className="text-xs text-[var(--text-secondary)] mt-1">Choose from your saved job posts in the Job Tracker.</p>
+                                    </div>
                                 </div>
-                            ) : (
-                                <div className="space-y-2 max-h-[300px] overflow-y-auto custom-scrollbar pr-1">
-                                    {jobs.map((job) => (
-                                        <label key={job.id} className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-all ${selectedJobId === job.id ? "bg-[var(--primary)]/10 border-[var(--primary)]/30 shadow-md" : "bg-black/5 dark:bg-white/5 border-[var(--border-color)] hover:border-[var(--foreground)]/30"}`}>
-                                            <input type="radio" name="jdSelect" value={job.id} checked={selectedJobId === job.id} onChange={() => setSelectedJobId(job.id)} className="mt-1 w-4 h-4 text-[var(--primary)] bg-transparent border-[var(--border-color)] focus:ring-[var(--primary)]" />
-                                            <div className="flex-1 min-w-0">
-                                                <p className="text-sm font-semibold text-[var(--foreground)] truncate">{job.jobTitle}</p>
-                                                <p className="text-xs text-[var(--text-secondary)] truncate">{job.company}</p>
-                                                <p className="text-xs text-[var(--text-secondary)] mt-1 line-clamp-2 opacity-60">{job.description?.substring(0, 120)}...</p>
-                                            </div>
-                                        </label>
+
+                                <div className="relative mb-3">
+                                    <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--text-secondary)]" />
+                                    <input
+                                        type="text"
+                                        value={jdSearch}
+                                        onChange={(e) => setJdSearch(e.target.value)}
+                                        placeholder="Search job posts by title, company, or keyword..."
+                                        className="w-full h-11 pl-11 pr-4 rounded-xl border border-[var(--border-color)] bg-[var(--background)] text-sm text-[var(--foreground)] placeholder-[var(--text-secondary)] focus:outline-none focus:border-[var(--primary)]/50 focus:ring-2 focus:ring-[var(--primary)]/15 transition"
+                                    />
+                                </div>
+
+                                {error && (
+                                    <div className="mb-3 p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-500 text-sm">{error}</div>
+                                )}
+
+                                {isFetchingJobs ? (
+                                    <div className="flex items-center justify-center h-40"><Loader2 className="h-5 w-5 animate-spin text-[var(--primary)]" /></div>
+                                ) : visibleJobs.length === 0 ? (
+                                    <div className="flex flex-col items-center justify-center h-40 text-[var(--text-secondary)] text-center">
+                                        <Briefcase className="h-8 w-8 mb-2 opacity-25" />
+                                        <p className="text-sm">{jobs.length === 0 ? "No jobs with descriptions found." : "No job posts match that search."}</p>
+                                        <p className="text-xs mt-1 opacity-70">
+                                            {jobs.length === 0 ? "Add a job with a description in the Job Tracker first." : "Try a different title or company."}
+                                        </p>
+                                    </div>
+                                ) : (
+                                    <div className="space-y-2.5 max-h-[420px] overflow-y-auto pr-1">
+                                        {visibleJobs.map((job, index) => {
+                                            const active = selectedJobId === job.id;
+                                            return (
+                                                <label
+                                                    key={job.id}
+                                                    className={`flex items-start gap-3 p-3.5 rounded-xl border cursor-pointer transition ${active
+                                                        ? "border-[var(--primary)] bg-[var(--primary)]/8"
+                                                        : "border-[var(--border-color)] hover:border-[var(--primary)]/40 hover:bg-[var(--primary)]/4"
+                                                        }`}
+                                                >
+                                                    <input
+                                                        type="radio"
+                                                        name="jdSelect"
+                                                        value={job.id}
+                                                        checked={active}
+                                                        onChange={() => setSelectedJobId(job.id)}
+                                                        className="mt-1 h-4 w-4 shrink-0 accent-[var(--primary)]"
+                                                    />
+                                                    <span className={`grid place-items-center h-10 w-10 shrink-0 rounded-xl text-sm font-bold ${LOGO_TINTS[index % LOGO_TINTS.length]}`}>
+                                                        {(job.company || "?").trim().charAt(0).toUpperCase()}
+                                                    </span>
+                                                    <span className="flex-1 min-w-0">
+                                                        <span className="flex items-start justify-between gap-3">
+                                                            <span className="min-w-0">
+                                                                <span className="block text-sm font-bold text-[var(--foreground)] leading-snug line-clamp-2">{job.jobTitle}</span>
+                                                                <span className="block text-xs text-[var(--text-secondary)] mt-0.5 truncate">{job.company}</span>
+                                                            </span>
+                                                            <span className="shrink-0 text-right text-[11px] text-[var(--text-secondary)] space-y-1">
+                                                                <span className="flex items-center justify-end gap-1">
+                                                                    <MapPin className="h-3 w-3" />
+                                                                    {job.location || "Remote"}
+                                                                </span>
+                                                                <span className="flex items-center justify-end gap-1">
+                                                                    <CalendarDays className="h-3 w-3" />
+                                                                    {new Date(job.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                                                                </span>
+                                                            </span>
+                                                        </span>
+                                                        <span className="block text-xs text-[var(--text-secondary)] mt-2 leading-relaxed line-clamp-2 opacity-80">
+                                                            {job.description?.slice(0, 180)}
+                                                        </span>
+                                                    </span>
+                                                </label>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* RIGHT: Resume Source */}
+                            <div className="rounded-2xl border border-[var(--border-color)] bg-[var(--sidebar-bg)] p-5 flex flex-col">
+                                <div className="flex items-start gap-3 mb-4">
+                                    <span className="grid place-items-center h-11 w-11 shrink-0 rounded-xl bg-[var(--primary)]/10 text-[var(--primary)]">
+                                        <FileText className="h-5 w-5" />
+                                    </span>
+                                    <div className="min-w-0">
+                                        <h2 className="text-[17px] font-bold text-[var(--foreground)] leading-tight">2. Choose Resume</h2>
+                                        <p className="text-xs text-[var(--text-secondary)] mt-1">Select a saved resume or upload a new PDF.</p>
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-2 mb-3">
+                                    {([["saved", "Saved Resumes", FileText], ["upload", "Upload PDF", UploadCloud]] as const).map(([key, label, Icon]) => (
+                                        <button
+                                            key={key}
+                                            onClick={() => setResumeSource(key)}
+                                            className={`flex items-center justify-center gap-2 h-11 rounded-xl border text-[13px] font-semibold transition ${resumeSource === key
+                                                ? "border-[var(--primary)]/40 bg-[var(--primary)]/10 text-[var(--primary)]"
+                                                : "border-[var(--border-color)] text-[var(--text-secondary)] hover:border-[var(--primary)]/30 hover:text-[var(--foreground)]"
+                                                }`}
+                                        >
+                                            <Icon className="h-4 w-4" /> {label}
+                                        </button>
                                     ))}
                                 </div>
-                            )}
-                        </div>
 
-                        {/* RIGHT: Resume Source */}
-                        <div className="bg-[var(--sidebar-bg)]/50 border border-[var(--border-color)] rounded-xl p-6 shadow-xl space-y-5 flex flex-col">
-                            <div>
-                                <h2 className="text-sm font-bold text-[var(--foreground)] uppercase tracking-wider mb-1">2. Choose Resume</h2>
-                                <p className="text-xs text-[var(--text-secondary)]">Select a saved resume or upload a new PDF.</p>
-                            </div>
-                            <div className="flex gap-2">
-                                <button onClick={() => setResumeSource("saved")} className={`flex-1 text-xs font-semibold py-2 px-3 rounded-lg border transition-all ${resumeSource === "saved" ? "bg-[var(--primary)]/10 border-[var(--primary)]/30 text-[var(--primary)]" : "bg-black/5 dark:bg-white/5 border-[var(--border-color)] text-[var(--text-secondary)] hover:border-[var(--foreground)]/30"}`}>
-                                    Saved Resumes
-                                </button>
-                                <button onClick={() => setResumeSource("upload")} className={`flex-1 text-xs font-semibold py-2 px-3 rounded-lg border transition-all ${resumeSource === "upload" ? "bg-[var(--primary)]/10 border-[var(--primary)]/30 text-[var(--primary)]" : "bg-black/5 dark:bg-white/5 border-[var(--border-color)] text-[var(--text-secondary)] hover:border-[var(--foreground)]/30"}`}>
-                                    Upload PDF
-                                </button>
-                            </div>
-
-                            {resumeSource === "saved" && (
-                                <div className="flex-1">
-                                    {isFetchingResumes ? (
-                                        <div className="flex items-center justify-center h-24"><Loader2 className="h-5 w-5 animate-spin text-[var(--primary)]" /></div>
-                                    ) : savedResumes.length === 0 ? (
-                                        <div className="flex flex-col items-center justify-center h-24 text-[var(--text-secondary)]">
-                                            <FileText className="h-8 w-8 mb-2 opacity-20" />
-                                            <p className="text-sm">No saved resumes found.</p>
-                                            <p className="text-xs mt-1">Generate a tailored resume first, or upload a PDF.</p>
-                                        </div>
-                                    ) : (
-                                        <div className="space-y-2 max-h-[220px] overflow-y-auto custom-scrollbar pr-1">
-                                            {savedResumes.map((resume) => (
-                                                <label key={resume.id} className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-all ${selectedResumeId === resume.id ? "bg-[var(--primary)]/10 border-[var(--primary)]/30 shadow-md" : "bg-black/5 dark:bg-white/5 border-[var(--border-color)] hover:border-[var(--foreground)]/30"}`}>
-                                                    <input type="radio" name="resumeSelect" value={resume.id} checked={selectedResumeId === resume.id} onChange={() => setSelectedResumeId(resume.id)} className="mt-1 w-4 h-4 text-[var(--primary)] bg-transparent border-[var(--border-color)] focus:ring-[var(--primary)]" />
-                                                    <div className="flex-1 min-w-0">
-                                                        <p className="text-sm font-semibold text-[var(--foreground)] truncate">{resume.name}</p>
-                                                        {resume.job && (
-                                                            <p className="text-xs text-[var(--text-secondary)] truncate">{resume.job.jobTitle} — {resume.job.company}</p>
-                                                        )}
-                                                        <p className="text-[10px] text-[var(--text-secondary)] mt-1 opacity-50">
-                                                            {new Date(resume.createdAt).toLocaleDateString()}
-                                                        </p>
-                                                    </div>
-                                                </label>
-                                            ))}
-                                        </div>
-                                    )}
-                                </div>
-                            )}
-
-                            {resumeSource === "upload" && (
-                                <div className="border-2 border-dashed border-[var(--border-color)] rounded-xl p-8 flex flex-col items-center justify-center bg-black/5 dark:bg-white/5 text-[var(--text-secondary)] hover:border-[var(--primary)]/40 transition-colors cursor-pointer relative group">
-                                    <input type="file" accept=".pdf" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" onChange={(e) => setUploadFile(e.target.files?.[0] || null)} />
-                                    <UploadCloud className="w-10 h-10 mb-2 opacity-30 group-hover:opacity-60 group-hover:text-[var(--primary)] transition-all" />
-                                    <span className="text-sm font-medium text-center">{uploadFile ? <span className="text-[var(--primary)]">{uploadFile.name}</span> : "Click or drag to upload PDF"}</span>
-                                </div>
-                            )}
-
-                            <div className="mt-auto pt-4 flex gap-2">
-                                {previousReports.length > 0 && (
-                                    <button 
-                                        onClick={() => loadPreviousReport(previousReports[0].id)} 
-                                        className="flex-1 flex items-center justify-center gap-2 bg-[var(--sidebar-bg)] border border-[var(--primary)] text-[var(--primary)] hover:bg-[var(--primary)]/10 px-5 py-3 rounded-xl transition font-medium text-sm"
-                                    >
-                                        Load Previous Report
-                                    </button>
+                                {resumeSource === "saved" && (
+                                    <div className="flex-1 min-h-0">
+                                        {isFetchingResumes ? (
+                                            <div className="flex items-center justify-center h-32"><Loader2 className="h-5 w-5 animate-spin text-[var(--primary)]" /></div>
+                                        ) : savedResumes.length === 0 ? (
+                                            <div className="flex flex-col items-center justify-center h-32 text-[var(--text-secondary)] text-center">
+                                                <FileText className="h-8 w-8 mb-2 opacity-25" />
+                                                <p className="text-sm">No saved resumes found.</p>
+                                                <p className="text-xs mt-1 opacity-70">Generate a tailored resume first, or upload a PDF.</p>
+                                            </div>
+                                        ) : (
+                                            <div className="space-y-2.5 max-h-[340px] overflow-y-auto pr-1">
+                                                {savedResumes.map((resume) => {
+                                                    const active = selectedResumeId === resume.id;
+                                                    return (
+                                                        <label
+                                                            key={resume.id}
+                                                            className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition ${active
+                                                                ? "border-[var(--primary)] bg-[var(--primary)]/8"
+                                                                : "border-[var(--border-color)] hover:border-[var(--primary)]/40 hover:bg-[var(--primary)]/4"
+                                                                }`}
+                                                        >
+                                                            <input
+                                                                type="radio"
+                                                                name="resumeSelect"
+                                                                value={resume.id}
+                                                                checked={active}
+                                                                onChange={() => setSelectedResumeId(resume.id)}
+                                                                className="h-4 w-4 shrink-0 accent-[var(--primary)]"
+                                                            />
+                                                            <span className="grid place-items-center h-10 w-10 shrink-0 rounded-xl bg-[var(--primary)]/10 text-[var(--primary)]">
+                                                                <FileText className="h-[18px] w-[18px]" />
+                                                            </span>
+                                                            <span className="flex-1 min-w-0">
+                                                                <span className="block text-sm font-bold text-[var(--foreground)] truncate">{resume.name}</span>
+                                                                {resume.job && (
+                                                                    <span className="block text-xs text-[var(--text-secondary)] mt-0.5 truncate">
+                                                                        {resume.job.jobTitle} — {resume.job.company}
+                                                                    </span>
+                                                                )}
+                                                            </span>
+                                                            <span className="shrink-0 flex items-center gap-1 text-[11px] text-[var(--text-secondary)]">
+                                                                <CalendarDays className="h-3 w-3" />
+                                                                {new Date(resume.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                                                            </span>
+                                                        </label>
+                                                    );
+                                                })}
+                                            </div>
+                                        )}
+                                    </div>
                                 )}
-                                <button id="tour-run-ats" onClick={handleRunAnalysis} disabled={!selectedJobId || (resumeSource === "saved" && !selectedResumeId) || (resumeSource === "upload" && !uploadFile)} className="flex-[2] flex items-center justify-center gap-2 bg-[var(--primary)] hover:bg-[var(--primary)]/90 text-white px-5 py-3 rounded-xl transition shadow-lg shadow-[var(--primary)]/20 font-medium text-sm disabled:opacity-40 disabled:cursor-not-allowed">
-                                    <ScanLine className="h-4 w-4" /> {previousReports.length > 0 ? "Run New Analysis" : "Run ATS Analysis"}
-                                </button>
+
+                                {resumeSource === "upload" && (
+                                    <div className="flex-1 min-h-0">
+                                        <div className="border-2 border-dashed border-[var(--border-color)] rounded-xl p-10 flex flex-col items-center justify-center text-[var(--text-secondary)] hover:border-[var(--primary)]/40 transition cursor-pointer relative group">
+                                            <input type="file" accept=".pdf" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" onChange={(e) => setUploadFile(e.target.files?.[0] || null)} />
+                                            <UploadCloud className="w-10 h-10 mb-2 opacity-30 group-hover:opacity-60 group-hover:text-[var(--primary)] transition-all" />
+                                            <span className="text-sm font-medium text-center">
+                                                {uploadFile ? <span className="text-[var(--primary)]">{uploadFile.name}</span> : "Click or drag to upload PDF"}
+                                            </span>
+                                        </div>
+                                    </div>
+                                )}
+
+                                <div className="mt-4 space-y-2">
+                                    {previousReports.length > 0 && (
+                                        <button
+                                            onClick={() => loadPreviousReport(previousReports[0].id)}
+                                            className="w-full flex items-center justify-center gap-2 h-11 rounded-xl border border-[var(--primary)]/40 text-[var(--primary)] hover:bg-[var(--primary)]/10 transition font-semibold text-sm"
+                                        >
+                                            Load Previous Report
+                                        </button>
+                                    )}
+                                    <button
+                                        id="tour-run-ats"
+                                        onClick={handleRunAnalysis}
+                                        disabled={!selectedJobId || (resumeSource === "saved" && !selectedResumeId) || (resumeSource === "upload" && !uploadFile)}
+                                        className="w-full flex items-center justify-center gap-2 h-12 rounded-xl text-white font-semibold text-sm shadow-lg shadow-[var(--primary)]/25 transition hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none"
+                                        style={{ backgroundImage: "var(--brand-gradient)" }}
+                                    >
+                                        <ScanLine className="h-4 w-4" />
+                                        {previousReports.length > 0 ? "Run New Analysis" : "Run ATS Analysis"}
+                                        <ArrowRight className="h-4 w-4" />
+                                    </button>
+
+                                    <p className="flex items-start gap-2 text-[11px] leading-relaxed text-[var(--text-secondary)] pt-1">
+                                        <Info className="h-3.5 w-3.5 shrink-0 mt-px" />
+                                        We&apos;ll analyze your resume against the selected job description to check ATS compatibility and provide detailed insights.
+                                    </p>
+                                </div>
                             </div>
                         </div>
-                    </div>
+
+                        {/* Value banner */}
+                        <div className="rounded-2xl border border-[var(--primary)]/20 bg-[var(--primary)]/5 p-5 flex flex-col lg:flex-row lg:items-center gap-5">
+                            <span className="grid place-items-center h-12 w-12 shrink-0 rounded-xl bg-[var(--primary)]/12 text-[var(--primary)]">
+                                <Sparkles className="h-6 w-6" />
+                            </span>
+                            <div className="flex-1 min-w-0">
+                                <h3 className="text-sm font-bold text-[var(--foreground)]">Get a higher chance of landing interviews</h3>
+                                <p className="text-xs text-[var(--text-secondary)] mt-1 leading-relaxed">
+                                    Our ATS analysis checks your resume against the job description and gives you actionable insights to improve your match score.
+                                </p>
+                            </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-2 shrink-0">
+                                {["ATS compatibility score", "Detailed recommendations", "Keyword analysis", "Improve your chances"].map((item) => (
+                                    <span key={item} className="flex items-center gap-2 text-xs text-[var(--text-secondary)]">
+                                        <CheckCircle2 className="h-4 w-4 shrink-0 text-[var(--primary)]" />
+                                        {item}
+                                    </span>
+                                ))}
+                            </div>
+                        </div>
+                    </>
                 )
             }
 

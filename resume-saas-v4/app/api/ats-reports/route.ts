@@ -11,18 +11,30 @@ export async function GET(req: NextRequest) {
         const { searchParams } = new URL(req.url);
         const jobId = searchParams.get("jobId");
 
-        if (!jobId) {
-            return NextResponse.json({ error: "Job ID required" }, { status: 400 });
-        }
-
+        // Without a jobId this returns the user's most recent reports across
+        // every job, which is what the dashboard needs. Capped, and the heavy
+        // resumeText column is left out.
         const reports = await prisma.atsScoreReport.findMany({
             where: {
                 userId: (session!.user as any).id,
-                jobId: jobId,
+                ...(jobId ? { jobId } : {}),
             },
             orderBy: {
                 createdAt: 'desc',
             },
+            ...(jobId
+                ? {}
+                : {
+                    take: 20,
+                    select: {
+                        id: true,
+                        jobId: true,
+                        resumeId: true,
+                        atsResult: true,
+                        createdAt: true,
+                        job: { select: { jobTitle: true, company: true } },
+                    },
+                }),
         });
 
         return NextResponse.json(reports);
