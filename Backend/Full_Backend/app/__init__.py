@@ -77,6 +77,7 @@ from app.routes.ats_ingest  import router as ats_ingest_router
 from app.routes.linkedin    import router as linkedin_router
 from app.routes.jd_format   import router as jd_format_router
 from app.routes.resume_assist import router as resume_assist_router
+from app.routes.outreach import router as outreach_router
 
 # Checkout and Payment
 from app.routes.checkout import router as checkout_router
@@ -99,6 +100,7 @@ app.include_router(ats_ingest_router)
 app.include_router(linkedin_router)
 app.include_router(jd_format_router)
 app.include_router(resume_assist_router)
+app.include_router(outreach_router)
 
 # Checkout and Payment
 app.include_router(checkout_router)

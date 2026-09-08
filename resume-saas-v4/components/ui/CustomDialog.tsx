@@ -145,8 +145,11 @@ export function CustomDialog({
                     <button
                         type="button"
                         onClick={() => {
+                            // A confirm used to leave itself open after acting, so the
+                            // work happened but the dialog sat there until Cancel.
+                            // `loading` is for callers that drive the spinner themselves.
                             if (onConfirm) onConfirm();
-                            if (type === "alert" && !loading) onClose();
+                            if (!loading) onClose();
                         }}
                         disabled={loading}
                         className={`inline-flex h-11 items-center justify-center rounded-xl px-4 text-sm font-medium transition ${current.confirmClass} disabled:opacity-60`}

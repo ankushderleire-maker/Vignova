@@ -8,12 +8,12 @@ export async function PUT(req: Request, props: { params: Promise<{ id: string }>
     const params = await props.params;
     try {
         const session = await getServerSession(authOptions);
-        if (!session?.user || !(session.user as any).id) return new NextResponse("Unauthorized", { status: 401 });
+        if (!session?.user || !(session.user as any).id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
         const userId = (session.user as any).id;
 
         const body = await req.json();
-        const { content, name, masterProfileName } = body;
+        const { content, name, masterProfileName, templateId } = body;
 
         // Verify ownership
         // Cast db to any because generated types might be out of sync
@@ -21,8 +21,8 @@ export async function PUT(req: Request, props: { params: Promise<{ id: string }>
             where: { id: params.id },
         });
 
-        if (!existingResume) return new NextResponse("Not Found", { status: 404 });
-        if (existingResume.userId !== userId) return new NextResponse("Unauthorized", { status: 403 });
+        if (!existingResume) return NextResponse.json({ error: "Not Found" }, { status: 404 });
+        if (existingResume.userId !== userId) return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
 
         // Update
         const updatedResume = await (db as any).generatedResume.update({
@@ -31,13 +31,14 @@ export async function PUT(req: Request, props: { params: Promise<{ id: string }>
                 content,
                 name: name || existingResume.name,
                 ...(masterProfileName && { extensionData: { masterProfileName } }),
+                ...(templateId ? { templateId } : {}),
             },
         });
 
         return NextResponse.json({ data: updatedResume });
     } catch (error) {
         console.error("[RESUME_PUT]", error);
-        return new NextResponse("Internal Error", { status: 500 });
+        return NextResponse.json({ error: "Internal Error" }, { status: 500 });
     }
 }
 
@@ -46,7 +47,7 @@ export async function DELETE(req: Request, props: { params: Promise<{ id: string
     const params = await props.params;
     try {
         const session = await getServerSession(authOptions);
-        if (!session?.user || !(session.user as any).id) return new NextResponse("Unauthorized", { status: 401 });
+        if (!session?.user || !(session.user as any).id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
         const userId = (session.user as any).id;
 
@@ -55,8 +56,8 @@ export async function DELETE(req: Request, props: { params: Promise<{ id: string
             where: { id: params.id },
         });
 
-        if (!existingResume) return new NextResponse("Not Found", { status: 404 });
-        if (existingResume.userId !== userId) return new NextResponse("Unauthorized", { status: 403 });
+        if (!existingResume) return NextResponse.json({ error: "Not Found" }, { status: 404 });
+        if (existingResume.userId !== userId) return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
 
         await (db as any).generatedResume.delete({
             where: { id: params.id },
@@ -65,6 +66,6 @@ export async function DELETE(req: Request, props: { params: Promise<{ id: string
         return NextResponse.json({ success: true });
     } catch (error) {
         console.error("[RESUME_DELETE]", error);
-        return new NextResponse("Internal Error", { status: 500 });
+        return NextResponse.json({ error: "Internal Error" }, { status: 500 });
     }
 }

@@ -215,7 +215,7 @@ export default function FindJobsPage() {
     }
 
     return (
-        <div className="max-w-7xl mx-auto space-y-6 animate-slide-down">
+        <div className="w-full max-w-[1700px] mx-auto space-y-6 animate-slide-down">
             <section className="rounded-3xl border border-[var(--border-color)] bg-[linear-gradient(135deg,rgba(34,197,94,0.08),rgba(59,130,246,0.06),transparent_70%)] p-6">
                 <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
                     <div className="space-y-3">

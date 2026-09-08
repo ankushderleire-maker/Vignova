@@ -73,7 +73,7 @@ function ResumeStudioPageContent() {
     const router = useRouter();
 
     // Zustand store for template selection
-    const { selectedTemplate, getActiveTemplate } = useResumeStore();
+    const { selectedTemplate, setSelectedTemplate, getActiveTemplate } = useResumeStore();
     const activeTemplateId = getActiveTemplate(); // This handles hover/select logic
 
     const [job, setJob] = useState<Job | null>(null);
@@ -195,6 +195,13 @@ function ResumeStudioPageContent() {
                 ? Boolean(coverLetter)
                 : Boolean(draftEmail);
 
+    /** Saved rows hold a plain string; only apply it if it is a template we ship. */
+    const applySavedTemplate = (templateId?: string | null) => {
+        if (templateId && TEMPLATES.some((t) => t.id === templateId)) {
+            setSelectedTemplate(templateId as TemplateId);
+        }
+    };
+
     // --- DATA FETCHING ---
     useEffect(() => {
         const fetchData = async () => {
@@ -261,6 +268,7 @@ function ResumeStudioPageContent() {
                         setHasGenerated(true);
                         setCurrentResumeId(foundResume.id);
                         setCurrentResumeName(foundResume.name);
+                        applySavedTemplate(foundResume.templateId);
                         // Ideally load saved design settings too if we saved them
                     }
                 }
@@ -520,7 +528,8 @@ function ResumeStudioPageContent() {
                     jobId: currentJob.id,
                     content: formattedData,
                     resumeName: `Resume V${savedResumes.length + 1}`,
-                    masterProfileName: masterProfileName
+                    masterProfileName: masterProfileName,
+                    templateId: selectedTemplate
                 }),
             });
 
@@ -568,7 +577,8 @@ function ResumeStudioPageContent() {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     content: resumeData,
-                    name: name || currentResumeName
+                    name: name || currentResumeName,
+                    templateId: selectedTemplate
                 })
             });
             if (res.ok) {
@@ -587,6 +597,7 @@ function ResumeStudioPageContent() {
                     jobId: job.id,
                     content: resumeData,
                     resumeName: name || `${job.company} Resume V${savedResumes.length + 1}`,
+                    templateId: selectedTemplate,
                     masterProfileName: masterProfileName
                 })
             });
@@ -1052,6 +1063,7 @@ function ResumeStudioPageContent() {
                                         setHasGenerated(true);
                                         setCurrentResumeId(resume.id);
                                         setCurrentResumeName(resume.name);
+                                        applySavedTemplate(resume.templateId);
                                         setActiveDocument("resume");
                                         setMobilePanelView("preview");
                                     }}

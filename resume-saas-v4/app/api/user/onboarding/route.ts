@@ -10,7 +10,7 @@ export async function GET() {
         const userId = (session?.user as any)?.id;
         
         if (!userId) {
-            return new NextResponse("Unauthorized", { status: 401 });
+            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
 
         const user = await db.users.findUnique({
@@ -50,7 +50,7 @@ export async function GET() {
         return NextResponse.json({ onboarding_done: isDone });
     } catch (error) {
         console.error("[ONBOARDING_GET]", error);
-        return new NextResponse("Internal Error", { status: 500 });
+        return NextResponse.json({ error: "Internal Error" }, { status: 500 });
     }
 }
 
@@ -61,7 +61,7 @@ export async function POST() {
         const userId = (session?.user as any)?.id;
 
         if (!userId) {
-            return new NextResponse("Unauthorized", { status: 401 });
+            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
 
         // 1. Mark as done
@@ -81,6 +81,6 @@ export async function POST() {
         return NextResponse.json({ onboarding_done: true });
     } catch (error) {
         console.error("[ONBOARDING_POST]", error);
-        return new NextResponse("Internal Error", { status: 500 });
+        return NextResponse.json({ error: "Internal Error" }, { status: 500 });
     }
 }

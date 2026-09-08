@@ -13,7 +13,7 @@ export async function GET() {
         const session = await getServerSession(authOptions);
 
         if (!(session?.user as any)?.id) {
-            return new NextResponse("Unauthorized", { status: 401 });
+            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
 
         const profiles = await db.master_profiles.findMany({
@@ -36,7 +36,7 @@ export async function GET() {
         return NextResponse.json({ profiles });
     } catch (error) {
         console.error("[PROFILES_GET]", error);
-        return new NextResponse("Internal Error", { status: 500 });
+        return NextResponse.json({ error: "Internal Error" }, { status: 500 });
     }
 }
 
@@ -49,7 +49,7 @@ export async function POST(req: Request) {
         const session = await getServerSession(authOptions);
 
         if (!(session?.user as any)?.id) {
-            return new NextResponse("Unauthorized", { status: 401 });
+            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
 
         const userId = (session?.user as any)?.id as string;
@@ -109,6 +109,6 @@ export async function POST(req: Request) {
         return NextResponse.json({ profile: newProfile }, { status: 201 });
     } catch (error) {
         console.error("[PROFILES_POST]", error);
-        return new NextResponse("Internal Error", { status: 500 });
+        return NextResponse.json({ error: "Internal Error" }, { status: 500 });
     }
 }

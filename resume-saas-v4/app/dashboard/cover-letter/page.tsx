@@ -218,7 +218,7 @@ export default function CoverLetterPage() {
 
     return (
         <>
-            <div className="mx-auto max-w-7xl space-y-5 animate-slide-down">
+            <div className="mx-auto w-full max-w-[1700px] space-y-5 animate-slide-down">
                 {jobs.length > 0 && (
                     <>
                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">

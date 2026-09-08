@@ -16,7 +16,7 @@ export async function GET(
         const session = await getServerSession(authOptions);
 
         if (!(session?.user as any)?.id) {
-            return new NextResponse("Unauthorized", { status: 401 });
+            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
 
         const profile = await db.master_profiles.findFirst({
@@ -27,13 +27,13 @@ export async function GET(
         });
 
         if (!profile) {
-            return new NextResponse("Profile not found", { status: 404 });
+            return NextResponse.json({ error: "Profile not found" }, { status: 404 });
         }
 
         return NextResponse.json({ profile });
     } catch (error) {
         console.error("[PROFILE_GET]", error);
-        return new NextResponse("Internal Error", { status: 500 });
+        return NextResponse.json({ error: "Internal Error" }, { status: 500 });
     }
 }
 
@@ -50,7 +50,7 @@ export async function PATCH(
         const session = await getServerSession(authOptions);
 
         if (!(session?.user as any)?.id) {
-            return new NextResponse("Unauthorized", { status: 401 });
+            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
 
         const userId = (session?.user as any)?.id as string;
@@ -66,7 +66,7 @@ export async function PATCH(
         });
 
         if (!existingProfile) {
-            return new NextResponse("Profile not found", { status: 404 });
+            return NextResponse.json({ error: "Profile not found" }, { status: 404 });
         }
 
         // If changing name, check for duplicates
@@ -99,7 +99,7 @@ export async function PATCH(
         return NextResponse.json({ profile: updatedProfile });
     } catch (error) {
         console.error("[PROFILE_PATCH]", error);
-        return new NextResponse("Internal Error", { status: 500 });
+        return NextResponse.json({ error: "Internal Error" }, { status: 500 });
     }
 }
 
@@ -116,7 +116,7 @@ export async function DELETE(
         const session = await getServerSession(authOptions);
 
         if (!(session?.user as any)?.id) {
-            return new NextResponse("Unauthorized", { status: 401 });
+            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
 
         const userId = (session?.user as any)?.id as string;
@@ -130,7 +130,7 @@ export async function DELETE(
         });
 
         if (!profile) {
-            return new NextResponse("Profile not found", { status: 404 });
+            return NextResponse.json({ error: "Profile not found" }, { status: 404 });
         }
 
         // Check if this is the last profile
@@ -171,6 +171,6 @@ export async function DELETE(
         return NextResponse.json({ success: true });
     } catch (error) {
         console.error("[PROFILE_DELETE]", error);
-        return new NextResponse("Internal Error", { status: 500 });
+        return NextResponse.json({ error: "Internal Error" }, { status: 500 });
     }
 }

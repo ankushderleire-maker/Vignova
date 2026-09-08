@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 import { CustomDialog } from "@/components/ui/CustomDialog";
 import { Modal } from "@/components/ui/Modal";
+import { CompanyLogo } from "@/components/jobs/CompanyLogo";
 import { JobDescriptionModal } from "@/components/jobs/JobDescriptionModal";
 
 type Job = {
@@ -132,29 +133,7 @@ function readinessOf(job: Job): Readiness {
   };
 }
 
-const LOGO_TINTS = [
-  "bg-blue-500/12 text-blue-600 dark:text-blue-400",
-  "bg-emerald-500/12 text-emerald-600 dark:text-emerald-400",
-  "bg-violet-500/12 text-violet-600 dark:text-violet-400",
-  "bg-amber-500/12 text-amber-600 dark:text-amber-400",
-  "bg-rose-500/12 text-rose-600 dark:text-rose-400",
-  "bg-cyan-500/12 text-cyan-600 dark:text-cyan-400",
-];
 
-/** Deterministic initial tile — no third-party logo service, so nothing about
- *  the user's job list leaves the app. */
-function CompanyLogo({ company }: { company: string }) {
-  const name = (company || "?").trim();
-  const initials = name.slice(0, 2).toUpperCase();
-  let hash = 0;
-  for (let i = 0; i < name.length; i++) hash = (hash * 31 + name.charCodeAt(i)) >>> 0;
-  const tint = LOGO_TINTS[hash % LOGO_TINTS.length];
-  return (
-    <div className={`w-10 h-10 shrink-0 rounded-lg flex items-center justify-center font-bold text-sm ${tint}`}>
-      {initials}
-    </div>
-  );
-}
 
 function formatDate(value: string) {
   return new Date(value).toLocaleDateString(undefined, {
@@ -493,7 +472,7 @@ export default function GeneratorPage() {
                     className="group bg-[var(--background)] border border-[var(--border-color)] rounded-xl p-4 shadow-sm hover:border-[var(--primary)]/40 hover:shadow-md transition"
                   >
                     <div className="flex gap-3">
-                      <CompanyLogo company={job.company} />
+                      <CompanyLogo company={job.company} jobUrl={job.jobUrl} />
 
                       <div className="min-w-0 flex-1">
                         <div className="flex items-start justify-between gap-3">

@@ -12,7 +12,7 @@ export async function POST(req: Request) {
         const session = await getServerSession(authOptions);
 
         if (!(session?.user as any)?.id) {
-            return new NextResponse("Unauthorized", { status: 401 });
+            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
 
         const userId = (session?.user as any)?.id as string;
@@ -35,7 +35,7 @@ export async function POST(req: Request) {
         });
 
         if (!profile) {
-            return new NextResponse("Profile not found", { status: 404 });
+            return NextResponse.json({ error: "Profile not found" }, { status: 404 });
         }
 
         // Update all profiles: set is_default = false
@@ -53,6 +53,6 @@ export async function POST(req: Request) {
         return NextResponse.json({ success: true });
     } catch (error) {
         console.error("[SET_DEFAULT_PROFILE]", error);
-        return new NextResponse("Internal Error", { status: 500 });
+        return NextResponse.json({ error: "Internal Error" }, { status: 500 });
     }
 }

@@ -7,7 +7,7 @@ export async function GET() {
     try {
         const session = await getServerSession(authOptions);
         if (!(session?.user as any)?.id) {
-            return new NextResponse("Unauthorized", { status: 401 });
+            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
 
         const user = await db.users.findUnique({
@@ -19,7 +19,7 @@ export async function GET() {
         return NextResponse.json(user?.extensionSettings || {});
     } catch (error) {
         console.error("[EXTENSION_SETTINGS_GET]", error);
-        return new NextResponse("Internal Error", { status: 500 });
+        return NextResponse.json({ error: "Internal Error" }, { status: 500 });
     }
 }
 
@@ -27,7 +27,7 @@ export async function POST(req: Request) {
     try {
         const session = await getServerSession(authOptions);
         if (!(session?.user as any)?.id) {
-            return new NextResponse("Unauthorized", { status: 401 });
+            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
 
         const body = await req.json();
@@ -49,6 +49,6 @@ export async function POST(req: Request) {
         return NextResponse.json(user.extensionSettings);
     } catch (error) {
         console.error("[EXTENSION_SETTINGS_POST]", error);
-        return new NextResponse("Internal Error", { status: 500 });
+        return NextResponse.json({ error: "Internal Error" }, { status: 500 });
     }
 }

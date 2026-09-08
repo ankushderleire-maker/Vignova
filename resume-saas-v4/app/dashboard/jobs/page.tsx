@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import {
   Plus,
   Search,
@@ -12,10 +12,23 @@ import {
   Trash2,
   X,
   LayoutList,
-  KanbanSquare
+  KanbanSquare,
+  ArrowDownUp,
+  Bookmark,
+  Send,
+  Users,
+  Trophy,
+  FolderOpen,
+  ExternalLink,
+  ChevronLeft,
+  ChevronRight,
+  TrendingUp,
+  TrendingDown,
+  Check
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { CustomDialog } from "@/components/ui/CustomDialog";
+import { CompanyLogo } from "@/components/jobs/CompanyLogo";
 import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
 
 // --- TYPES & CONFIG ---
@@ -33,9 +46,28 @@ type Job = {
   createdAt: string;
 };
 
+const PAGE_SIZE = 12;
+const STATUS_ORDER = ["SAVED", "APPLIED", "INTERVIEW", "OFFER", "REJECTED"];
+
+const SORTS = {
+  newest: "Date added (newest)",
+  oldest: "Date added (oldest)",
+  company: "Company A–Z",
+  status: "Status",
+} as const;
+type SortKey = keyof typeof SORTS;
+
+/** Icon per status, so the pill reads at a glance. */
+const STATUS_ICONS: Record<string, React.ElementType> = {
+  SAVED: Bookmark,
+  APPLIED: Send,
+  INTERVIEW: Users,
+  OFFER: Trophy,
+  REJECTED: X,
+};
+
 const STATUSES = {
   SAVED: { label: "Saved", color: "text-gray-400 bg-gray-500/10 border-gray-500/20" },
-  TAILORING: { label: "Tailoring", color: "text-purple-400 bg-purple-500/10 border-purple-500/20" },
   APPLIED: { label: "Applied", color: "text-blue-400 bg-blue-500/10 border-blue-500/20" },
   INTERVIEW: { label: "Interviewing", color: "text-orange-400 bg-orange-500/10 border-orange-500/20" },
   OFFER: { label: "Offer", color: "text-[var(--primary)] bg-[var(--primary)]/10 border-[var(--primary)]/20" },
@@ -68,6 +100,10 @@ export default function JobTrackerPage() {
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [viewMode, setViewMode] = useState<'list' | 'board'>('list');
   const [isMounted, setIsMounted] = useState(false);
+  const [sortKey, setSortKey] = useState<SortKey>("newest");
+  const [sortOpen, setSortOpen] = useState(false);
+  const [pageNumber, setPageNumber] = useState(1);
+  const [statusMenuId, setStatusMenuId] = useState<string | null>(null);
 
   const handleViewModeChange = (mode: 'list' | 'board') => {
     setViewMode(mode);
@@ -172,6 +208,59 @@ export default function JobTrackerPage() {
     return matchesSearch && matchesStatus;
   });
 
+  // Counts per status, with how many of each arrived this month against last.
+  // Derived here rather than from an API: every job is already loaded, and
+  // `createdAt` is the only timestamp that reliably marks when a job entered
+  // the tracker. A status change does not get its own timestamp, so "this
+  // month" means added this month — not moved to that status this month.
+  const stats = useMemo(() => {
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+    const prevStart = new Date(now.getFullYear(), now.getMonth() - 1, 1).getTime();
+
+    const count = (match: (j: Job) => boolean) => {
+      let total = 0, thisMonth = 0, lastMonth = 0;
+      for (const job of jobs) {
+        if (!match(job)) continue;
+        total += 1;
+        const at = new Date(job.createdAt).getTime();
+        if (at >= monthStart) thisMonth += 1;
+        else if (at >= prevStart) lastMonth += 1;
+      }
+      const change = thisMonth - lastMonth;
+      const percent = lastMonth === 0 ? (thisMonth > 0 ? 100 : 0) : Math.round((change / lastMonth) * 100);
+      return { total, thisMonth, lastMonth, change, percent };
+    };
+
+    const is = (status: string) => (job: Job) => (job.status || "SAVED").toUpperCase() === status;
+    return [
+      { key: "ALL", label: "Total Jobs", icon: FolderOpen, ...count(() => true) },
+      { key: "SAVED", label: "Saved", icon: Bookmark, ...count(is("SAVED")) },
+      { key: "APPLIED", label: "Applied", icon: Send, ...count(is("APPLIED")) },
+      { key: "INTERVIEW", label: "Interviewing", icon: Users, ...count(is("INTERVIEW")) },
+      { key: "OFFER", label: "Offers", icon: Trophy, ...count(is("OFFER")) },
+    ];
+  }, [jobs]);
+
+  const sortedJobs = useMemo(() => {
+    const at = (job: Job) => new Date(job.createdAt).getTime();
+    const list = [...filteredJobs];
+    if (sortKey === "oldest") return list.sort((a, b) => at(a) - at(b));
+    if (sortKey === "company") return list.sort((a, b) => a.company.localeCompare(b.company) || at(b) - at(a));
+    if (sortKey === "status") {
+      const rank = (job: Job) => STATUS_ORDER.indexOf((job.status || "SAVED").toUpperCase());
+      return list.sort((a, b) => rank(a) - rank(b) || at(b) - at(a));
+    }
+    return list.sort((a, b) => at(b) - at(a));
+  }, [filteredJobs, sortKey]);
+
+  const totalPages = Math.max(1, Math.ceil(sortedJobs.length / PAGE_SIZE));
+  const page = Math.min(pageNumber, totalPages);
+  const pagedJobs = sortedJobs.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+  // A narrowed list must not leave the user stranded on an empty page.
+  useEffect(() => { setPageNumber(1); }, [searchQuery, statusFilter, sortKey]);
+
   // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = () => setActiveMenuId(null);
@@ -180,67 +269,116 @@ export default function JobTrackerPage() {
   }, [activeMenuId]);
 
   return (
-    <div className="w-full max-w-7xl mx-auto h-[calc(100vh-120px)] flex flex-col space-y-6 min-w-0 px-2 sm:px-4">
+    <div className="w-full max-w-[1700px] mx-auto h-[calc(100vh-120px)] flex flex-col space-y-5 min-w-0">
 
-      {/* --- ADD JOB BUTTON --- */}
-      <div className="flex justify-end shrink-0">
-        <button
-          id="tour-add-job"
-          onClick={openAddModal}
-          className="flex items-center gap-2 bg-[var(--primary)] hover:bg-[var(--primary)]/90 text-white px-5 py-2.5 rounded-lg transition shadow-lg shadow-[var(--primary)]/20 font-medium text-sm"
-        >
-          <Plus className="h-4 w-4" />
-          Add Job Manually
-        </button>
+      {/* --- PIPELINE AT A GLANCE --- */}
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 shrink-0">
+        {stats.map((card) => {
+          const Icon = card.icon;
+          const up = card.change >= 0;
+          const active = statusFilter === card.key;
+          return (
+            <button
+              key={card.key}
+              onClick={() => setStatusFilter(card.key)}
+              className={`text-left rounded-2xl border bg-[var(--sidebar-bg)] p-3.5 transition ${active
+                ? "border-[var(--primary)] ring-1 ring-[var(--primary)]/25"
+                : "border-[var(--border-color)] hover:border-[var(--primary)]/40"}`}
+            >
+              <div className="flex items-start gap-2.5">
+                <span className="grid place-items-center h-9 w-9 shrink-0 rounded-xl bg-[var(--primary)]/10 text-[var(--primary)]">
+                  <Icon className="h-[18px] w-[18px]" />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-[11px] text-[var(--text-secondary)] truncate">{card.label}</p>
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-2xl font-bold text-[var(--foreground)] leading-none">{card.total}</span>
+                    {card.change !== 0 && (
+                      <span className={`inline-flex items-center gap-0.5 text-[11px] font-semibold ${up ? "text-emerald-500" : "text-red-500"}`}>
+                        {up ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+                        {up ? "+" : ""}{card.percent}%
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+              <p className="mt-2 text-[11px] text-[var(--text-secondary)]">
+                {card.change === 0
+                  ? `${card.thisMonth} added this month`
+                  : `${card.change > 0 ? "+" : ""}${card.change} vs last month`}
+              </p>
+            </button>
+          );
+        })}
       </div>
 
       {/* --- TOOLBAR --- */}
-      <div className="flex flex-col md:flex-row gap-4 p-1 shrink-0">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--text-secondary)]" />
+      <div className="flex flex-col lg:flex-row gap-3 shrink-0">
+        <div className="relative flex-1 min-w-0">
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--text-secondary)]" />
           <input
             type="text"
-            placeholder="Search companies or roles..."
-            className="w-full bg-[var(--sidebar-bg)] border border-[var(--border-color)] rounded-lg pl-10 pr-4 py-2.5 text-[var(--foreground)] placeholder-[var(--text-secondary)] focus:outline-none focus:border-[var(--primary)]/50 focus:ring-1 focus:ring-[var(--primary)]/50 transition"
+            placeholder="Search companies, roles, or keywords..."
+            className="w-full h-11 bg-[var(--sidebar-bg)] border border-[var(--border-color)] rounded-xl pl-11 pr-4 text-sm text-[var(--foreground)] placeholder-[var(--text-secondary)] focus:outline-none focus:border-[var(--primary)]/50 focus:ring-2 focus:ring-[var(--primary)]/15 transition"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
         </div>
 
-        {/* View Toggle */}
-        <div id="tour-job-views" className="flex bg-[var(--sidebar-bg)] border border-[var(--border-color)] rounded-lg p-1 shrink-0">
-          <button
-            onClick={() => handleViewModeChange('board')}
-            className={`px-3 py-1.5 rounded-md flex items-center gap-2 text-xs font-medium transition ${viewMode === 'board' ? 'bg-[var(--primary)] text-white shadow' : 'text-[var(--text-secondary)] hover:text-[var(--foreground)]'}`}
-            title="Board View"
-          >
-            <KanbanSquare className="h-4 w-4" />
-            <span className="hidden sm:inline">Board</span>
-          </button>
-          <button
-            onClick={() => handleViewModeChange('list')}
-            className={`px-3 py-1.5 rounded-md flex items-center gap-2 text-xs font-medium transition ${viewMode === 'list' ? 'bg-[var(--primary)] text-white shadow' : 'text-[var(--text-secondary)] hover:text-[var(--foreground)]'}`}
-            title="List View"
-          >
-            <LayoutList className="h-4 w-4" />
-            <span className="hidden sm:inline">List</span>
-          </button>
-        </div>
-
-        <div className="flex items-center gap-2 overflow-x-auto pb-2 md:pb-0 no-scrollbar">
-          {["ALL", "SAVED", "APPLIED", "INTERVIEW", "OFFER"].map((status) => (
+        <div id="tour-job-views" className="flex bg-[var(--sidebar-bg)] border border-[var(--border-color)] rounded-xl p-1 shrink-0">
+          {([["board", KanbanSquare, "Board"], ["list", LayoutList, "List"]] as const).map(([mode, Icon, label]) => (
             <button
-              key={status}
-              onClick={() => setStatusFilter(status)}
-              className={`px-4 py-2 rounded-lg text-xs font-medium border transition whitespace-nowrap ${statusFilter === status
-                ? "bg-[var(--primary)] text-white border-[var(--primary)] shadow-md"
-                : "bg-[var(--sidebar-bg)] text-[var(--text-secondary)] border-[var(--border-color)] hover:border-[var(--foreground)]/50 hover:text-[var(--foreground)]"
-                }`}
+              key={mode}
+              onClick={() => handleViewModeChange(mode)}
+              className={`px-3.5 h-9 rounded-lg flex items-center gap-2 text-xs font-semibold transition ${viewMode === mode
+                ? "bg-[var(--primary)] text-white shadow"
+                : "text-[var(--text-secondary)] hover:text-[var(--foreground)]"}`}
             >
-              {status === "ALL" ? "All Jobs" : STATUSES[status as keyof typeof STATUSES]?.label || status}
+              <Icon className="h-4 w-4" />
+              <span className="hidden sm:inline">{label}</span>
             </button>
           ))}
         </div>
+
+        <div className="relative shrink-0">
+          <button
+            onClick={() => setSortOpen((v) => !v)}
+            aria-expanded={sortOpen}
+            className="flex h-11 w-full lg:w-[210px] items-center gap-2.5 rounded-xl border border-[var(--border-color)] bg-[var(--sidebar-bg)] px-3.5 text-left transition hover:border-[var(--primary)]/40"
+          >
+            <ArrowDownUp className="h-4 w-4 shrink-0 text-[var(--text-secondary)]" />
+            <span className="min-w-0 flex-1">
+              <span className="block text-[10px] font-semibold uppercase tracking-wide text-[var(--text-secondary)]">Sort by</span>
+              <span className="block truncate text-[13px] font-semibold text-[var(--foreground)]">{SORTS[sortKey]}</span>
+            </span>
+          </button>
+          {sortOpen && (
+            <>
+              <div className="fixed inset-0 z-30" onClick={() => setSortOpen(false)} />
+              <div className="absolute right-0 top-full z-40 mt-1 w-56 overflow-hidden rounded-xl border border-[var(--border-color)] bg-[var(--sidebar-bg)] py-1 shadow-xl">
+                {(Object.keys(SORTS) as SortKey[]).map((key) => (
+                  <button
+                    key={key}
+                    onClick={() => { setSortKey(key); setSortOpen(false); }}
+                    className={`flex w-full items-center justify-between px-3 py-2 text-left text-xs transition hover:bg-[var(--primary)]/8 ${key === sortKey ? "font-bold text-[var(--primary)]" : "text-[var(--text-secondary)] hover:text-[var(--foreground)]"}`}
+                  >
+                    {SORTS[key]}
+                    {key === sortKey && <Check className="h-3.5 w-3.5" />}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+
+        <button
+          id="tour-add-job"
+          onClick={openAddModal}
+          className="flex h-11 items-center justify-center gap-2 rounded-xl bg-[var(--primary)] px-5 text-sm font-semibold text-white shadow-lg shadow-[var(--primary)]/20 transition hover:bg-[var(--primary-dark)] shrink-0"
+        >
+          <Plus className="h-4 w-4" />
+          <span className="whitespace-nowrap">Add Job</span>
+        </button>
       </div>
 
       {/* --- CONTENT AREA --- */}
@@ -248,12 +386,12 @@ export default function JobTrackerPage() {
         <div className="flex-1 bg-[var(--sidebar-bg)]/50 border border-[var(--border-color)] rounded-xl overflow-hidden flex flex-col shadow-2xl">
           {/* Desktop table header */}
           <div className="hidden md:grid grid-cols-12 gap-4 p-4 border-b border-[var(--border-color)] bg-[var(--sidebar-bg)] text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider shrink-0">
-            <div className="col-span-4">Company & Role</div>
-            <div className="col-span-3">Status</div>
+            <div className="col-span-4">Company &amp; Role</div>
+            <div className="col-span-2">Status</div>
             <div className="col-span-2">Location</div>
             <div className="col-span-1 text-center">Job Post</div>
             <div className="col-span-1 text-right">Added</div>
-            <div className="col-span-1 text-center">Actions</div>
+            <div className="col-span-2 text-right pr-1">Actions</div>
           </div>
           {/* Mobile header */}
           <div className="flex md:hidden items-center justify-between px-3 py-2 border-b border-[var(--border-color)] bg-[var(--sidebar-bg)] text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider shrink-0">
@@ -270,11 +408,12 @@ export default function JobTrackerPage() {
                 <p>No jobs found.</p>
               </div>
             ) : (
-              filteredJobs.map((job) => (
+              pagedJobs.map((job) => (
                 <div key={job.id} className="border-b border-[var(--border-color)] hover:bg-black/5 dark:hover:bg-white/5 transition group relative">
 
                   {/* Mobile card row */}
                   <div className="flex md:hidden items-center gap-3 p-3">
+                    <CompanyLogo company={job.company} jobUrl={job.jobUrl} size={36} />
                     <div className="flex-1 min-w-0 cursor-pointer" onClick={() => router.push(`/dashboard/jobs/${job.id}`)}>
                       <h3 className="font-bold text-[var(--foreground)] text-sm group-hover:text-[var(--primary)] transition-colors truncate">{job.jobTitle}</h3>
                       <p className="text-xs text-[var(--text-secondary)] truncate">{job.company}</p>
@@ -311,23 +450,21 @@ export default function JobTrackerPage() {
                   {/* Desktop table row */}
                   <div className="hidden md:grid grid-cols-12 gap-4 p-4 items-center">
                     {/* Column 1: Info */}
-                    <div className="col-span-4 cursor-pointer min-w-0 pr-4" onClick={() => router.push(`/dashboard/jobs/${job.id}`)}>
-                      <h3 className="font-bold text-[var(--foreground)] text-sm group-hover:text-[var(--primary)] transition-colors truncate" title={job.jobTitle}>{job.jobTitle}</h3>
-                      <p className="text-xs text-[var(--text-secondary)] mt-0.5 truncate">{job.company}</p>
+                    <div className="col-span-4 cursor-pointer min-w-0 pr-4 flex items-center gap-3" onClick={() => router.push(`/dashboard/jobs/${job.id}`)}>
+                      <CompanyLogo company={job.company} jobUrl={job.jobUrl} size={38} />
+                      <div className="min-w-0">
+                        <h3 className="font-bold text-[var(--foreground)] text-sm group-hover:text-[var(--primary)] transition-colors truncate" title={job.jobTitle}>{job.jobTitle}</h3>
+                        <p className="text-xs text-[var(--text-secondary)] mt-0.5 truncate">{job.company}</p>
+                      </div>
                     </div>
                     {/* Column 2: Status */}
-                    <div className="col-span-3">
-                      <div className="relative inline-block">
-                        <select
-                          value={job.status}
-                          onChange={(e) => handleStatusChange(job.id, e.target.value)}
-                          className={`appearance-none pl-3 pr-8 py-1.5 rounded-md text-xs font-medium border bg-transparent cursor-pointer focus:outline-none focus:ring-1 focus:ring-[var(--primary)]/50 transition ${STATUSES[job.status as keyof typeof STATUSES]?.color || "text-[var(--foreground)] border-[var(--border-color)]"}`}
-                        >
-                          {Object.entries(STATUSES).map(([key, config]) => (
-                            <option key={key} value={key} className="bg-[var(--sidebar-bg)] text-[var(--foreground)]">{config.label}</option>
-                          ))}
-                        </select>
-                      </div>
+                    <div className="col-span-2 relative" onClick={(e) => e.stopPropagation()}>
+                      <StatusPill
+                        status={job.status}
+                        open={statusMenuId === job.id}
+                        onToggle={() => setStatusMenuId(statusMenuId === job.id ? null : job.id)}
+                        onPick={(next) => { handleStatusChange(job.id, next); setStatusMenuId(null); }}
+                      />
                     </div>
                     {/* Column 3: Location */}
                     <div className="col-span-2 flex items-center gap-2 text-xs text-[var(--text-secondary)]">
@@ -351,7 +488,13 @@ export default function JobTrackerPage() {
                       {new Date(job.createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
                     </div>
                     {/* Column 6: Actions */}
-                    <div className="col-span-1 flex justify-center relative" onClick={(e) => e.stopPropagation()}>
+                    <div className="col-span-2 flex items-center justify-end gap-2 relative" onClick={(e) => e.stopPropagation()}>
+                      <button
+                        onClick={() => router.push(`/dashboard/jobs/${job.id}`)}
+                        className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-[var(--primary)]/30 bg-[var(--primary)]/8 px-3 text-[12px] font-semibold text-[var(--primary)] transition hover:bg-[var(--primary)]/15"
+                      >
+                        View
+                      </button>
                       <button
                         onClick={(e) => { e.stopPropagation(); setActiveMenuId(activeMenuId === job.id ? null : job.id); }}
                         className="p-1.5 rounded-md hover:bg-black/10 dark:hover:bg-white/10 text-[var(--text-secondary)] hover:text-[var(--foreground)] transition"
@@ -374,6 +517,50 @@ export default function JobTrackerPage() {
               ))
             )}
           </div>
+
+          {/* Pagination — a long tracker should not be one endless scroll */}
+          {!loading && sortedJobs.length > 0 && (
+            <div className="flex items-center justify-between gap-3 border-t border-[var(--border-color)] px-4 py-3 shrink-0">
+              <p className="text-xs text-[var(--text-secondary)]">
+                Showing {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, sortedJobs.length)} of {sortedJobs.length} job{sortedJobs.length !== 1 ? "s" : ""}
+              </p>
+              {totalPages > 1 && (
+                <div className="flex items-center gap-1.5">
+                  <button
+                    onClick={() => setPageNumber(page - 1)}
+                    disabled={page === 1}
+                    aria-label="Previous page"
+                    className="grid h-8 w-8 place-items-center rounded-lg border border-[var(--border-color)] text-[var(--text-secondary)] transition hover:border-[var(--primary)]/40 hover:text-[var(--primary)] disabled:opacity-40 disabled:hover:border-[var(--border-color)] disabled:hover:text-[var(--text-secondary)]"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </button>
+                  {Array.from({ length: totalPages }, (_, i) => i + 1)
+                    .filter((n) => n === 1 || n === totalPages || Math.abs(n - page) <= 1)
+                    .map((n, i, all) => (
+                      <span key={n} className="flex items-center gap-1.5">
+                        {i > 0 && all[i - 1] !== n - 1 && <span className="text-xs text-[var(--text-secondary)]">…</span>}
+                        <button
+                          onClick={() => setPageNumber(n)}
+                          className={`h-8 min-w-8 rounded-lg px-2 text-xs font-semibold transition ${n === page
+                            ? "bg-[var(--primary)] text-white"
+                            : "border border-[var(--border-color)] text-[var(--text-secondary)] hover:border-[var(--primary)]/40 hover:text-[var(--primary)]"}`}
+                        >
+                          {n}
+                        </button>
+                      </span>
+                    ))}
+                  <button
+                    onClick={() => setPageNumber(page + 1)}
+                    disabled={page === totalPages}
+                    aria-label="Next page"
+                    className="grid h-8 w-8 place-items-center rounded-lg border border-[var(--border-color)] text-[var(--text-secondary)] transition hover:border-[var(--primary)]/40 hover:text-[var(--primary)] disabled:opacity-40 disabled:hover:border-[var(--border-color)] disabled:hover:text-[var(--text-secondary)]"
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       ) : (
         /* --- KANBAN BOARD VIEW --- */
@@ -431,9 +618,7 @@ export default function JobTrackerPage() {
                                     <div className="flex justify-between items-start mb-2 pointer-events-none">
                                       {/* Company Icon & Name */}
                                       <div className="flex gap-2.5 overflow-hidden">
-                                        <div className="h-7 w-7 rounded-md bg-gradient-to-br from-[var(--primary)] to-blue-600 text-white flex items-center justify-center font-bold text-[11px] shrink-0 shadow-inner">
-                                          {job.company.substring(0, 2).toUpperCase()}
-                                        </div>
+                                        <CompanyLogo company={job.company} jobUrl={job.jobUrl} size={28} rounded="rounded-md" />
                                         <div className="overflow-hidden">
                                           <h4 className="font-bold text-[var(--foreground)] text-[13px] leading-snug truncate pr-1 group-hover:text-[var(--primary)]">{job.jobTitle}</h4>
                                           <p className="text-[11px] text-[var(--text-secondary)] truncate">{job.company}</p>
@@ -531,6 +716,60 @@ function toLocalInput(value?: string | null): string {
   if (Number.isNaN(date.getTime())) return "";
   const pad = (n: number) => String(n).padStart(2, "0");
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+/**
+ * Status as a coloured pill rather than a bare <select>: it reads at a glance
+ * in a dense table, and still opens the picker on click so the status stays
+ * editable from the list.
+ */
+function StatusPill({
+  status,
+  open,
+  onToggle,
+  onPick,
+}: {
+  status: string;
+  open: boolean;
+  onToggle: () => void;
+  onPick: (next: string) => void;
+}) {
+  const key = (status || "SAVED").toUpperCase();
+  const config = STATUSES[key as keyof typeof STATUSES];
+  const Icon = STATUS_ICONS[key] || Bookmark;
+
+  return (
+    <>
+      <button
+        onClick={onToggle}
+        aria-expanded={open}
+        className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold transition hover:brightness-110 ${config?.color || "text-[var(--foreground)] border-[var(--border-color)]"}`}
+      >
+        <Icon className="h-3 w-3" />
+        {config?.label || key}
+      </button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={onToggle} />
+          <div className="absolute left-0 top-full z-50 mt-1 w-40 overflow-hidden rounded-xl border border-[var(--border-color)] bg-[var(--sidebar-bg)] py-1 shadow-2xl">
+            {Object.entries(STATUSES).map(([value, cfg]) => {
+              const RowIcon = STATUS_ICONS[value] || Bookmark;
+              return (
+                <button
+                  key={value}
+                  onClick={() => onPick(value)}
+                  className={`flex w-full items-center gap-2 px-3 py-2 text-left text-xs transition hover:bg-[var(--primary)]/8 ${value === key ? "font-bold text-[var(--primary)]" : "text-[var(--text-secondary)] hover:text-[var(--foreground)]"}`}
+                >
+                  <RowIcon className="h-3.5 w-3.5" />
+                  {cfg.label}
+                </button>
+              );
+            })}
+          </div>
+        </>
+      )}
+    </>
+  );
 }
 
 function JobModal({ jobToEdit, onClose, onSuccess }: { jobToEdit: Job | null; onClose: () => void; onSuccess: () => void; }) {

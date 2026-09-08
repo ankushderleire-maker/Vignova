@@ -4,6 +4,7 @@ import { getExtensionUser } from "@/lib/extensionAuth";
 import { getTemplateGenerator } from "@/components/resume-html-templates";
 import { generatePdfFromHtml } from "@/lib/pdf/puppeteer";
 import { withCors, handleCorsOptions } from "@/lib/extensionCors";
+import { findExistingWork, findJobByUrl, duplicateResponse } from "@/lib/extensionDuplicate";
 
 export async function OPTIONS() {
     return handleCorsOptions();
@@ -30,7 +31,7 @@ export async function POST(req: Request) {
 
         // ─── 2. Input ───
         const body = await req.json();
-        const { jobDescription, jobTitle, company, jobUrl, hint, source = "EXTENSION" } = body;
+        const { jobDescription, jobTitle, company, jobUrl, hint, force = false, source = "EXTENSION" } = body;
 
         if (!jobDescription || !jobTitle || !company) {
             return withCors(NextResponse.json(
@@ -39,7 +40,18 @@ export async function POST(req: Request) {
             ));
         }
 
-        // ─── 3. Credits ───
+        // ─── 3. Already generated? ───
+        // Asked before the credit check so a repeat visit to a posting can
+        // never cost a credit on its own. The extension turns this into a
+        // "generate again?" prompt and retries with force: true.
+        if (!force) {
+            const existing = await findExistingWork(userId, jobUrl);
+            if (existing) {
+                return withCors(NextResponse.json(duplicateResponse(existing), { status: 409 }));
+            }
+        }
+
+        // ─── 4. Credits ───
         if (subscription!.credits_remaining <= 0) {
             return withCors(NextResponse.json(
                 { error: "Insufficient credits. Please upgrade or wait for reset.", credits_remaining: 0 },
@@ -47,7 +59,7 @@ export async function POST(req: Request) {
             ));
         }
 
-        // ─── 4. Profile ───
+        // ─── 5. Profile ───
         let profile = await db.master_profiles.findFirst({
             where: { user_id: userId, is_default: true },
         });
@@ -66,22 +78,30 @@ export async function POST(req: Request) {
 
         const masterProfile = profile.parsed_data as any;
 
-        // ─── 5. Save Job ───
-        const job = await db.jobApplication.create({
-            data: {
-                userId,
-                company,
-                jobTitle,
-                description: jobDescription,
-                jobUrl: jobUrl || "",
-                location: "",
-                status: "TAILORING",
-                source: "extension",
-                sourceUrl: jobUrl || "",
-            },
-        });
+        // ─── 6. Save Job ───
+        // Regenerating updates the row we already have. Creating a second one
+        // would show the same posting twice in the tracker.
+        const tracked = await findJobByUrl(userId, jobUrl);
+        const job = tracked
+            ? await db.jobApplication.update({
+                where: { id: tracked.id },
+                data: { company, jobTitle, description: jobDescription, status: "TAILORING" },
+            })
+            : await db.jobApplication.create({
+                data: {
+                    userId,
+                    company,
+                    jobTitle,
+                    description: jobDescription,
+                    jobUrl: jobUrl || "",
+                    location: "",
+                    status: "TAILORING",
+                    source: "extension",
+                    sourceUrl: jobUrl || "",
+                },
+            });
 
-        // ─── 6. Build profile context (shared by cover letter & email) ───
+        // ─── 7. Build profile context (shared by cover letter & email) ───
         const fullName = `${masterProfile.first_name || masterProfile.fullName || ""} ${masterProfile.last_name || ""}`.trim();
         const currentTitle = masterProfile.experience?.[0]?.role || masterProfile.experience?.[0]?.title || "";
         const currentCompany = masterProfile.experience?.[0]?.company || "";
@@ -104,7 +124,7 @@ export async function POST(req: Request) {
             ? masterProfile.education.map((e: any) => `${e.degree || ""} from ${e.school || ""}`).join("; ")
             : "";
 
-        // ─── 7. Parallel generation: Resume + Cover Letter + Email ───
+        // ─── 8. Parallel generation: Resume + Cover Letter + Email ───
         const OLLAMA_BASE_URL = process.env.OLLAMA_BASE_URL || "http://localhost:11434";
         const OLLAMA_MODEL = process.env.OLLAMA_MODEL || "llama3.2";
         const AI_BACKEND_URL = process.env.AI_BACKEND_URL || "http://localhost:8000";
@@ -199,7 +219,7 @@ INSTRUCTIONS:
             }),
         ]);
 
-        // ─── 8. Process resume result ───
+        // ─── 9. Process resume result ───
         let pdfBase64 = null;
         let resumeData = null;
         let savedResume = null;
@@ -291,35 +311,41 @@ INSTRUCTIONS:
             console.error("[GENERATE_ALL_RESUME_FAILED]", resumeResult.status === "rejected" ? resumeResult.reason : "Non-OK response");
         }
 
-        // ─── 9. Process cover letter result ───
+        // ─── 10. Process cover letter result ───
         let coverLetter = null;
         if (coverLetterResult.status === "fulfilled" && coverLetterResult.value.ok) {
             const clData = await coverLetterResult.value.json();
             coverLetter = clData.response?.trim() || null;
         }
 
-        // ─── 10. Process email result ───
+        // ─── 11. Process email result ───
         let draftEmail = null;
         if (emailResult.status === "fulfilled" && emailResult.value.ok) {
             const emData = await emailResult.value.json();
             draftEmail = emData.response?.trim() || null;
         }
 
-        // ─── 11. Save cover letter to job ───
-        if (coverLetter) {
+        // ─── 12. Save cover letter and email to the job ───
+        // The email used to be returned and forgotten, so closing the overlay
+        // lost it. Stored now, which is also what makes the duplicate check
+        // above able to see it.
+        if (coverLetter || draftEmail) {
             await db.jobApplication.update({
                 where: { id: job.id },
-                data: { coverLetter },
+                data: {
+                    ...(coverLetter ? { coverLetter } : {}),
+                    ...(draftEmail ? { draftEmail } : {}),
+                },
             });
         }
 
-        // ─── 12. Deduct 1 credit ───
+        // ─── 13. Deduct 1 credit ───
         await db.subscriptions.update({
             where: { id: subscription!.id },
             data: { credits_remaining: { decrement: 1 } },
         });
 
-        // ─── 13. Update job status ───
+        // ─── 14. Update job status ───
         await db.jobApplication.update({
             where: { id: job.id },
             data: { status: "SAVED" },
