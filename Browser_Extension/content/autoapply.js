@@ -237,7 +237,7 @@
             btn.style.zIndex = "2147483647";
             btn.style.background = "#ffffff";
             btn.style.display = "none";
-            btn.style.border = "1px solid #e2e8f0";
+            btn.style.border = "1px solid rgba(108, 75, 234, 0.22)";
             btn.style.borderRight = "none";
             btn.style.boxShadow = "-4px 0 16px rgba(0,0,0,0.1)";
             btn.style.padding = "5px";
@@ -264,10 +264,13 @@
 
             btn.textContent = "";
             const div = document.createElement("div");
-            div.style.cssText = "background:#0f0f0f;border-radius:8px;padding:8px;display:flex;align-items:center;justify-content:center;";
+            // The mark is deep violet, so it used to disappear into the
+            // near-black tile that was here. A soft brand tint instead,
+            // matching the injected bar and the overlay.
+            div.style.cssText = "background:linear-gradient(135deg,#f3ecff,#e6f1ff);border-radius:9px;padding:7px;display:flex;align-items:center;justify-content:center;";
             const img = document.createElement("img");
             img.src = chrome.runtime.getURL('icons/logo.png');
-            img.style.cssText = "width:32px;height:32px;object-fit:contain;";
+            img.style.cssText = "width:34px;height:34px;object-fit:contain;display:block;";
             div.appendChild(img);
             btn.appendChild(div);
 

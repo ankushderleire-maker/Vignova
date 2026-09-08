@@ -194,6 +194,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                         }
                     });
                     sendResponse({ success: true, ...data });
+                } else if (data.duplicate) {
+                    // Not a failure: the server found an earlier generation for
+                    // this posting and is asking whether to spend another
+                    // credit. Passed through so the caller can prompt.
+                    sendResponse({ success: false, duplicate: true, existing: data.existing, message: data.message });
                 } else {
                     sendResponse({ success: false, error: data.error || "Generation failed" });
                 }
@@ -228,6 +233,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                         }
                     });
                     sendResponse({ success: true, ...data });
+                } else if (data.duplicate) {
+                    // Not a failure: the server found an earlier generation for
+                    // this posting and is asking whether to spend another
+                    // credit. Passed through so the content script can prompt.
+                    sendResponse({ success: false, duplicate: true, existing: data.existing, message: data.message });
                 } else {
                     sendResponse({ success: false, error: data.error || "Generation failed" });
                 }
@@ -258,6 +268,58 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                 } else {
                     sendResponse({ success: false, error: data.error || "Failed to save job" });
                 }
+            } catch (err) {
+                sendResponse({ success: false, error: "Cannot connect to Vignova server." });
+            }
+        });
+        return true;
+    }
+
+    // ─── API Proxy: Outreach (recruiter message / application email) ───
+    // The dashboard route holds the master profile and the internal key; the
+    // extension only says which job it is looking at.
+    if (message.type === "API_OUTREACH") {
+        chrome.storage.local.get(["vignova_token"], async (result) => {
+            try {
+                const response = await fetch(`${Vignova_API_BASE}/api/extension/outreach`, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "Authorization": `Bearer ${result.vignova_token}`,
+                    },
+                    body: JSON.stringify(message.data),
+                });
+
+                const data = await response.json();
+                if (response.ok) {
+                    sendResponse({ success: true, ...data });
+                } else {
+                    sendResponse({ success: false, error: data.error || "Could not write that." });
+                }
+            } catch (err) {
+                sendResponse({ success: false, error: "Cannot connect to Vignova server." });
+            }
+        });
+        return true;
+    }
+
+    // ─── API Proxy: Set application status ───
+    if (message.type === "API_SET_STATUS") {
+        chrome.storage.local.get(["vignova_token"], async (result) => {
+            try {
+                const response = await fetch(`${Vignova_API_BASE}/api/extension/job-status`, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "Authorization": `Bearer ${result.vignova_token}`,
+                    },
+                    body: JSON.stringify(message.data),
+                });
+
+                const data = await response.json();
+                sendResponse(response.ok
+                    ? { success: true, ...data }
+                    : { success: false, error: data.error || "Could not set status." });
             } catch (err) {
                 sendResponse({ success: false, error: "Cannot connect to Vignova server." });
             }
@@ -609,6 +671,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
                 if (response.ok) {
                     sendResponse({ success: true, ...data });
+                } else if (data.duplicate) {
+                    sendResponse({ success: false, duplicate: true, existing: data.existing, message: data.message });
                 } else {
                     sendResponse({ success: false, error: data.error || "Failed to generate cover letter" });
                 }

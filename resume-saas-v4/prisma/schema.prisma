@@ -101,6 +101,9 @@ model JobApplication {
   source           String            @default("manual")
   sourceUrl        String?
   coverLetter      String?
+  /// Application email drafted alongside the resume and cover letter, kept so
+  /// the user can come back to it and so a repeat generation can be detected.
+  draftEmail       String?
   atsReport        Json?
   aiReport         Json?
   /// Structured job description produced by the JD formatter agent.
@@ -149,6 +152,8 @@ model GeneratedResume {
   source        String         @default("manual")
   sourceUrl     String?
   extensionData Json?
+  /// Template the resume was saved with, so preview and download reproduce it.
+  templateId    String?
   job           JobApplication @relation(fields: [jobId], references: [id], onDelete: Cascade)
   user          users          @relation(fields: [userId], references: [id], onDelete: Cascade)
 

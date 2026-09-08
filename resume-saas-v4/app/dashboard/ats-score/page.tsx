@@ -37,6 +37,7 @@ import {
 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { CustomDialog } from "@/components/ui/CustomDialog";
+import { CompanyLogo } from "@/components/jobs/CompanyLogo";
 
 const SectionHeader = ({ number, title, description }: { number: number, title: string, description?: string }) => (
     <div className="mb-6 mt-10">
@@ -59,15 +60,6 @@ type Job = {
     createdAt: string;
 };
 
-/** Company initials get a rotating tint, so a list of jobs is scannable. */
-const LOGO_TINTS = [
-    "bg-violet-500/12 text-violet-600 dark:text-violet-400",
-    "bg-blue-500/12 text-blue-600 dark:text-blue-400",
-    "bg-emerald-500/12 text-emerald-600 dark:text-emerald-400",
-    "bg-amber-500/12 text-amber-600 dark:text-amber-400",
-    "bg-rose-500/12 text-rose-600 dark:text-rose-400",
-    "bg-cyan-500/12 text-cyan-600 dark:text-cyan-400",
-];
 
 interface KeywordItem {
     keyword: string;
@@ -584,7 +576,7 @@ function AtsScoreContent() {
     };
 
     return (
-        <div className="w-full max-w-7xl mx-auto min-h-[calc(100vh-120px)] flex flex-col space-y-6 animate-slide-down">
+        <div className="w-full max-w-[1700px] mx-auto min-h-[calc(100vh-120px)] flex flex-col space-y-6 animate-slide-down">
 
             {/* Page Header */}
             <div className="flex items-center justify-end shrink-0">
@@ -670,9 +662,7 @@ function AtsScoreContent() {
                                                         onChange={() => setSelectedJobId(job.id)}
                                                         className="mt-1 h-4 w-4 shrink-0 accent-[var(--primary)]"
                                                     />
-                                                    <span className={`grid place-items-center h-10 w-10 shrink-0 rounded-xl text-sm font-bold ${LOGO_TINTS[index % LOGO_TINTS.length]}`}>
-                                                        {(job.company || "?").trim().charAt(0).toUpperCase()}
-                                                    </span>
+                                                    <CompanyLogo company={job.company} jobUrl={(job as any).jobUrl} size={40} rounded="rounded-xl" />
                                                     <span className="flex-1 min-w-0">
                                                         <span className="flex items-start justify-between gap-3">
                                                             <span className="min-w-0">

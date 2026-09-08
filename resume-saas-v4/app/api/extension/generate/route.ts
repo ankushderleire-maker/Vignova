@@ -4,6 +4,7 @@ import { getExtensionUser } from "@/lib/extensionAuth";
 import { getTemplateGenerator } from "@/components/resume-html-templates";
 import { generatePdfFromHtml } from "@/lib/pdf/puppeteer";
 import { withCors, handleCorsOptions } from "@/lib/extensionCors";
+import { findExistingWork, findJobByUrl, duplicateResponse } from "@/lib/extensionDuplicate";
 
 // CORS preflight
 export async function OPTIONS() {
@@ -43,7 +44,7 @@ export async function POST(req: Request) {
 
         // ─── 2. Validate Input ───
         const body = await req.json();
-        const { jobDescription, jobTitle, company, jobUrl, source = "EXTENSION" } = body;
+        const { jobDescription, jobTitle, company, jobUrl, force = false, source = "EXTENSION" } = body;
 
         if (!jobDescription || !jobTitle || !company) {
             return withCors(NextResponse.json(
@@ -52,7 +53,18 @@ export async function POST(req: Request) {
             ));
         }
 
-        // ─── 3. Check Credits ───
+        // ─── 3. Already generated? ───
+        // Asked before the credit check so a repeat visit to a posting can
+        // never cost a credit on its own. The extension turns this into a
+        // "generate again?" prompt and retries with force: true.
+        if (!force) {
+            const existing = await findExistingWork(userId, jobUrl);
+            if (existing) {
+                return withCors(NextResponse.json(duplicateResponse(existing), { status: 409 }));
+            }
+        }
+
+        // ─── 4. Check Credits ───
         if (subscription!.credits_remaining <= 0) {
             return withCors(NextResponse.json(
                 { error: "Insufficient credits. Please upgrade or wait for reset.", credits_remaining: 0 },
@@ -60,8 +72,7 @@ export async function POST(req: Request) {
             ));
         }
 
-        // ─── 4. Fetch Default Master Profile ───
-        // ─── 4. Fetch Default Master Profile (fallback to any profile) ───
+        // ─── 5. Fetch Default Master Profile (fallback to any profile) ───
         let profile = await db.master_profiles.findFirst({
             where: {
                 user_id: userId,
@@ -86,22 +97,30 @@ export async function POST(req: Request) {
 
         const masterProfile = profile.parsed_data as any;
 
-        // ─── 5. Save Job to DB ───
-        const job = await db.jobApplication.create({
-            data: {
-                userId,
-                company,
-                jobTitle,
-                description: jobDescription,
-                jobUrl: jobUrl || "",
-                location: "",
-                status: "TAILORING",
-                source: "extension",
-                sourceUrl: jobUrl || "",
-            },
-        });
+        // ─── 6. Save Job to DB ───
+        // Regenerating updates the row we already have. Creating a second one
+        // would show the same posting twice in the tracker.
+        const tracked = await findJobByUrl(userId, jobUrl);
+        const job = tracked
+            ? await db.jobApplication.update({
+                where: { id: tracked.id },
+                data: { company, jobTitle, description: jobDescription, status: "TAILORING" },
+            })
+            : await db.jobApplication.create({
+                data: {
+                    userId,
+                    company,
+                    jobTitle,
+                    description: jobDescription,
+                    jobUrl: jobUrl || "",
+                    location: "",
+                    status: "TAILORING",
+                    source: "extension",
+                    sourceUrl: jobUrl || "",
+                },
+            });
 
-        // ─── 6. Call AI Backend ───
+        // ─── 7. Call AI Backend ───
         const AI_BACKEND_URL = process.env.AI_BACKEND_URL || "http://localhost:8000";
 
         const aiResponse = await fetch(`${AI_BACKEND_URL}/api/generate-tailored-resume`, {
@@ -128,7 +147,7 @@ export async function POST(req: Request) {
         const aiResult = await aiResponse.json();
         const aiData = aiResult.data;
 
-        // ─── 7. Format Resume Data ───
+        // ─── 8. Format Resume Data ───
         const resumeData = {
             fullName: aiData.fullName || masterProfile.fullName,
             jobTitle: aiData.jobTitle || jobTitle,
@@ -173,7 +192,7 @@ export async function POST(req: Request) {
             })) || [],
         };
 
-        // ─── 8. Save Resume to DB ───
+        // ─── 9. Save Resume to DB ───
         const savedResume = await db.generatedResume.create({
             data: {
                 userId,
@@ -185,7 +204,7 @@ export async function POST(req: Request) {
             },
         });
 
-        // ─── 9. Generate PDF ───
+        // ─── 10. Generate PDF ───
         let pdfBase64 = null;
         try {
             // Determine template based on extension settings
@@ -220,13 +239,13 @@ export async function POST(req: Request) {
             // PDF generation failed but resume was still created - non-fatal
         }
 
-        // ─── 10. Deduct Credit (Atomic to prevent race conditions) ───
+        // ─── 11. Deduct Credit (Atomic to prevent race conditions) ───
         await db.subscriptions.update({
             where: { id: subscription!.id },
             data: { credits_remaining: { decrement: 1 } },
         });
 
-        // ─── 11. Update Job Status ───
+        // ─── 12. Update Job Status ───
         await db.jobApplication.update({
             where: { id: job.id },
             data: { status: "SAVED" }, // Standardize status for dashboard

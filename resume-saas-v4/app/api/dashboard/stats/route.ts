@@ -8,7 +8,7 @@ export async function GET(req: Request) {
         const session = await getServerSession(authOptions);
 
         if (!(session?.user as any)?.id) {
-            return new NextResponse("Unauthorized", { status: 401 });
+            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
 
         const userId = (session?.user as any)?.id as string;
@@ -191,6 +191,6 @@ export async function GET(req: Request) {
         });
     } catch (error) {
         console.error("[DASHBOARD_STATS]", error);
-        return new NextResponse("Internal Error", { status: 500 });
+        return NextResponse.json({ error: "Internal Error" }, { status: 500 });
     }
 }

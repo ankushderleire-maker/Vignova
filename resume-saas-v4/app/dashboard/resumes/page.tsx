@@ -35,6 +35,7 @@ type SavedResume = {
     jobId: string;
     job: { company: string; jobTitle: string };
     content: any;
+    templateId?: string | null;
 };
 
 type JobGroup = {
@@ -56,11 +57,8 @@ const SORT_LABELS: Record<SortKey, string> = {
 
 const ALL_COMPANIES = "__all__";
 
-/**
- * Saved rows don't record which template produced them, so preview and download
- * render with the studio's default rather than guessing.
- */
-const PREVIEW_TEMPLATE = "modern";
+/** Used only for rows saved before templateId existed. */
+const FALLBACK_TEMPLATE = "modern";
 
 export default function SavedResumesPage() {
     const router = useRouter();
@@ -152,7 +150,8 @@ export default function SavedResumesPage() {
         // Loaded on demand: the template module pulls in every template, and
         // this page only needs it once someone previews or downloads.
         const { getTemplateGenerator } = await import("@/components/resume-html-templates");
-        return getTemplateGenerator(PREVIEW_TEMPLATE)(resume.content);
+        // Reproduce the template the resume was saved with; older rows have none.
+        return getTemplateGenerator(resume.templateId || FALLBACK_TEMPLATE)(resume.content);
     };
 
     const failed = (title: string, description: string) =>
@@ -259,7 +258,7 @@ export default function SavedResumesPage() {
 
     return (
         <>
-            <div className="max-w-7xl mx-auto space-y-5 animate-slide-down">
+            <div className="w-full max-w-[1700px] mx-auto space-y-5 animate-slide-down">
                 {/* Toolbar: counts on the left, controls on the right */}
                 {resumes.length > 0 && (
                     <div className="flex flex-col xl:flex-row xl:items-center gap-3">

@@ -6,7 +6,7 @@ import { db } from "@/lib/db";
 export async function POST(req: Request) {
   try {
     const session = await getServerSession(authOptions);
-    if (!(session?.user as any)?.id) return new NextResponse("Unauthorized", { status: 401 });
+    if (!(session?.user as any)?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const userId = (session?.user as any)?.id as string;
 
@@ -22,7 +22,7 @@ export async function POST(req: Request) {
     }
 
     if (sub.credits_remaining <= 0) {
-      return new NextResponse("Insufficient Credits", { status: 403 });
+      return NextResponse.json({ error: "Insufficient Credits" }, { status: 403 });
     }
 
     // 2. Deduct 1 Credit
@@ -34,6 +34,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ success: true, remaining: updatedSub.credits_remaining });
   } catch (error) {
     console.error("[CREDIT_DEDUCT]", error);
-    return new NextResponse("Internal Error", { status: 500 });
+    return NextResponse.json({ error: "Internal Error" }, { status: 500 });
   }
 }

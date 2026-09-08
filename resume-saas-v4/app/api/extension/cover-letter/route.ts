@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getExtensionUser } from "@/lib/extensionAuth";
 import { db } from "@/lib/db";
 import { withCors, handleCorsOptions } from "@/lib/extensionCors";
+import { findExistingWork, duplicateResponse } from "@/lib/extensionDuplicate";
 
 export const OPTIONS = handleCorsOptions;
 
@@ -14,10 +15,20 @@ export async function POST(req: Request) {
         const user = auth.user;
 
         const body = await req.json();
-        const { jobTitle, company, jobUrl, description } = body;
+        const { jobTitle, company, jobUrl, description, force = false } = body;
 
         if (!description || description.length < 50) {
             return withCors(NextResponse.json({ error: "Job description too short" }, { status: 400 }));
+        }
+
+        // Already written one for this posting? Ask rather than quietly
+        // replacing it — the extension turns this into a prompt and
+        // retries with force: true.
+        if (!force) {
+            const existing = await findExistingWork(user.id, jobUrl);
+            if (existing) {
+                return withCors(NextResponse.json(duplicateResponse(existing), { status: 409 }));
+            }
         }
 
         // Fetch user's primary profile

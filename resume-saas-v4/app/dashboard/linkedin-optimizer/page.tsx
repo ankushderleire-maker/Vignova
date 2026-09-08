@@ -563,7 +563,7 @@ function LinkedInOptimizerContent() {
                     </div>
                 </div>
             )}
-        <div className="w-full max-w-7xl mx-auto min-h-[calc(100vh-120px)] flex flex-col space-y-6 animate-slide-down">
+        <div className="w-full max-w-[1700px] mx-auto min-h-[calc(100vh-120px)] flex flex-col space-y-6 animate-slide-down">
             
             <div className="flex items-center justify-end shrink-0">
                 <div className="flex items-center gap-3">
