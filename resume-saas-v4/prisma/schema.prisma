@@ -383,6 +383,11 @@ model admin_extension_settings {
   extension_version String   @default("1.0.0")
   extension_name    String   @default("Vignova Extension")
   install_url       String   @default("")
+  /// Oldest build still allowed to run. Anything below it is blocked in the
+  /// extension itself and told to update — the store cannot force an install.
+  min_version       String   @default("0.0.0")
+  /// Shown on the block screen, e.g. why the old build had to be retired.
+  update_message    String   @default("")
   updated_at        DateTime @default(now()) @db.Timestamptz(6)
   updated_by        String?  @db.Uuid
 }

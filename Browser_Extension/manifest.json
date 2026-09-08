@@ -2,7 +2,7 @@
     "manifest_version": 3,
     "name": "Vignova - Your Career AI Assistant",
     "short_name": "Vignova",
-    "version": "1.3.0",
+    "version": "1.4.0",
     "description": "AI career copilot: tailor resumes, auto-fill applications, and track jobs with Kanban.",
     "minimum_chrome_version": "116",
     "icons": {

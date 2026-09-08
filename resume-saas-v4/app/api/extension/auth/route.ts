@@ -52,25 +52,24 @@ export async function POST(req: Request) {
         }
 
         // ─── Check Subscription & Extension Access ───
-        const subscription = await db.subscriptions.findFirst({
+        // No row is treated as FREE rather than refused: signing in has to work
+        // so the free features do, and the paid routes gate themselves.
+        const found = await db.subscriptions.findFirst({
             where: { user_id: user.id },
         });
 
-        if (!subscription) {
-            return withCors(NextResponse.json(
-                {
-                    error: "No subscription found. Please set up your account first.",
-                    upgrade_required: true,
-                    plan: "NONE",
-                },
-                { status: 403 }
-            ));
-        }
+        const subscription = found ?? {
+            id: "",
+            plan_type: "FREE",
+            credits_remaining: 0,
+            credits_total: 0,
+            has_extension_access: true,
+        };
 
         // Check extension access: first from plan_configs, fallback to subscription flag, fallback to plan_type
         let hasAccess = subscription.has_extension_access;
 
-        if (!hasAccess) {
+        if (found && !hasAccess) {
             // Check the plan_configs table for the actual plan settings
             const planConfig = await db.plan_configs.findUnique({
                 where: { plan_type: subscription.plan_type },
@@ -85,7 +84,7 @@ export async function POST(req: Request) {
             }
         }
 
-        if (!hasAccess) {
+        if (found && !hasAccess) {
             // Final fallback: PRO and PREMIUM always get extension access
             if (subscription.plan_type === "PRO" || subscription.plan_type === "PREMIUM") {
                 hasAccess = true;

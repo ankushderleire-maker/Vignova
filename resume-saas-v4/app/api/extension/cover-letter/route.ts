@@ -3,6 +3,7 @@ import { getExtensionUser } from "@/lib/extensionAuth";
 import { db } from "@/lib/db";
 import { withCors, handleCorsOptions } from "@/lib/extensionCors";
 import { findExistingWork, duplicateResponse } from "@/lib/extensionDuplicate";
+import { checkAiAccess } from "@/lib/extensionPlan";
 
 export const OPTIONS = handleCorsOptions;
 
@@ -16,6 +17,10 @@ export async function POST(req: Request) {
 
         const body = await req.json();
         const { jobTitle, company, jobUrl, description, force = false } = body;
+
+        // Writing a letter calls a model, so it is Pro-and-up.
+        const denied = checkAiAccess(auth.subscription, "Cover Letter");
+        if (denied) return denied;
 
         if (!description || description.length < 50) {
             return withCors(NextResponse.json({ error: "Job description too short" }, { status: 400 }));

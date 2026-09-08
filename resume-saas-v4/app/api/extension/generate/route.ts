@@ -5,6 +5,7 @@ import { getTemplateGenerator } from "@/components/resume-html-templates";
 import { generatePdfFromHtml } from "@/lib/pdf/puppeteer";
 import { withCors, handleCorsOptions } from "@/lib/extensionCors";
 import { findExistingWork, findJobByUrl, duplicateResponse } from "@/lib/extensionDuplicate";
+import { checkAiAccess } from "@/lib/extensionPlan";
 
 // CORS preflight
 export async function OPTIONS() {
@@ -64,13 +65,11 @@ export async function POST(req: Request) {
             }
         }
 
-        // ─── 4. Check Credits ───
-        if (subscription!.credits_remaining <= 0) {
-            return withCors(NextResponse.json(
-                { error: "Insufficient credits. Please upgrade or wait for reset.", credits_remaining: 0 },
-                { status: 403 }
-            ));
-        }
+        // ─── 4. Plan and credits ───
+        // Tailoring calls a model, so it is Pro-and-up. Free accounts keep
+        // the match score, job tracking and autofill.
+        const denied = checkAiAccess(subscription, "Tailor Resume");
+        if (denied) return denied;
 
         // ─── 5. Fetch Default Master Profile (fallback to any profile) ───
         let profile = await db.master_profiles.findFirst({

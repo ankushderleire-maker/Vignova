@@ -228,6 +228,17 @@
         if (!hasValidExtensionContext()) return;
         isRenderingUI = true;
 
+        // A build the admin has retired stops offering its features. The
+        // check fails open, so an unreachable server changes nothing.
+        const updateState = await chrome.runtime
+            .sendMessage({ type: "GET_UPDATE_STATE" })
+            .catch(() => null);
+        if (updateState && updateState.blocked) {
+            renderUpdateRequired();
+            isRenderingUI = false;
+            return;
+        }
+
         // Check Auth
         const authStatus = await new Promise((resolve) => {
             chrome.runtime.sendMessage({ type: "GET_AUTH_STATUS" }, resolve);
@@ -254,19 +265,79 @@
             container.appendChild(loginBtn);
         } else {
             // Render Action Buttons
-            renderActionButtons(container);
+            renderActionButtons(container, Vignova_Plan.isPaid(authStatus.user));
         }
 
         isRenderingUI = false;
     }
 
-    function renderActionButtons(container) {
+    /**
+     * Replaces the bar with an update notice.
+     *
+     * A retired build should not keep offering buttons that will fail, but
+     * silently vanishing looks like the extension broke, so it says why.
+     */
+    function renderUpdateRequired() {
+        const container = document.getElementById(CONTAINER_ID);
+        if (!container) return;
+        container.textContent = "";
+
+        const logo = document.createElement("img");
+        logo.src = chrome.runtime.getURL("icons/logo.png");
+        logo.style.cssText = "height:34px;width:auto;object-fit:contain;margin-right:10px;flex:0 0 auto;";
+        container.appendChild(logo);
+
+        const note = document.createElement("span");
+        note.className = "vignova-update-note";
+        note.textContent = "Vignova needs updating to keep working.";
+        container.appendChild(note);
+
+        const btn = document.createElement("button");
+        btn.className = "vignova-tailor-btn";
+        btn.textContent = "Update";
+        btn.addEventListener("click", () => {
+            chrome.runtime.sendMessage({ type: "GET_UPDATE_STATE" }, (state) => {
+                window.open(state?.installUrl || "https://chromewebstore.google.com/search/vignova", "_blank");
+            });
+        });
+        container.appendChild(btn);
+    }
+
+    /**
+     * Turns an AI button into an upgrade prompt.
+     *
+     * The lock is only cosmetic — the server refuses these routes on a
+     * free plan regardless. This just stops the button lying about what
+     * pressing it will do.
+     */
+    function markUpgradeButton(btn, feature) {
+        btn.classList.add("vignova-btn-locked");
+        btn.title = feature + " needs a Pro plan. Your match score and job tracking stay free.";
+        btn.addEventListener("click", () => {
+            Vignova_Overlay.showLoading();
+            Vignova_Overlay.showUpgrade({
+                feature,
+                message: feature + " needs a Pro or Premium plan. Upgrade to use it \u2014 the match score, job tracking and status updates stay free.",
+            });
+        });
+    }
+
+    /**
+     * @param {boolean} isPaid  Pro or Premium. Free accounts keep the match
+     *   score and the status dropdown; the two AI buttons become an invite
+     *   to upgrade rather than buttons that fail when pressed.
+     */
+    function renderActionButtons(container, isPaid) {
         // 1. Tailor Button
         const tailorBtn = document.createElement("button");
         tailorBtn.id = BUTTON_ID;
         tailorBtn.className = "vignova-tailor-btn";
         setBtnContent(tailorBtn, "vignova-btn-icon", "⚡", "Tailor Resume");
-        tailorBtn.addEventListener("click", handleTailorClick);
+        if (isPaid) {
+            tailorBtn.addEventListener("click", handleTailorClick);
+        } else {
+            markUpgradeButton(tailorBtn, "Tailor Resume");
+        }
 
         // 2. Cover Letter Button
         const saveBtn = document.createElement("button");
@@ -274,7 +345,11 @@
         saveBtn.className = "vignova-save-btn";
         setBtnContent(saveBtn, "vignova-btn-icon", "✉️", "Cover Letter");
         saveBtn.style.marginLeft = "8px";
-        saveBtn.addEventListener("click", handleCoverLetterClick);
+        if (isPaid) {
+            saveBtn.addEventListener("click", handleCoverLetterClick);
+        } else {
+            markUpgradeButton(saveBtn, "Cover Letter");
+        }
 
         // Check stored state
         checkJobState(window.location.href, tailorBtn, saveBtn);

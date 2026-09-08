@@ -3,6 +3,7 @@ import { getExtensionUser } from "@/lib/extensionAuth";
 import { db } from "@/lib/db";
 import { withCors, handleCorsOptions } from "@/lib/extensionCors";
 import { callBackend } from "@/lib/career-ops";
+import { checkAiAccess } from "@/lib/extensionPlan";
 
 export const OPTIONS = handleCorsOptions;
 
@@ -69,6 +70,10 @@ export async function POST(req: Request) {
         const body = await req.json();
         const action: Action = body.action === "email" ? "email" : "hr-message";
         const { jobTitle, company, jobDescription, recipient, source } = body;
+
+        // Both writers call a model, so they are Pro-and-up.
+        const denied = checkAiAccess(auth.subscription, action === "email" ? "Apply by Email" : "Message HR");
+        if (denied) return denied;
 
         if (!jobTitle && !jobDescription) {
             return withCors(

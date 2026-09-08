@@ -16,6 +16,8 @@ type ExtensionSettings = {
     extensionVersion: string;
     extensionName: string;
     installUrl: string;
+    minVersion: string;
+    updateMessage: string;
     updatedAt: string;
 };
 
@@ -31,6 +33,8 @@ export default function AdminExtensionPage() {
     const [extVersion, setExtVersion] = useState("");
     const [extName,    setExtName]    = useState("");
     const [installUrl, setInstallUrl] = useState("");
+    const [minVersion, setMinVersion] = useState("");
+    const [updateMsg,  setUpdateMsg]  = useState("");
 
     const load = useCallback(async () => {
         setLoading(true);
@@ -44,6 +48,8 @@ export default function AdminExtensionPage() {
             setExtVersion(data.extensionVersion);
             setExtName(data.extensionName);
             setInstallUrl(data.installUrl);
+            setMinVersion(data.minVersion || "0.0.0");
+            setUpdateMsg(data.updateMessage || "");
         } catch (e: any) {
             setError(e?.message || "Failed to load settings");
         } finally {
@@ -66,6 +72,8 @@ export default function AdminExtensionPage() {
                     extensionVersion: extVersion.trim(),
                     extensionName:    extName.trim(),
                     installUrl:       installUrl.trim(),
+                    minVersion:       minVersion.trim(),
+                    updateMessage:    updateMsg.trim(),
                 }),
             });
             if (!res.ok) throw new Error((await res.json()).error || "Save failed");
@@ -87,7 +95,9 @@ export default function AdminExtensionPage() {
             extId      !== settings.extensionId      ||
             extVersion !== settings.extensionVersion ||
             extName    !== settings.extensionName    ||
-            installUrl !== settings.installUrl
+            installUrl !== settings.installUrl        ||
+            minVersion !== (settings.minVersion || "0.0.0") ||
+            updateMsg  !== (settings.updateMessage || "")
         );
 
     return (
@@ -215,6 +225,49 @@ export default function AdminExtensionPage() {
                         <p className="text-[11px] text-gray-500 mt-1.5">
                             Chrome Web Store URL users are sent to when the extension is not detected.
                             Defaults to /dashboard/extension if left blank.
+                        </p>
+                    </div>
+
+                    {/* Force update — the store cannot retire a build for us, so the
+                        extension has to block itself. */}
+                    <div className="pt-5 border-t border-white/5">
+                        <label className="text-xs font-bold uppercase tracking-wider text-gray-400 block mb-1.5">
+                            Minimum Allowed Version
+                        </label>
+                        <input
+                            type="text"
+                            value={minVersion}
+                            onChange={(e) => setMinVersion(e.target.value)}
+                            placeholder="0.0.0"
+                            className="w-full px-3 py-2.5 bg-zinc-900 border border-white/10 rounded-lg text-sm text-white font-mono placeholder:text-gray-600 focus:outline-none focus:border-blue-500/50"
+                        />
+                        <p className="text-[11px] text-gray-500 mt-1.5">
+                            Any installed extension older than this blocks itself and shows an
+                            update screen — the buttons on LinkedIn and Indeed stop appearing
+                            too. Use it to retire a build the Web Store is still serving.
+                            Leave at <span className="font-mono">0.0.0</span> to block nothing.
+                        </p>
+                        {minVersion.trim() !== "0.0.0" && minVersion.trim() !== "" && (
+                            <p className="text-[11px] text-amber-400/90 mt-2">
+                                Anyone below {minVersion.trim()} loses the extension until they update.
+                            </p>
+                        )}
+                    </div>
+
+                    <div>
+                        <label className="text-xs font-bold uppercase tracking-wider text-gray-400 block mb-1.5">
+                            Update Message
+                        </label>
+                        <input
+                            type="text"
+                            value={updateMsg}
+                            onChange={(e) => setUpdateMsg(e.target.value)}
+                            placeholder="e.g. This version stopped working with LinkedIn's new layout."
+                            className="w-full px-3 py-2.5 bg-zinc-900 border border-white/10 rounded-lg text-sm text-white placeholder:text-gray-600 focus:outline-none focus:border-blue-500/50"
+                        />
+                        <p className="text-[11px] text-gray-500 mt-1.5">
+                            Shown on the block screen. Say what broke, so the prompt reads as a
+                            fix rather than a nag.
                         </p>
                     </div>
                 </div>
