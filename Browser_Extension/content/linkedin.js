@@ -57,6 +57,22 @@
         return jobId;
     }
 
+    /**
+     * The posting's stable URL, whatever page it is being viewed from.
+     *
+     * On the search view the address bar says /jobs/search/?currentJobId=123,
+     * so sending window.location.href tracked the search page instead of the
+     * job — every posting in one search collapsed to a single row, and the
+     * status dropdown could never find the job the generate buttons had
+     * created. Everything that sends a jobUrl uses this.
+     */
+    function canonicalJobUrl() {
+        const id = getJobIdFromUrl();
+        return id
+            ? `https://www.linkedin.com/jobs/view/${id}/`
+            : window.location.href.split("?")[0];
+    }
+
     let currentJobId = getJobIdFromUrl();
 
     // ─── Applied/Saved badges on job list cards ───
@@ -304,6 +320,20 @@
     }
 
     /**
+     * Briefly confirms a status change on the dropdown itself.
+     *
+     * Opening the whole overlay to say "Saved" would be heavier than the
+     * action deserves, but with no feedback at all people press it twice.
+     */
+    function flashStatusSaved(select, created) {
+        const note = document.createElement("span");
+        note.className = "vignova-status-flash";
+        note.textContent = created ? "Saved to tracker" : "Status updated";
+        select.insertAdjacentElement("afterend", note);
+        setTimeout(() => note.remove(), 2600);
+    }
+
+    /**
      * Turns an AI button into an upgrade prompt.
      *
      * The lock is only cosmetic — the server refuses these routes on a
@@ -352,7 +382,8 @@
         }
 
         // Check stored state
-        checkJobState(window.location.href, tailorBtn, saveBtn);
+        // Canonical, because that is the key the generate handlers write under.
+        checkJobState(canonicalJobUrl(), tailorBtn, saveBtn);
 
         // Add Vignova Branding Logo
         const logoImg = document.createElement("img");
@@ -396,16 +427,31 @@
             const previous = statusSelect.dataset.current || "";
             statusSelect.disabled = true;
             try {
+                // The job details go with the status so an untracked posting
+                // is saved rather than refused — picking "Saved" on a job you
+                // have not tailored is the obvious way to add it.
+                let job = {};
+                try { job = (await scrapeLinkedInJob()) || {}; } catch { job = {}; }
                 const res = await chrome.runtime.sendMessage({
                     type: "API_SET_STATUS",
-                    data: { jobUrl: window.location.href, status },
+                    data: {
+                        jobUrl: canonicalJobUrl(),
+                        status,
+                        jobTitle: job.jobTitle,
+                        company: job.company,
+                        location: job.location,
+                        description: job.jobDescription,
+                    },
                 });
                 if (res?.success) {
                     statusSelect.dataset.current = status;
+                    flashStatusSaved(statusSelect, res.created);
                 } else {
-                    // Most often: the job isn't tracked yet. Say so instead of
-                    // silently leaving a status the server never accepted.
-                    Vignova_Overlay.showError(res?.error || "Could not set status.");
+                    Vignova_Overlay.showError(
+                        res?.error || "Could not set status.",
+                        null,
+                        "Couldn't update status"
+                    );
                     statusSelect.value = previous;
                 }
             } catch {
@@ -671,7 +717,7 @@
             return;
         }
 
-        const currentUrl = (() => { const id = getJobIdFromUrl(); return id ? `https://www.linkedin.com/jobs/view/${id}/` : window.location.href.split("?")[0]; })();
+        const currentUrl = canonicalJobUrl();
 
         try {
             // Goes through Vignova_Generate so an earlier generation for
@@ -737,8 +783,7 @@
             return;
         }
 
-        const jobId = getJobIdFromUrl();
-        const currentUrl = jobId ? `https://www.linkedin.com/jobs/view/${jobId}/` : window.location.href.split('?')[0];
+        const currentUrl = canonicalJobUrl();
 
         try {
             // Goes through Vignova_Generate so an earlier generation for

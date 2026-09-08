@@ -2,16 +2,24 @@ import { NextResponse } from "next/server";
 import { getExtensionUser } from "@/lib/extensionAuth";
 import { db } from "@/lib/db";
 import { withCors, handleCorsOptions } from "@/lib/extensionCors";
+import { findJobByUrl } from "@/lib/extensionDuplicate";
 
 export const OPTIONS = handleCorsOptions;
 
 /**
- * Sets the pipeline status of a tracked job from the extension, so someone can
- * mark an application as sent without opening the dashboard.
+ * Sets the pipeline status of a job from the extension, so someone can save a
+ * posting or mark it applied without opening the dashboard.
+ *
+ * Creates the job when it isn't tracked yet. Picking "Saved" on a posting you
+ * have never touched is the most natural way to save it, and refusing with
+ * "this job isn't in your tracker yet" made the dropdown look broken — there
+ * was no other way to add it from the page.
  *
  * Matched by jobUrl rather than an id: the extension knows the page it is on,
- * not our primary keys. If the job isn't tracked yet there is nothing to move,
- * which the caller shows as a prompt to tailor a resume first.
+ * not our primary keys. It must send the canonical job URL — the one the
+ * generate routes use — or the same posting ends up tracked twice.
+ *
+ * Free on every plan: no model is involved.
  */
 
 const ALLOWED = new Set(["SAVED", "APPLIED", "INTERVIEW", "OFFER", "REJECTED"]);
@@ -25,7 +33,7 @@ export async function POST(req: Request) {
             );
         }
 
-        const { jobUrl, status } = await req.json();
+        const { jobUrl, status, jobTitle, company, location, description } = await req.json();
 
         if (!jobUrl || typeof jobUrl !== "string") {
             return withCors(NextResponse.json({ error: "A job URL is required." }, { status: 400 }));
@@ -34,26 +42,52 @@ export async function POST(req: Request) {
             return withCors(NextResponse.json({ error: "Unknown status." }, { status: 400 }));
         }
 
-        // Postings carry tracking parameters that differ between visits, so
-        // match on the path as well as the exact URL.
-        const bare = jobUrl.split("?")[0];
-        const job = await db.jobApplication.findFirst({
-            where: {
-                userId: auth.user.id,
-                OR: [{ jobUrl }, { jobUrl: bare }, { jobUrl: { startsWith: bare } }],
-            },
-            orderBy: { createdAt: "desc" },
-            select: { id: true },
-        });
+        const existing = await findJobByUrl(auth.user.id, jobUrl);
 
-        if (!job) {
+        if (existing) {
+            const job = await db.jobApplication.update({
+                where: { id: existing.id },
+                data: {
+                    status,
+                    // Fill in anything the row is missing — a job first created
+                    // by a status change has no description until the user
+                    // opens it again with the scraper running.
+                    ...(jobTitle && !existing.jobTitle ? { jobTitle } : {}),
+                    ...(company && !existing.company ? { company } : {}),
+                },
+                select: { id: true, status: true },
+            });
+            return withCors(NextResponse.json({ ok: true, jobId: job.id, status: job.status, created: false }));
+        }
+
+        // Not tracked yet — save it. The scraped title and company are the only
+        // things worth requiring; everything else can be filled in later from
+        // the dashboard.
+        if (!jobTitle || !company) {
             return withCors(
-                NextResponse.json({ error: "This job isn't in your tracker yet." }, { status: 404 })
+                NextResponse.json(
+                    { error: "Could not read the job title from this page. Open the posting and try again." },
+                    { status: 400 }
+                )
             );
         }
 
-        await db.jobApplication.update({ where: { id: job.id }, data: { status } });
-        return withCors(NextResponse.json({ ok: true, jobId: job.id, status }));
+        const job = await db.jobApplication.create({
+            data: {
+                userId: auth.user.id,
+                company: String(company).slice(0, 300),
+                jobTitle: String(jobTitle).slice(0, 300),
+                description: typeof description === "string" ? description.slice(0, 20000) : "",
+                location: typeof location === "string" ? location.slice(0, 300) : "",
+                jobUrl,
+                sourceUrl: jobUrl,
+                source: "extension",
+                status,
+            },
+            select: { id: true, status: true },
+        });
+
+        return withCors(NextResponse.json({ ok: true, jobId: job.id, status: job.status, created: true }));
     } catch (error) {
         console.error("[EXTENSION_JOB_STATUS]", error);
         return withCors(NextResponse.json({ error: "Could not set the status." }, { status: 500 }));
