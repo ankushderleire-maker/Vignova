@@ -19,6 +19,9 @@ model users {
   resetTokenExpiry        DateTime?
   onboarding_done         Boolean                  @default(false)
   country                 String?                  @db.VarChar(2)
+  /// Contact number in E.164 (a leading + and digits only), so the country
+  /// code travels with it and the value is unambiguous wherever it is read.
+  phone                   String?                  @db.VarChar(20)
   status                  String                   @default("ACTIVE") @db.VarChar(16)
   generated_resumes       GeneratedResume[]
   job_applications        JobApplication[]

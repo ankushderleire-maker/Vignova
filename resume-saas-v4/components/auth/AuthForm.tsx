@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { Mail, ChevronDown, Loader2, Lock, Eye, EyeOff } from "lucide-react";
 import Link from "next/link";
 import { COUNTRIES, findCountry, flagOf, DEFAULT_COUNTRY } from "@/lib/countries";
+import { stripDialPrefix } from "@/lib/phone";
 
 interface AuthFormProps {
     defaultMode?: "signin" | "signup";
@@ -45,6 +46,7 @@ export function AuthForm({ defaultMode = "signup" }: AuthFormProps) {
                         email,
                         password,
                         country,
+                        phone,
                     }),
                 });
 
@@ -199,7 +201,14 @@ export function AuthForm({ defaultMode = "signup" }: AuthFormProps) {
                                     placeholder="(775) 351-6501"
                                     className="w-full bg-transparent border-none focus:outline-none focus:ring-0 text-sm text-white placeholder:text-gray-500 px-4 py-2.5"
                                     value={phone}
-                                    onChange={(e) => setPhone(e.target.value)}
+                                    // Digits only, at the point of typing: letters and
+                                    // punctuation never enter state, so what is shown is
+                                    // exactly what gets sent. inputMode brings up the
+                                    // numeric keypad on a phone.
+                                    onChange={(e) => setPhone(stripDialPrefix(e.target.value, selectedCountry?.dial ?? ""))}
+                                    inputMode="numeric"
+                                    autoComplete="tel-national"
+                                    maxLength={15}
                                     tabIndex={mode === 'signup' ? 0 : -1}
                                 />
                             </div>

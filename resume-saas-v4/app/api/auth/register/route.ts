@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { hashPassword } from '@/lib/auth';
+import { toE164 } from '@/lib/phone';
+import { findCountry } from '@/lib/countries';
 
 // ── Input Validation ──
 const EMAIL_REGEX = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
@@ -60,7 +62,7 @@ function validateRegistrationInput(email: string, password: string, fullName: st
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { email, password, fullName, country } = body;
+    const { email, password, fullName, country, phone } = body;
 
     // Validate input
     const validationErrors = validateRegistrationInput(email, password, fullName, country);
@@ -85,6 +87,13 @@ export async function POST(req: Request) {
         );
     }
 
+    // Re-derived here rather than trusted from the browser, and from the
+    // country the user picked rather than a dial code they could send.
+    // Optional: an unfilled or unusable number is stored as absent, not
+    // an error, since nothing on the form requires it.
+    const dial = findCountry(country)?.dial;
+    const normalizedPhone = dial ? toE164(dial, String(phone ?? '')) : null;
+
     const hashed = await hashPassword(password);
 
     // Create User
@@ -94,6 +103,7 @@ export async function POST(req: Request) {
         password_hash: hashed,
         full_name: fullName.trim(),
         country: country,
+        phone: normalizedPhone,
         // Create related records automatically
         subscriptions: {
             create: { plan_type: "FREE", credits_remaining: 3 }
