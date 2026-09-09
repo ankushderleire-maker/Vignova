@@ -48,7 +48,7 @@ export function JobDescriptionModal({
     onClose: () => void;
     onOpenStudio: (jobId: string) => void;
 }) {
-    const { jd, formatting } = useFormattedJd(job);
+    const { jd, formatting, refining } = useFormattedJd(job);
     const [tab, setTab] = useState<"description" | "key" | "match">("description");
 
     useEffect(() => setTab("description"), [job?.id]);
@@ -136,7 +136,7 @@ export function JobDescriptionModal({
             <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_296px] gap-5 items-start">
                 <div className="min-w-0 rounded-xl border border-[var(--border-color)] bg-[var(--background)] p-4 sm:p-5">
                     {tab === "description" ? (
-                        <JobDescriptionBody job={job} jd={jd} />
+                        <JobDescriptionBody job={job} jd={jd} refining={refining} />
                     ) : tab === "key" ? (
                         <>
                             <h4 className="text-sm font-bold text-[var(--foreground)] mb-3">Key Information</h4>

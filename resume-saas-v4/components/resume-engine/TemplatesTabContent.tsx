@@ -8,14 +8,64 @@ import { TemplateThumbnail } from './TemplateThumbnail';
 export function TemplatesTabContent() {
     const { selectedTemplate, setSelectedTemplate, setHoveredTemplate } = useResumeStore();
     const [searchQuery, setSearchQuery] = useState('');
+    const [layout, setLayout] = useState<'single' | 'two'>('single');
 
+    // Layout leads, because it is the only choice here that changes how a
+    // parser reads the page. Twenty-five names in a flat grid asked people
+    // to pick on looks alone.
     const filteredTemplates = TEMPLATES.filter(template =>
-        template.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        template.description.toLowerCase().includes(searchQuery.toLowerCase())
+        template.layout === layout && (
+            template.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            template.description.toLowerCase().includes(searchQuery.toLowerCase())
+        )
     );
+
+    const counts = {
+        single: TEMPLATES.filter(t => t.layout === 'single').length,
+        two: TEMPLATES.filter(t => t.layout === 'two').length,
+    };
+
+    const LAYOUTS = [
+        {
+            id: 'single' as const,
+            name: 'Single Column',
+            blurb: 'One top-to-bottom flow. The safest choice for applicant tracking systems.',
+        },
+        {
+            id: 'two' as const,
+            name: 'Two Column',
+            blurb: 'A sidebar beside the main content. Denser, but some parsers read the columns out of order.',
+        },
+    ];
 
     return (
         <div className="flex-1 flex flex-col overflow-hidden animate-slide-down">
+            {/* Layout chooser */}
+            <div className="p-4 pb-0">
+                <div className="grid grid-cols-2 gap-2">
+                    {LAYOUTS.map(l => (
+                        <button
+                            key={l.id}
+                            onClick={() => setLayout(l.id)}
+                            className={`text-left rounded-xl border p-3 transition-colors ${
+                                layout === l.id
+                                    ? 'border-[var(--primary)] bg-[var(--primary)]/10'
+                                    : 'border-[var(--border-color)] hover:border-[var(--primary)]/40'
+                            }`}
+                        >
+                            <div className="flex items-center gap-2 mb-1">
+                                <LayoutGlyph kind={l.id} active={layout === l.id} />
+                                <span className={`text-sm font-bold ${layout === l.id ? 'text-[var(--primary)]' : 'text-[var(--foreground)]'}`}>
+                                    {l.name}
+                                </span>
+                                <span className="ml-auto text-[10px] font-bold text-[var(--text-secondary)]">{counts[l.id]}</span>
+                            </div>
+                            <p className="text-[11px] leading-snug text-[var(--text-secondary)]">{l.blurb}</p>
+                        </button>
+                    ))}
+                </div>
+            </div>
+
             {/* Search Bar */}
             <div className="p-4 border-b border-white/10">
                 <div className="relative">
@@ -94,5 +144,31 @@ export function TemplatesTabContent() {
                 )}
             </div>
         </div>
+    );
+}
+
+/** A two-up sketch of the layout, so the choice is legible without reading. */
+function LayoutGlyph({ kind, active }: { kind: 'single' | 'two'; active: boolean }) {
+    const bar = active ? 'bg-[var(--primary)]/70' : 'bg-[var(--text-secondary)]/50';
+    return (
+        <span className={`w-5 h-6 rounded-[3px] border p-[3px] flex gap-[2px] shrink-0 ${active ? 'border-[var(--primary)]/60' : 'border-[var(--text-secondary)]/40'}`}>
+            {kind === 'single' ? (
+                <span className="flex-1 flex flex-col gap-[2px]">
+                    <span className={`h-[2px] rounded-full ${bar}`} />
+                    <span className={`h-[2px] rounded-full ${bar}`} />
+                    <span className={`h-[2px] rounded-full ${bar}`} />
+                    <span className={`h-[2px] w-2/3 rounded-full ${bar}`} />
+                </span>
+            ) : (
+                <>
+                    <span className={`w-[5px] rounded-[1px] ${bar}`} />
+                    <span className="flex-1 flex flex-col gap-[2px]">
+                        <span className={`h-[2px] rounded-full ${bar}`} />
+                        <span className={`h-[2px] rounded-full ${bar}`} />
+                        <span className={`h-[2px] w-2/3 rounded-full ${bar}`} />
+                    </span>
+                </>
+            )}
+        </span>
     );
 }
