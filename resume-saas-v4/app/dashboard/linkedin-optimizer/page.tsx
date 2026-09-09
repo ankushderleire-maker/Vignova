@@ -24,6 +24,7 @@ import {
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import LinkedInProfileView, { summarizeProfile } from "@/components/linkedin/LinkedInProfileView";
+import OptimizationReport from "@/components/linkedin/OptimizationReport";
 import { cleanSkills, sanitizeLinkedInProfile } from "@/lib/linkedin-skills";
 
 interface LinkedInAnalysisResult {
@@ -936,54 +937,18 @@ function LinkedInOptimizerContent() {
                     const delta = Math.max(0, Math.round(optimizedScore - currentScore));
                     return (
                         <div className="rounded-2xl bg-[var(--background)] border border-emerald-200/70 dark:border-emerald-800/40 p-4 sm:p-5 space-y-4 shadow-sm">
-                            <div className="bg-[var(--background)]/95 border border-emerald-200/80 dark:border-emerald-800/40 rounded-xl p-4 shadow-sm">
-                                <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-                                    <div className="flex items-start gap-3">
-                                        <div className="w-10 h-10 rounded-lg bg-[#0a66c2] text-white flex items-center justify-center shrink-0">
-                                            <Linkedin className="w-5 h-5" />
-                                        </div>
-                                        <div>
-                                        <p className="text-[11px] font-bold uppercase tracking-wider text-[#0a66c2]">AI profile transformation</p>
-                                        <h2 className="text-xl font-bold text-[var(--foreground)] mt-1">Current profile vs optimized profile</h2>
-                                        <p className="text-xs text-[var(--text-secondary)] mt-1">Review every rewritten section side by side before applying changes on LinkedIn.</p>
-                                        </div>
-                                    </div>
-                                    <div className="flex items-center gap-2 rounded-xl bg-[#0a66c2]/5 p-2">
-                                        <div className="hidden sm:block text-xs font-semibold text-[var(--text-secondary)] px-2">Profile score</div>
-                                        <div className="text-center rounded-lg bg-black/5 dark:bg-white/5 px-4 py-2 min-w-[88px]">
-                                            <p className="text-[10px] text-[var(--text-secondary)] font-semibold uppercase">Before</p>
-                                            <p className="text-2xl font-bold text-[var(--foreground)]">{Math.round(currentScore)}</p>
-                                        </div>
-                                        <ArrowRight className="w-5 h-5 text-[var(--text-secondary)]" />
-                                        <div className="text-center rounded-lg bg-green-500/10 border border-green-500/20 px-4 py-2 min-w-[88px]">
-                                            <p className="text-[10px] text-green-700 dark:text-green-400 font-semibold uppercase">After</p>
-                                            <p className="text-2xl font-bold text-green-600 dark:text-green-500">{Math.round(optimizedScore)}</p>
-                                        </div>
-                                        <div className="rounded-full bg-green-500/10 text-green-700 dark:text-green-400 px-3 py-1 text-xs font-bold">+{delta}</div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {captured.length > 0 && (
-                                <div className="bg-[var(--background)] border border-[var(--border-color)] rounded-xl p-4 shadow-sm">
-                                    <h3 className="text-xs font-bold text-[var(--foreground)] mb-3 flex items-center gap-2">
-                                        <CheckCircle2 className="w-3.5 h-3.5 text-[var(--primary)]" /> Fetched from LinkedIn
-                                    </h3>
-                                    <div className="grid gap-2" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))" }}>
-                                        {captured.map((c) => (
-                                            <div key={c.label} className="rounded-lg bg-black/5 dark:bg-white/5 px-3 py-2 text-center">
-                                                <p className="text-base font-bold text-[var(--foreground)] leading-none">{c.value}</p>
-                                                <p className="text-[10px] text-[var(--text-secondary)] mt-1">{c.label}</p>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
-
-                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                                {renderScoreBreakdown(normalizedCurrentScores, "Before breakdown", currentProfile)}
-                                {renderScoreBreakdown(normalizedOptimizedScores, "After breakdown", optimizedProfile, true)}
-                            </div>
+                            <OptimizationReport
+                                currentScore={currentScore}
+                                optimizedScore={optimizedScore}
+                                currentScores={normalizedCurrentScores}
+                                optimizedScores={normalizedOptimizedScores}
+                                currentProfile={currentProfile}
+                                optimizedProfile={optimizedProfile}
+                                missingKeywords={result?.recommendations
+                                    ?.filter((r: any) => r.category === "keyword")
+                                    .map((r: any) => r.message) || []}
+                                profileUrl={linkedinUrl}
+                            />
 
                             <div className="relative grid grid-cols-1 xl:grid-cols-2 gap-5 items-start">
                                 <div className="space-y-3 min-w-0 rounded-xl bg-[var(--background)] p-3">
