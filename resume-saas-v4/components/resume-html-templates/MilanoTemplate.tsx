@@ -29,6 +29,7 @@ export const MilanoTemplate: React.FC<HtmlTemplateProps> = ({ data, designSettin
                         data.contact?.phone,
                         data.contact?.location,
                         data.contact?.linkedin,
+                        data.contact?.github,
                         data.contact?.website,
                     ].filter(Boolean).map((item, i, arr) => (
                         <React.Fragment key={i}>
@@ -94,7 +95,7 @@ export const MilanoTemplate: React.FC<HtmlTemplateProps> = ({ data, designSettin
                                     <div className="mil-entry-role" data-editable={`education-${i}-degree`}>
                                         {edu.degree}{edu.field ? ` in ${edu.field}` : ''}
                                     </div>
-                                    <div className="mil-entry-org" data-editable={`education-${i}-school`}>{edu.school}</div>
+                                    <div className="mil-entry-org" data-editable={`education-${i}-school`}>{edu.school}{edu.grade ? ` · ${edu.grade}` : ''}</div>
                                 </div>
                                 <div className="mil-entry-date">{edu.startDate} – {edu.endDate}</div>
                             </div>

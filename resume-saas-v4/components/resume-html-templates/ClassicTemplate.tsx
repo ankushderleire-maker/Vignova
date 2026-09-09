@@ -18,6 +18,7 @@ export const ClassicTemplate: React.FC<HtmlTemplateProps> = ({ data, designSetti
             {/* Header */}
             <header className="header no-break" style={{ marginBottom: `${headerSettings.spacing}px` }} data-section="header">
                 <h1 className="name" data-editable="fullName">{data.fullName}</h1>
+                {data.jobTitle && <p className="job-title" data-editable="jobTitle">{data.jobTitle}</p>}
                 <div className="contact-row">
                     {data.contact?.location && <span data-editable="location">{data.contact.location}</span>}
                     {data.contact?.phone && <span className="separator">|</span>}
@@ -28,6 +29,16 @@ export const ClassicTemplate: React.FC<HtmlTemplateProps> = ({ data, designSetti
                 {data.contact?.linkedin && (
                     <a href={`https://${data.contact.linkedin}`} className="link" data-editable="linkedin">
                         {data.contact.linkedin}
+                    </a>
+                )}
+                {data.contact?.website && (
+                    <a href={`https://${data.contact.website}`} className="link" data-editable="website">
+                        {data.contact.website}
+                    </a>
+                )}
+                {data.contact?.github && (
+                    <a href={`https://${data.contact.github}`} className="link" data-editable="github">
+                        {data.contact.github}
                     </a>
                 )}
             </header>
@@ -59,7 +70,7 @@ export const ClassicTemplate: React.FC<HtmlTemplateProps> = ({ data, designSetti
                             style={{ marginBottom: `${experienceSettings.spacing / 2}px` }}
                         >
                             <div className="exp-header">
-                                <span className="company">{exp.company}</span>
+                                <span className="company">{exp.company}{exp.location ? ` · ${exp.location}` : ''}</span>
                                 <span className="date">{exp.startDate} - {exp.endDate}</span>
                             </div>
                             <div className="role">{exp.role}</div>
@@ -124,8 +135,8 @@ export const ClassicTemplate: React.FC<HtmlTemplateProps> = ({ data, designSetti
                         >
                             <div className="edu-row">
                                 <div>
-                                    <span className="school">{edu.school}</span>
-                                    <span className="degree">, {edu.degree}</span>
+                                    <span className="school">{edu.school}{edu.grade ? ` · ${edu.grade}` : ''}</span>
+                                    <span className="degree">, {edu.degree}{edu.field ? ' · ' + edu.field : ''}</span>
                                 </div>
                                 <span className="date">{edu.startDate} - {edu.endDate}</span>
                             </div>
@@ -280,134 +291,30 @@ ${BASE_STYLES}
 /**
  * Generate full HTML document for PDF rendering
  */
+/**
+ * Renders the component, the way every other template does.
+ *
+ * This used to be a second, hand-written copy of the markup, and the two
+ * had drifted: the string version never picked up job location, field of
+ * study, grade, GitHub or the website link, so those were dropped for
+ * anyone on this template no matter what the component said.
+ */
 export function generateClassicHtml(data: any, designSettings?: any): string {
-    // We need to render the component to HTML
-    // This is a simplified version for the API
-    const cssVars = getCssVariables(designSettings);
-    const styleString = Object.entries(cssVars)
-        .map(([key, value]) => `${key}: ${value}`)
-        .join('; ');
+    const { renderToStaticMarkup } = require('react-dom/server');
+    const html = renderToStaticMarkup(<ClassicTemplate data={data} designSettings={designSettings} />);
 
-    const headerSettings = getSettings(designSettings, 'header');
-    const summarySettings = getSettings(designSettings, 'summary');
-    const experienceSettings = getSettings(designSettings, 'experience');
-    const educationSettings = getSettings(designSettings, 'education');
-    const skillsSettings = getSettings(designSettings, 'skills');
-
-    const experienceHtml = (data.experience || []).map((exp: any) => `
-        <div class="experience-item no-break" style="margin-bottom: ${experienceSettings.spacing / 2}px">
-            <div class="exp-header">
-                <span class="company">${exp.company || ''}</span>
-                <span class="date">${exp.startDate || ''} - ${exp.endDate || ''}</span>
-            </div>
-            <div class="role">${exp.role || ''}</div>
-            <div class="description text-wrap" style="line-height: ${experienceSettings.lineHeight}">
-                ${splitDescription(exp.description).map((line: string) => `<p style="margin-bottom: 4px">• ${line}</p>`).join('')}
-            </div>
-        </div>
-    `).join('');
-
-    const educationHtml = (data.education || []).map((edu: any) => `
-        <div class="education-item no-break" style="margin-bottom: ${educationSettings.spacing / 2}px">
-            <div class="edu-row">
-                <div>
-                    <span class="school">${edu.school || ''}</span>
-                    <span class="degree">, ${edu.degree || ''}</span>
-                </div>
-                <span class="date">${edu.startDate || ''} - ${edu.endDate || ''}</span>
-            </div>
-        </div>
-    `).join('');
-
-    const projectsHtml = (data.projects || []).map((proj: any) => `
-        <div class="project-item no-break" style="margin-bottom: ${experienceSettings.spacing / 2}px">
-            <div class="proj-header">
-                <span class="company">${proj.name || ''}</span>
-                ${proj.link ? `<a href="${proj.link}" class="link" target="_blank" style="margin-left: 6px">Link</a>` : ''}
-            </div>
-            ${proj.techStack ? `<div class="role" style="color: #555; font-style: normal; font-size: 14px">${proj.techStack}</div>` : ''}
-            <div class="description text-wrap" style="line-height: ${experienceSettings.lineHeight}">
-                ${splitDescription(proj.description).map((line: string) => `<p style="margin-bottom: 4px">• ${line}</p>`).join('')}
-            </div>
-        </div>
-    `).join('');
-
-    const certificationsHtml = (data.certifications || []).map((cert: string) => `
-        <p style="margin-bottom: 4px">• ${cert}</p>
-    `).join('');
-
-    const skills = Array.isArray(data.skills)
-        ? data.skills.join(', ')
-        : (data.skills?.technical || '');
-
-    return `<!DOCTYPE html>
-<html>
+    return `
+<!DOCTYPE html>
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <title>${data.fullName} - Resume</title>
     <style>${CLASSIC_STYLES}</style>
 </head>
 <body>
-    <div class="resume-page classic-template" style="${styleString}">
-        <header class="header no-break" style="margin-bottom: ${headerSettings.spacing}px">
-            <h1 class="name" data-editable="fullName">${data.fullName || ''}</h1>
-            <div class="contact-row">
-                ${data.contact?.location ? `<span data-editable="location">${data.contact.location}</span>` : ''}
-                ${data.contact?.phone ? `<span class="separator">|</span><span data-editable="phone">${data.contact.phone}</span>` : ''}
-                ${data.contact?.email ? `<span class="separator">|</span><span data-editable="email">${data.contact.email}</span>` : ''}
-            </div>
-            ${data.contact?.linkedin ? `<a href="https://${data.contact.linkedin}" class="link" data-editable="linkedin">${data.contact.linkedin}</a>` : ''}
-        </header>
-
-        ${data.summary ? `
-        <section class="section no-break" style="margin-bottom: ${summarySettings.spacing}px">
-            <h2 class="section-title">Professional Summary</h2>
-            <p class="summary-text text-wrap" data-editable="summary" style="line-height: ${summarySettings.lineHeight}">
-                ${data.summary}
-            </p>
-        </section>
-        ` : ''}
-
-        ${data.experience?.length ? `
-        <section class="section" style="margin-bottom: ${experienceSettings.spacing}px">
-            <h2 class="section-title">Professional Experience</h2>
-            ${experienceHtml}
-        </section>
-        ` : ''}
-
-        ${data.projects?.length ? `
-        <section class="section" style="margin-bottom: ${experienceSettings.spacing}px">
-            <h2 class="section-title">Projects</h2>
-            ${projectsHtml}
-        </section>
-        ` : ''}
-
-        ${data.education?.length ? `
-        <section class="section" style="margin-bottom: ${educationSettings.spacing}px">
-            <h2 class="section-title">Education</h2>
-            ${educationHtml}
-        </section>
-        ` : ''}
-        
-        ${data.certifications?.length ? `
-        <section class="section no-break" style="margin-bottom: ${educationSettings.spacing}px">
-            <h2 class="section-title">Certifications</h2>
-            <div class="description text-wrap" style="font-size: ${educationSettings.fontSize}px; line-height: ${educationSettings.lineHeight}">
-                ${certificationsHtml}
-            </div>
-        </section>
-        ` : ''}
-
-        ${skills ? `
-        <section class="section no-break">
-            <h2 class="section-title">Skills</h2>
-            <p class="skills-text text-wrap" style="line-height: ${skillsSettings.lineHeight}">
-                ${skills}
-            </p>
-        </section>
-        ` : ''}
-    </div>
+    ${html}
 </body>
-</html>`;
+</html>
+    `.trim();
 }

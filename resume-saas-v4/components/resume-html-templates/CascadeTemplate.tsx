@@ -28,6 +28,7 @@ export const CascadeTemplate: React.FC<HtmlTemplateProps> = ({ data, designSetti
                         {data.contact?.phone && <div className="sb-item">{data.contact.phone}</div>}
                         {data.contact?.location && <div className="sb-item">{data.contact.location}</div>}
                         {data.contact?.linkedin && <div className="sb-item">{data.contact.linkedin}</div>}
+                        {data.contact?.github && <div className="sb-item">{data.contact.github}</div>}
                         {data.contact?.website && <div className="sb-item">{data.contact.website}</div>}
                     </div>
 
@@ -48,7 +49,7 @@ export const CascadeTemplate: React.FC<HtmlTemplateProps> = ({ data, designSetti
                             {data.education.map((edu: any, i: number) => (
                                 <div key={i} className="sb-edu">
                                     <div className="sb-edu-degree">{edu.degree}{edu.field ? `, ${edu.field}` : ''}</div>
-                                    <div className="sb-edu-school">{edu.school}</div>
+                                    <div className="sb-edu-school">{edu.school}{edu.grade ? ` · ${edu.grade}` : ''}</div>
                                     <div className="sb-edu-date">{edu.startDate} – {edu.endDate}</div>
                                 </div>
                             ))}
@@ -213,7 +214,7 @@ ${BASE_STYLES}
 .skill-tag {
     background: rgba(255,255,255,0.15);
     color: rgba(255,255,255,0.9);
-    font-size: 9px;
+    font-size: 11px;
     padding: 3px 7px;
     border-radius: 3px;
     font-weight: 500;

@@ -156,6 +156,10 @@ export async function POST(req: Request) {
                 location: aiData.location || masterProfile.location || "",
                 linkedin: aiData.linkedin || masterProfile.linkedin || "",
                 website: aiData.website || "",
+                // The profile form collects a GitHub URL and every template can now
+                // show one, but it was never copied into the contact block, so what
+                // the user typed never reached the page.
+                github: aiData.github || masterProfile.github || "",
             },
             summary: aiData.summary,
             skills: aiData.skills?.technical

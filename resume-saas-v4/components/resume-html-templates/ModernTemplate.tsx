@@ -22,6 +22,7 @@ export const ModernTemplate: React.FC<HtmlTemplateProps> = ({ data, designSettin
             {/* Header */}
             <header className="header no-break" style={{ marginBottom: `${headerSettings.spacing}px`, textAlign: 'center' }} data-section="header">
                 <h1 className="name" data-editable="fullName">{data.fullName}</h1>
+                {data.jobTitle && <p className="job-title" data-editable="jobTitle">{data.jobTitle}</p>}
                 <div className="contact-row" style={{ display: 'block', textAlign: 'center' }}>
                     {data.contact?.location && <span data-editable="location">{data.contact.location}</span>}
                     {data.contact?.email && <span data-editable="email">• {data.contact.email}</span>}
@@ -31,6 +32,11 @@ export const ModernTemplate: React.FC<HtmlTemplateProps> = ({ data, designSettin
                     {data.contact?.linkedin && (
                         <a href={`https://${data.contact.linkedin}`} className="link" data-editable="linkedin">
                             {data.contact.linkedin}
+                        </a>
+                    )}
+                    {data.contact?.github && (
+                        <a href={`https://${data.contact.github}`} className="link" data-editable="github">
+                            {data.contact.github}
                         </a>
                     )}
                     {data.contact?.website && (
@@ -85,7 +91,7 @@ export const ModernTemplate: React.FC<HtmlTemplateProps> = ({ data, designSettin
                             style={{ marginBottom: `${experienceSettings.spacing / 1.5}px` }}
                         >
                             <div className="exp-header">
-                                <span className="company" data-editable={`experience-${index}-company`}>{exp.company}</span>
+                                <span className="company" data-editable={`experience-${index}-company`}>{exp.company}{exp.location ? ` · ${exp.location}` : ''}</span>
                                 <span className="date">{exp.startDate} - {exp.endDate}</span>
                             </div>
                             <div className="role" data-editable={`experience-${index}-role`}>{exp.role}</div>
@@ -105,6 +111,36 @@ export const ModernTemplate: React.FC<HtmlTemplateProps> = ({ data, designSettin
                 </section>
             )}
 
+            {/* Projects — this template had no projects section at all, so
+                everything entered under Projects was silently dropped. */}
+            {data.projects && data.projects.length > 0 && (
+                <section className="section" style={{ marginBottom: `${experienceSettings.spacing}px` }} data-section="projects">
+                    <h2 className="section-title">Projects</h2>
+                    {data.projects.map((proj: any, index: number) => (
+                        <div
+                            key={proj.id || index}
+                            className="experience-item no-break"
+                            style={{ marginBottom: `${experienceSettings.spacing / 1.5}px` }}
+                        >
+                            <div className="exp-header">
+                                <span className="company" data-editable={`projects-${index}-name`}>{proj.name}</span>
+                                {proj.link && <span className="date">{proj.link}</span>}
+                            </div>
+                            {proj.techStack && <div className="role" data-editable={`projects-${index}-tech`}>{proj.techStack}</div>}
+                            <div
+                                className="description text-wrap"
+                                data-editable={`projects-${index}-description`}
+                                style={{ lineHeight: experienceSettings.lineHeight }}
+                            >
+                                {splitDescription(proj.description).map((line: string, i: number) => (
+                                    <p key={i} style={{ marginBottom: '4px' }}>• {line}</p>
+                                ))}
+                            </div>
+                        </div>
+                    ))}
+                </section>
+            )}
+
             {/* Education */}
             {data.education && data.education.length > 0 && (
                 <section className="section" data-section="education">
@@ -116,8 +152,8 @@ export const ModernTemplate: React.FC<HtmlTemplateProps> = ({ data, designSettin
                             style={{ marginBottom: `${educationSettings.spacing / 2}px` }}
                         >
                             <div className="edu-content">
-                                <div className="school" data-editable={`education-${index}-school`}>{edu.school}</div>
-                                <div className="degree" data-editable={`education-${index}-degree`}>{edu.degree}</div>
+                                <div className="school" data-editable={`education-${index}-school`}>{edu.school}{edu.grade ? ` · ${edu.grade}` : ''}</div>
+                                <div className="degree" data-editable={`education-${index}-degree`}>{edu.degree}{edu.field ? ` · ${edu.field}` : ''}</div>
                             </div>
                             <span className="date">{edu.startDate} - {edu.endDate}</span>
                         </div>
@@ -309,125 +345,30 @@ ${BASE_STYLES}
 /**
  * Generate full HTML document for PDF rendering
  */
+/**
+ * Renders the component, the way every other template does.
+ *
+ * This used to be a second, hand-written copy of the markup, and the two
+ * had drifted: the string version never picked up job location, field of
+ * study, grade, GitHub or the website link, so those were dropped for
+ * anyone on this template no matter what the component said.
+ */
 export function generateModernHtml(data: any, designSettings?: any): string {
-    const cssVars = getCssVariables(designSettings);
-    const styleString = Object.entries(cssVars)
-        .map(([key, value]) => `${key}: ${value}`)
-        .join('; ');
+    const { renderToStaticMarkup } = require('react-dom/server');
+    const html = renderToStaticMarkup(<ModernTemplate data={data} designSettings={designSettings} />);
 
-    const headerSettings = getSettings(designSettings, 'header');
-    const summarySettings = getSettings(designSettings, 'summary');
-    const experienceSettings = getSettings(designSettings, 'experience');
-    const educationSettings = getSettings(designSettings, 'education');
-    const skillsSettings = getSettings(designSettings, 'skills');
-
-    const skills = Array.isArray(data.skills)
-        ? data.skills
-        : (data.skills?.technical ? data.skills.technical.split(',').map((s: string) => s.trim()) : []);
-
-    const skillsHtml = skills.map((skill: string) =>
-        `<span class="skill-tag">${skill}</span>`
-    ).join('');
-
-    const experienceHtml = (data.experience || []).map((exp: any) => `
-        <div class="experience-item no-break" style="margin-bottom: ${experienceSettings.spacing / 1.5}px">
-            <div class="exp-header">
-                <span class="company">${exp.company || ''}</span>
-                <span class="date">${exp.startDate || ''} - ${exp.endDate || ''}</span>
-            </div>
-            <div class="role">${exp.role || ''}</div>
-            <div class="description text-wrap" style="line-height: ${experienceSettings.lineHeight}">
-                ${splitDescription(exp.description).map((line: string) => `<p style="margin-bottom: 4px">• ${line}</p>`).join('')}
-            </div>
-        </div>
-    `).join('');
-
-    const projectsHtml = (data.projects || []).map((proj: any) => `
-        <div class="project-item no-break" style="margin-bottom: ${experienceSettings.spacing / 2}px">
-            <div class="proj-header">
-                <div class="project-name">${proj.name || ''}</div>
-                ${proj.link ? `<a href="${proj.link}" class="link" style="font-size: 14px">Link</a>` : ''}
-            </div>
-            ${proj.techStack ? `<div class="tech-stack" style="margin-bottom: 4px">${proj.techStack}</div>` : ''}
-            <div class="description text-wrap" style="line-height: ${experienceSettings.lineHeight}">
-                ${splitDescription(proj.description).map((line: string) => `<p style="margin-bottom: 4px">• ${line}</p>`).join('')}
-            </div>
-        </div>
-    `).join('');
-
-
-    const educationHtml = (data.education || []).map((edu: any) => `
-        <div class="education-item no-break" style="margin-bottom: ${educationSettings.spacing / 2}px">
-            <div class="edu-content">
-                <div class="school">${edu.school || ''}</div>
-                <div class="degree">${edu.degree || ''}</div>
-            </div>
-            <span class="date">${edu.startDate || ''} - ${edu.endDate || ''}</span>
-        </div>
-    `).join('');
-
-    return `<!DOCTYPE html>
-<html>
+    return `
+<!DOCTYPE html>
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <title>${data.fullName} - Resume</title>
     <style>${MODERN_STYLES}</style>
 </head>
 <body>
-    <div class="resume-page modern-template" style="${styleString}">
-        <header class="header no-break" style="margin-bottom: ${headerSettings.spacing}px">
-            <h1 class="name" data-editable="fullName">${data.fullName || ''}</h1>
-            <div class="contact-row" style="display: block; text-align: center">
-                ${data.contact?.location ? `<span data-editable="location">${data.contact.location}</span>` : ''}
-                ${data.contact?.email ? `<span data-editable="email">• ${data.contact.email}</span>` : ''}
-                ${data.contact?.phone ? `<span data-editable="phone">• ${data.contact.phone}</span>` : ''}
-            </div>
-            <div class="links-row" style="display: block; text-align: center">
-                ${data.contact?.linkedin ? `<a href="https://${data.contact.linkedin}" class="link" data-editable="linkedin">${data.contact.linkedin}</a>` : ''}
-                ${data.contact?.website ? `<a href="https://${data.contact.website}" class="link" data-editable="website">${data.contact.website}</a>` : ''}
-            </div>
-        </header>
-
-        ${data.summary ? `
-        <section class="section no-break" style="margin-bottom: ${summarySettings.spacing}px">
-            <h2 class="section-title">Profile</h2>
-            <p class="summary-text text-wrap" data-editable="summary" style="line-height: ${summarySettings.lineHeight}">
-                ${data.summary}
-            </p>
-        </section>
-        ` : ''}
-
-        ${skills.length ? `
-        <section class="section no-break" style="margin-bottom: ${skillsSettings.spacing}px">
-            <h2 class="section-title">Key Skills</h2>
-            <div class="skills-row flex-wrap">
-                ${skillsHtml}
-            </div>
-        </section>
-        ` : ''}
-
-        ${data.experience?.length ? `
-        <section class="section" style="margin-bottom: ${experienceSettings.spacing}px">
-            <h2 class="section-title">Experience</h2>
-            ${experienceHtml}
-        </section>
-        ` : ''}
-
-        ${data.projects?.length ? `
-        <section class="section" style="margin-bottom: ${experienceSettings.spacing}px">
-            <h2 class="section-title">Projects</h2>
-            ${projectsHtml}
-        </section>
-        ` : ''}
-
-        ${data.education?.length ? `
-        <section class="section">
-            <h2 class="section-title">Education</h2>
-            ${educationHtml}
-        </section>
-        ` : ''}
-    </div>
+    ${html}
 </body>
-</html>`;
+</html>
+    `.trim();
 }

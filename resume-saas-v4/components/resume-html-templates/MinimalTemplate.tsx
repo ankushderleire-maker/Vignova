@@ -27,6 +27,9 @@ export const MinimalTemplate: React.FC<HtmlTemplateProps> = ({ data, designSetti
                     {data.contact?.email && <span data-editable="email">{data.contact.email}</span>}
                     {data.contact?.phone && <span data-editable="phone">{data.contact.phone}</span>}
                     {data.contact?.location && <span data-editable="location">{data.contact.location}</span>}
+                    {data.contact?.linkedin && <span data-editable="linkedin">{data.contact.linkedin}</span>}
+                    {data.contact?.website && <span data-editable="website">{data.contact.website}</span>}
+                    {data.contact?.github && <span data-editable="github">{data.contact.github}</span>}
                 </div>
             </header>
 
@@ -60,7 +63,7 @@ export const MinimalTemplate: React.FC<HtmlTemplateProps> = ({ data, designSetti
                                 <span className="role" data-editable={`experience-${index}-role`}>{exp.role}</span>
                                 <span className="date">{exp.startDate} - {exp.endDate}</span>
                             </div>
-                            <div className="company" data-editable={`experience-${index}-company`}>{exp.company}</div>
+                            <div className="company" data-editable={`experience-${index}-company`}>{exp.company}{exp.location ? ` · ${exp.location}` : ''}</div>
                             <div
                                 className="description text-wrap"
                                 data-editable={`experience-${index}-description`}
@@ -122,10 +125,10 @@ export const MinimalTemplate: React.FC<HtmlTemplateProps> = ({ data, designSetti
                     style={{ marginBottom: `${educationSettings.spacing / 2}px` }}
                 >
                     <div className="edu-header">
-                        <span className="degree" data-editable={`education-${index}-degree`}>{edu.degree}</span>
+                        <span className="degree" data-editable={`education-${index}-degree`}>{edu.degree}{edu.field ? ` · ${edu.field}` : ''}</span>
                         <span className="date">{edu.startDate} - {edu.endDate}</span>
                     </div>
-                    <div className="school" data-editable={`education-${index}-school`}>{edu.school}</div>
+                    <div className="school" data-editable={`education-${index}-school`}>{edu.school}{edu.grade ? ` · ${edu.grade}` : ''}</div>
                 </div>
             ))}
 

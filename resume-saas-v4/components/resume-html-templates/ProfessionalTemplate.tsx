@@ -52,6 +52,22 @@ export const ProfessionalTemplate: React.FC<HtmlTemplateProps> = ({ data, design
                                     </a>
                                 </div>
                             )}
+                            {data.contact?.website && (
+                                <div className="contact-item">
+                                    <span className="label">Website</span>
+                                    <a href={`https://${data.contact.website}`} className="value link" data-editable="website">
+                                        Profile
+                                    </a>
+                                </div>
+                            )}
+                            {data.contact?.github && (
+                                <div className="contact-item">
+                                    <span className="label">GitHub</span>
+                                    <a href={`https://${data.contact.github}`} className="value link" data-editable="github">
+                                        Profile
+                                    </a>
+                                </div>
+                            )}
                         </div>
                     </section>
 
@@ -75,8 +91,8 @@ export const ProfessionalTemplate: React.FC<HtmlTemplateProps> = ({ data, design
                             <h3 className="sidebar-title">EDUCATION</h3>
                             {data.education.map((edu, index) => (
                                 <div key={edu.id || index} className="edu-item no-break">
-                                    <div className="edu-degree" data-editable={`education-${index}-degree`}>{edu.degree}</div>
-                                    <div className="edu-school" data-editable={`education-${index}-school`}>{edu.school}</div>
+                                    <div className="edu-degree" data-editable={`education-${index}-degree`}>{edu.degree}{edu.field ? ` · ${edu.field}` : ''}</div>
+                                    <div className="edu-school" data-editable={`education-${index}-school`}>{edu.school}{edu.grade ? ` · ${edu.grade}` : ''}</div>
                                     <div className="edu-date">{edu.startDate} - {edu.endDate}</div>
                                 </div>
                             ))}
@@ -135,7 +151,7 @@ export const ProfessionalTemplate: React.FC<HtmlTemplateProps> = ({ data, design
                                     <div className="exp-header">
                                         <div className="exp-left">
                                             <div className="role" data-editable={`experience-${index}-role`}>{exp.role}</div>
-                                            <div className="company" data-editable={`experience-${index}-company`}>{exp.company}</div>
+                                            <div className="company" data-editable={`experience-${index}-company`}>{exp.company}{exp.location ? ` · ${exp.location}` : ''}</div>
                                         </div>
                                         <div className="date">{exp.startDate} - {exp.endDate}</div>
                                     </div>
@@ -277,7 +293,7 @@ ${BASE_STYLES}
     background: rgba(52, 152, 219, 0.2);
     padding: 4px 8px;
     border-radius: 3px;
-    font-size: 13px;
+    font-size: 14px;
     color: white;
     border-left: 2px solid #3498db;
 }

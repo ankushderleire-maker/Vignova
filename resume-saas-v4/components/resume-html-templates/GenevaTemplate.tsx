@@ -27,6 +27,7 @@ export const GenevaTemplate: React.FC<HtmlTemplateProps> = ({ data, designSettin
                     {data.contact?.phone    && <span className="gen-ci">{data.contact.phone}</span>}
                     {data.contact?.location && <span className="gen-ci">{data.contact.location}</span>}
                     {data.contact?.linkedin && <span className="gen-ci">{data.contact.linkedin}</span>}
+                    {data.contact?.github && <span className="gen-ci">{data.contact.github}</span>}
                     {data.contact?.website  && <span className="gen-ci">{data.contact.website}</span>}
                 </div>
             </header>
@@ -88,7 +89,7 @@ export const GenevaTemplate: React.FC<HtmlTemplateProps> = ({ data, designSettin
                                         <div className="gen-entry-role" data-editable={`education-${i}-degree`}>
                                             {edu.degree}{edu.field ? `, ${edu.field}` : ''}
                                         </div>
-                                        <div className="gen-entry-org" data-editable={`education-${i}-school`}>{edu.school}</div>
+                                        <div className="gen-entry-org" data-editable={`education-${i}-school`}>{edu.school}{edu.grade ? ` · ${edu.grade}` : ''}</div>
                                     </div>
                                     <div className="gen-entry-date">{edu.startDate} – {edu.endDate}</div>
                                 </div>

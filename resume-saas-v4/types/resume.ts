@@ -17,6 +17,8 @@ export type Education = {
   field: string;
   startDate: string;
   endDate: string;
+  /** Grade or GPA. Collected by the profile form; optional everywhere. */
+  grade?: string;
 };
 
 export type Project = {
@@ -33,6 +35,9 @@ export type ContactInfo = {
   location: string;
   linkedin: string;
   website: string;
+  /** Collected by the profile form since the beginning; no template
+   *  rendered it, and the generate routes never copied it here. */
+  github?: string;
 };
 
 /** A section the user invented, e.g. Publications or Conferences. */
