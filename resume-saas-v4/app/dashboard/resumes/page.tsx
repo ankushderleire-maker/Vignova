@@ -171,13 +171,28 @@ export default function SavedResumesPage() {
     const downloadPdf = async (resume: SavedResume, group: JobGroup) => {
         setBusyId(resume.id);
         try {
-            const html = await buildHtml(resume);
             const fileName = `${group.company || "resume"} - ${group.jobTitle || resume.name}.pdf`.replace(/[\\/:*?"<>|]/g, "-");
+            // Template id and data, not finished HTML: the server renders it so
+            // the premium check cannot be sidestepped by the browser.
             const response = await fetch("/api/pdf/generate", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ html, filename: fileName }),
+                body: JSON.stringify({
+                    templateId: resume.templateId || FALLBACK_TEMPLATE,
+                    data: resume.content,
+                    filename: fileName,
+                }),
             });
+
+            if (response.status === 402) {
+                const info = await response.json().catch(() => ({}));
+                failed(
+                    info.error || "Pro template",
+                    info.message || "This template needs a Pro plan. Switch to a free template to download."
+                );
+                return;
+            }
+
             if (!response.ok) throw new Error("PDF request failed");
 
             const url = URL.createObjectURL(await response.blob());

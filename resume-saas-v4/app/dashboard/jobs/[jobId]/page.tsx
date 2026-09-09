@@ -9,7 +9,7 @@ import {
     Bold, Italic, Target, Copy, Mail, Sparkles, ChevronRight, Send, ArrowRight, Rocket,
     ExternalLink, MapPin, CalendarDays, Repeat, BarChart3, Search, SlidersHorizontal,
     X, Plus, RefreshCw, GraduationCap, Wrench, LayoutGrid, Globe, FolderKanban, Check,
-    Award, Users, Link as LinkIcon
+    Award, Users, Link as LinkIcon, Crown
 } from "lucide-react";
 import { AIPreparationAnimation } from "@/components/resume-engine/AIPreparationAnimation";
 
@@ -1182,6 +1182,20 @@ function ResumeStudioPageContent() {
                             templateId={selectedTemplate}
                             designSettings={designSettings}
                             fileName={`${job.company.replace(/[^a-zA-Z0-9]/g, '_')}_Resume.pdf`}
+                            onUpgradeRequired={(info) =>
+                                setDialogConfig({
+                                    isOpen: true,
+                                    type: "alert",
+                                    title: info?.error || "This is a Pro template",
+                                    description:
+                                        (info?.message ||
+                                            "Downloading this template needs a Pro or Premium plan.") +
+                                        (info?.freeTemplates?.length
+                                            ? " Free templates: " + info.freeTemplates.join(", ") + "."
+                                            : ""),
+                                    variant: "default",
+                                })
+                            }
                         />
                     </div>
                 )}
@@ -1719,12 +1733,22 @@ function ResumeStudioPageContent() {
                     ) : activeDocument === "resume" ? (
                         resumeData ? (
                             /* Using Interactive Preview with Canva-like editing */
-                            <InteractivePreviewPanel
-                                data={resumeData}
-                                templateId={activeTemplateId}
-                                designSettings={designSettings}
-                                onDataChange={(newData) => setResumeData(newData)}
-                            />
+                            <div className="flex-1 relative min-h-0">
+                                <InteractivePreviewPanel
+                                    data={resumeData}
+                                    templateId={activeTemplateId}
+                                    designSettings={designSettings}
+                                    onDataChange={(newData) => setResumeData(newData)}
+                                />
+                                {/* Says up front that this one costs money to take away,
+                                    rather than letting the refusal arrive at download. */}
+                                {TEMPLATES.find((t) => t.id === activeTemplateId)?.isPremium && (
+                                    <div className="absolute top-3 right-5 z-20 pointer-events-none flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-gradient-to-r from-amber-500 to-orange-500 text-white text-[11px] font-extrabold tracking-wide shadow-lg">
+                                        <Crown className="w-3 h-3" />
+                                        PRO
+                                    </div>
+                                )}
+                            </div>
                         ) : (
                             <div className="flex-1 flex flex-col items-center justify-center p-10 text-center text-[var(--foreground)] bg-[var(--background)]">
                                 <FileText className="w-16 h-16 text-[var(--border-color)] mb-4" />

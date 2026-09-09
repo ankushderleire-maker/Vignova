@@ -99,6 +99,8 @@ interface PdfDownloadButtonProps {
     templateId: string;
     designSettings?: DesignSettings;
     fileName?: string;
+    /** Called when the server refuses a premium template on a free plan. */
+    onUpgradeRequired?: (info: any) => void;
 }
 
 /**
@@ -108,23 +110,28 @@ export const PdfDownloadButton: React.FC<PdfDownloadButtonProps> = ({
     data,
     templateId,
     designSettings,
-    fileName = 'resume.pdf'
+    fileName = 'resume.pdf',
+    onUpgradeRequired,
 }) => {
     const [isLoading, setIsLoading] = useState(false);
 
     const handleDownload = async () => {
         setIsLoading(true);
         try {
-            // Generate HTML
-            const generator = getTemplateGenerator(templateId);
-            const html = generator(data, designSettings);
-
-            // Call PDF generation API
+            // The server renders the template, so the premium check has
+            // something real to check against — sending finished HTML would
+            // let any template be downloaded on any plan.
             const response = await fetch('/api/pdf/generate', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ html, filename: fileName }),
+                body: JSON.stringify({ templateId, data, designSettings, filename: fileName }),
             });
+
+            if (response.status === 402) {
+                const info = await response.json().catch(() => ({}));
+                onUpgradeRequired?.(info);
+                return;
+            }
 
             if (!response.ok) {
                 throw new Error('Failed to generate PDF');
