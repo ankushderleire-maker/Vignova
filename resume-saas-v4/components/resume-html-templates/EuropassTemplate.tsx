@@ -30,6 +30,7 @@ export const EuropassTemplate: React.FC<HtmlTemplateProps> = ({ data, designSett
                     {data.contact?.phone    && <div className="ep-contact-row"><span className="ep-contact-lbl">Phone</span><span>{data.contact.phone}</span></div>}
                     {data.contact?.location && <div className="ep-contact-row"><span className="ep-contact-lbl">Address</span><span>{data.contact.location}</span></div>}
                     {data.contact?.linkedin && <div className="ep-contact-row"><span className="ep-contact-lbl">LinkedIn</span><span>{data.contact.linkedin}</span></div>}
+                    {data.contact?.github && <div className="ep-contact-row"><span className="ep-contact-lbl">GitHub</span><span>{data.contact.github}</span></div>}
                     {data.contact?.website  && <div className="ep-contact-row"><span className="ep-contact-lbl">Website</span><span>{data.contact.website}</span></div>}
                 </div>
             </div>
@@ -99,7 +100,7 @@ export const EuropassTemplate: React.FC<HtmlTemplateProps> = ({ data, designSett
                                         <div className="ep-entry-role" data-editable={`education-${i}-degree`}>
                                             {edu.degree}{edu.field ? ` in ${edu.field}` : ''}
                                         </div>
-                                        <div className="ep-entry-org" data-editable={`education-${i}-school`}>{edu.school}</div>
+                                        <div className="ep-entry-org" data-editable={`education-${i}-school`}>{edu.school}{edu.grade ? ` · ${edu.grade}` : ''}</div>
                                     </div>
                                 </div>
                             </div>

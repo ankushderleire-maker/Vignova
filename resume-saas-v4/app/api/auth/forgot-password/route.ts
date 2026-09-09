@@ -51,25 +51,46 @@ export async function POST(req: Request) {
 
         const resetUrl = `${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/reset-password?token=${resetToken}`;
 
-        // Send the email
-        await transporter.sendMail({
-            from: process.env.SMTP_FROM || `"Vignova" <noreply@vignova.io>`,
-            to: user.email,
-            subject: "Reset Your Password - Vignova",
-            html: `
-            <div style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
-                <h2>Password Reset Request</h2>
-                <p>Hello ${user.full_name || 'there'},</p>
-                <p>Someone requested to reset the password for your Vignova account. If this was you, please click the button below to set a new password:</p>
-                <a href="${resetUrl}" style="display: inline-block; padding: 12px 24px; margin: 20px 0; background-color: #059669; color: white; text-decoration: none; border-radius: 6px; font-weight: bold;">Reset Password</a>
-                <p>If you did not request this, you can safely ignore this email.</p>
-                <p>This link will expire in 1 hour.</p>
-                <br />
-                <p>Best regards,</p>
-                <p><strong>The Vignova Team</strong></p>
-            </div>
-            `,
-        });
+        // Send the email.
+        //
+        // The token is already stored at this point, so a send failure has to
+        // undo it: otherwise a live token sits on the account that nobody was
+        // ever told about, and the next attempt cannot tell a lost email from
+        // a broken mailer.
+        try {
+            await transporter.sendMail({
+                from: process.env.SMTP_FROM || `"Vignova" <noreply@vignova.io>`,
+                to: user.email,
+                subject: "Reset Your Password - Vignova",
+                html: `
+                <div style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
+                    <h2>Password Reset Request</h2>
+                    <p>Hello ${user.full_name || 'there'},</p>
+                    <p>Someone requested to reset the password for your Vignova account. If this was you, please click the button below to set a new password:</p>
+                    <a href="${resetUrl}" style="display: inline-block; padding: 12px 24px; margin: 20px 0; background-color: #059669; color: white; text-decoration: none; border-radius: 6px; font-weight: bold;">Reset Password</a>
+                    <p>If you did not request this, you can safely ignore this email.</p>
+                    <p>This link will expire in 1 hour.</p>
+                    <br />
+                    <p>Best regards,</p>
+                    <p><strong>The Vignova Team</strong></p>
+                </div>
+                `,
+            });
+        } catch (mailError) {
+            await db.users.update({
+                where: { email: normalizedEmail },
+                data: { resetToken: null, resetTokenExpiry: null },
+            }).catch(() => { /* the token expires in an hour regardless */ });
+
+            // Logged loudly and separately from the generic handler below:
+            // this is nearly always SMTP_HOST/USER/PASS missing from the
+            // environment, and it is invisible from the client on purpose.
+            console.error("[FORGOT_PASSWORD] Could not send reset email. Check SMTP_HOST/SMTP_PORT/SMTP_USER/SMTP_PASS.", mailError);
+            return NextResponse.json(
+                { message: "We couldn't send the reset email just now. Please try again in a few minutes." },
+                { status: 502 }
+            );
+        }
 
         return NextResponse.json({ message: "If that email is in our database, we will send a reset link." }, { status: 200 });
 

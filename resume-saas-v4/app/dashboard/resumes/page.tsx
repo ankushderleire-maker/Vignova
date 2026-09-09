@@ -35,6 +35,7 @@ type SavedResume = {
     jobId: string;
     job: { company: string; jobTitle: string };
     content: any;
+    templateId?: string | null;
 };
 
 type JobGroup = {
@@ -56,11 +57,8 @@ const SORT_LABELS: Record<SortKey, string> = {
 
 const ALL_COMPANIES = "__all__";
 
-/**
- * Saved rows don't record which template produced them, so preview and download
- * render with the studio's default rather than guessing.
- */
-const PREVIEW_TEMPLATE = "modern";
+/** Used only for rows saved before templateId existed. */
+const FALLBACK_TEMPLATE = "modern";
 
 export default function SavedResumesPage() {
     const router = useRouter();
@@ -152,7 +150,8 @@ export default function SavedResumesPage() {
         // Loaded on demand: the template module pulls in every template, and
         // this page only needs it once someone previews or downloads.
         const { getTemplateGenerator } = await import("@/components/resume-html-templates");
-        return getTemplateGenerator(PREVIEW_TEMPLATE)(resume.content);
+        // Reproduce the template the resume was saved with; older rows have none.
+        return getTemplateGenerator(resume.templateId || FALLBACK_TEMPLATE)(resume.content);
     };
 
     const failed = (title: string, description: string) =>
@@ -172,13 +171,28 @@ export default function SavedResumesPage() {
     const downloadPdf = async (resume: SavedResume, group: JobGroup) => {
         setBusyId(resume.id);
         try {
-            const html = await buildHtml(resume);
             const fileName = `${group.company || "resume"} - ${group.jobTitle || resume.name}.pdf`.replace(/[\\/:*?"<>|]/g, "-");
+            // Template id and data, not finished HTML: the server renders it so
+            // the premium check cannot be sidestepped by the browser.
             const response = await fetch("/api/pdf/generate", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ html, filename: fileName }),
+                body: JSON.stringify({
+                    templateId: resume.templateId || FALLBACK_TEMPLATE,
+                    data: resume.content,
+                    filename: fileName,
+                }),
             });
+
+            if (response.status === 402) {
+                const info = await response.json().catch(() => ({}));
+                failed(
+                    info.error || "Pro template",
+                    info.message || "This template needs a Pro plan. Switch to a free template to download."
+                );
+                return;
+            }
+
             if (!response.ok) throw new Error("PDF request failed");
 
             const url = URL.createObjectURL(await response.blob());
@@ -259,7 +273,7 @@ export default function SavedResumesPage() {
 
     return (
         <>
-            <div className="max-w-7xl mx-auto space-y-5 animate-slide-down">
+            <div className="w-full max-w-[1700px] mx-auto space-y-5 animate-slide-down">
                 {/* Toolbar: counts on the left, controls on the right */}
                 {resumes.length > 0 && (
                     <div className="flex flex-col xl:flex-row xl:items-center gap-3">

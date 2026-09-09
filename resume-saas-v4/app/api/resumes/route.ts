@@ -7,7 +7,7 @@ import { db } from "@/lib/db";
 export async function GET(req: Request) {
     try {
         const session = await getServerSession(authOptions);
-        if (!(session?.user as any)?.id) return new NextResponse("Unauthorized", { status: 401 });
+        if (!(session?.user as any)?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
         const { searchParams } = new URL(req.url);
         const jobId = searchParams.get("jobId");
@@ -28,7 +28,7 @@ export async function GET(req: Request) {
         return NextResponse.json({ data: resumes });
     } catch (error) {
         console.error("[RESUMES_GET]", error);
-        return new NextResponse("Internal Error", { status: 500 });
+        return NextResponse.json({ error: "Internal Error" }, { status: 500 });
     }
 }
 
@@ -36,13 +36,13 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
     try {
         const session = await getServerSession(authOptions);
-        if (!(session?.user as any)?.id) return new NextResponse("Unauthorized", { status: 401 });
+        if (!(session?.user as any)?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
         const body = await req.json();
-        const { jobId, content, resumeName, masterProfileName } = body;
+        const { jobId, content, resumeName, masterProfileName, templateId } = body;
 
         if (!jobId || !content) {
-            return new NextResponse("Job ID and Content are required", { status: 400 });
+            return NextResponse.json({ error: "Job ID and Content are required" }, { status: 400 });
         }
 
         const resume = await db.generatedResume.create({
@@ -52,12 +52,13 @@ export async function POST(req: Request) {
                 content,
                 name: resumeName || `Resume ${new Date().toLocaleString()}`,
                 extensionData: masterProfileName ? { masterProfileName } : undefined,
+                ...(templateId ? { templateId } : {}),
             },
         });
 
         return NextResponse.json({ data: resume });
     } catch (error) {
         console.error("[RESUMES_POST]", error);
-        return new NextResponse("Internal Error", { status: 500 });
+        return NextResponse.json({ error: "Internal Error" }, { status: 500 });
     }
 }

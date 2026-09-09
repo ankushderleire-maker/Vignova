@@ -19,6 +19,9 @@ model users {
   resetTokenExpiry        DateTime?
   onboarding_done         Boolean                  @default(false)
   country                 String?                  @db.VarChar(2)
+  /// Contact number in E.164 (a leading + and digits only), so the country
+  /// code travels with it and the value is unambiguous wherever it is read.
+  phone                   String?                  @db.VarChar(20)
   status                  String                   @default("ACTIVE") @db.VarChar(16)
   generated_resumes       GeneratedResume[]
   job_applications        JobApplication[]
@@ -101,6 +104,9 @@ model JobApplication {
   source           String            @default("manual")
   sourceUrl        String?
   coverLetter      String?
+  /// Application email drafted alongside the resume and cover letter, kept so
+  /// the user can come back to it and so a repeat generation can be detected.
+  draftEmail       String?
   atsReport        Json?
   aiReport         Json?
   /// Structured job description produced by the JD formatter agent.
@@ -149,6 +155,8 @@ model GeneratedResume {
   source        String         @default("manual")
   sourceUrl     String?
   extensionData Json?
+  /// Template the resume was saved with, so preview and download reproduce it.
+  templateId    String?
   job           JobApplication @relation(fields: [jobId], references: [id], onDelete: Cascade)
   user          users          @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -378,6 +386,11 @@ model admin_extension_settings {
   extension_version String   @default("1.0.0")
   extension_name    String   @default("Vignova Extension")
   install_url       String   @default("")
+  /// Oldest build still allowed to run. Anything below it is blocked in the
+  /// extension itself and told to update — the store cannot force an install.
+  min_version       String   @default("0.0.0")
+  /// Shown on the block screen, e.g. why the old build had to be retired.
+  update_message    String   @default("")
   updated_at        DateTime @default(now()) @db.Timestamptz(6)
   updated_by        String?  @db.Uuid
 }

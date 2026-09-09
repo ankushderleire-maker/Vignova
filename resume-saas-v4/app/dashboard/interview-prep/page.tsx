@@ -113,12 +113,14 @@ export default function InterviewPrepPage() {
       setActiveCompany(job.company || "");
     }
 
+    let creditTaken = false;
     try {
       const creditRes = await fetch("/api/credits/deduct", { method: "POST" });
       if (!creditRes.ok) {
         if (creditRes.status === 403) throw new Error("Insufficient Credits to perform this action.");
         throw new Error("Failed to deduct credit.");
       }
+      creditTaken = true;
 
       const res = await fetch("/api/interview/questions", {
         method: "POST", headers: { "Content-Type": "application/json" },
@@ -136,8 +138,29 @@ export default function InterviewPrepPage() {
         setPhase("results");
       } else throw new Error("The AI returned an invalid format. Please try again.");
     } catch (err: any) {
+      // The credit was reserved before the request; give it back.
+      if (creditTaken) await refundCredit("interview-prep: " + (err?.message || "failed"));
       setError(err.message || "An unexpected error occurred.");
       setPhase("setup");
+    }
+  };
+
+  /**
+   * Returns the credit reserved for work that then failed.
+   *
+   * The credit is taken before the generation runs so an empty balance
+   * cannot start expensive work; that only stays fair if a failure hands
+   * it back.
+   */
+  const refundCredit = async (reason: string) => {
+    try {
+      await fetch("/api/credits/refund", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reason }),
+      });
+    } catch {
+      // Nothing useful to do here; the server logs a failed refund.
     }
   };
 

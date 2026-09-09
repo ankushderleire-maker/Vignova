@@ -6,6 +6,8 @@ import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { Mail, ChevronDown, Loader2, Lock, Eye, EyeOff } from "lucide-react";
 import Link from "next/link";
+import { COUNTRIES, findCountry, flagOf, DEFAULT_COUNTRY } from "@/lib/countries";
+import { stripDialPrefix } from "@/lib/phone";
 
 interface AuthFormProps {
     defaultMode?: "signin" | "signup";
@@ -20,10 +22,12 @@ export function AuthForm({ defaultMode = "signup" }: AuthFormProps) {
     const [lastName, setLastName] = useState("");
     const [email, setEmail] = useState("");
     const [phone, setPhone] = useState("");
-    const [country, setCountry] = useState("US");
+    const [country, setCountry] = useState(DEFAULT_COUNTRY);
     const [password, setPassword] = useState("");
     const [showPassword, setShowPassword] = useState(false);
     
+    const selectedCountry = findCountry(country);
+
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
 
@@ -42,6 +46,7 @@ export function AuthForm({ defaultMode = "signup" }: AuthFormProps) {
                         email,
                         password,
                         country,
+                        phone,
                     }),
                 });
 
@@ -167,16 +172,43 @@ export function AuthForm({ defaultMode = "signup" }: AuthFormProps) {
                     <div className={`grid transition-[grid-template-rows,margin] duration-300 ease-in-out ${mode === 'signup' ? 'grid-rows-[1fr] mb-3' : 'grid-rows-[0fr] mb-0'}`}>
                         <div className="overflow-hidden">
                             <div className="relative flex items-center bg-white/[0.03] border border-white/10 rounded-xl focus-within:border-white/20 focus-within:bg-white/[0.06] transition-all">
-                                <div className="flex items-center gap-2 pl-4 pr-3 py-2.5 border-r border-white/10 shrink-0 cursor-pointer hover:bg-white/5 rounded-l-xl transition-colors">
-                                    <span className="text-base leading-none">🇺🇸</span>
+                                {/* A real <select> sits transparently over the flag and
+                                    code. This used to be a bare div with a hardcoded
+                                    flag and a chevron that did nothing, so the country
+                                    could never be changed from US. Native, so it keeps
+                                    keyboard typeahead and the OS picker on mobile,
+                                    and cannot be clipped by the card's overflow. */}
+                                <div className="relative flex items-center gap-1.5 pl-4 pr-3 py-2.5 border-r border-white/10 shrink-0 rounded-l-xl hover:bg-white/5 focus-within:bg-white/5 transition-colors">
+                                    <span className="text-base leading-none">{flagOf(country)}</span>
+                                    <span className="text-sm text-gray-300 tabular-nums">+{selectedCountry?.dial}</span>
                                     <ChevronDown className="w-3.5 h-3.5 text-gray-500" />
+                                    <select
+                                        aria-label="Country calling code"
+                                        value={country}
+                                        onChange={(e) => setCountry(e.target.value)}
+                                        tabIndex={mode === 'signup' ? 0 : -1}
+                                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer appearance-none"
+                                    >
+                                        {COUNTRIES.map((c) => (
+                                            <option key={c.code} value={c.code} className="bg-zinc-900 text-white">
+                                                {c.name} (+{c.dial})
+                                            </option>
+                                        ))}
+                                    </select>
                                 </div>
                                 <input
                                     type="tel"
                                     placeholder="(775) 351-6501"
                                     className="w-full bg-transparent border-none focus:outline-none focus:ring-0 text-sm text-white placeholder:text-gray-500 px-4 py-2.5"
                                     value={phone}
-                                    onChange={(e) => setPhone(e.target.value)}
+                                    // Digits only, at the point of typing: letters and
+                                    // punctuation never enter state, so what is shown is
+                                    // exactly what gets sent. inputMode brings up the
+                                    // numeric keypad on a phone.
+                                    onChange={(e) => setPhone(stripDialPrefix(e.target.value, selectedCountry?.dial ?? ""))}
+                                    inputMode="numeric"
+                                    autoComplete="tel-national"
+                                    maxLength={15}
                                     tabIndex={mode === 'signup' ? 0 : -1}
                                 />
                             </div>

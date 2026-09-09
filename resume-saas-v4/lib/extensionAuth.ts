@@ -64,12 +64,33 @@ export async function getExtensionUser(req: Request) {
     if (!user) return { error: "User not found", status: 401 };
 
     // Check subscription and extension access
-    const subscription = await db.subscriptions.findFirst({
+    const found = await db.subscriptions.findFirst({
         where: { user_id: user.id },
     });
 
-    if (!subscription) {
-        return { error: "No subscription found", status: 403 };
+    // A missing row used to 403 every extension route with "No subscription
+    // found", which broke the free features too — the status dropdown, the
+    // match score and the profile lookup all went dead for anyone whose row
+    // had not been created. Treated as FREE instead; the paid routes check the
+    // plan themselves via checkAiAccess.
+    const subscription = found ?? {
+        id: "",
+        user_id: user.id,
+        plan_type: "FREE",
+        billing_cycle: "MONTHLY",
+        credits_remaining: 0,
+        credits_total: 0,
+        has_extension_access: true,
+        has_multi_profile: false,
+        has_unlimited_resumes: false,
+        starts_at: new Date(),
+        expires_at: null,
+        created_at: new Date(),
+        updated_at: new Date(),
+    };
+
+    if (!found) {
+        return { user, subscription, error: null, status: 200 };
     }
 
     // 3-tier extension access check

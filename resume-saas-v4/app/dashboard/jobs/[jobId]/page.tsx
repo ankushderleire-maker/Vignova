@@ -9,7 +9,7 @@ import {
     Bold, Italic, Target, Copy, Mail, Sparkles, ChevronRight, Send, ArrowRight, Rocket,
     ExternalLink, MapPin, CalendarDays, Repeat, BarChart3, Search, SlidersHorizontal,
     X, Plus, RefreshCw, GraduationCap, Wrench, LayoutGrid, Globe, FolderKanban, Check,
-    Award, Users, Link as LinkIcon
+    Award, Users, Link as LinkIcon, Crown, Download
 } from "lucide-react";
 import { AIPreparationAnimation } from "@/components/resume-engine/AIPreparationAnimation";
 
@@ -73,7 +73,7 @@ function ResumeStudioPageContent() {
     const router = useRouter();
 
     // Zustand store for template selection
-    const { selectedTemplate, getActiveTemplate } = useResumeStore();
+    const { selectedTemplate, setSelectedTemplate, getActiveTemplate } = useResumeStore();
     const activeTemplateId = getActiveTemplate(); // This handles hover/select logic
 
     const [job, setJob] = useState<Job | null>(null);
@@ -180,7 +180,7 @@ function ResumeStudioPageContent() {
 
     // Structured JD from the formatter agent; falls back to the parser while
     // the agent answers, so this panel is never empty.
-    const { jd: formattedJd, formatting: jdFormatting } = useFormattedJd(job as any);
+    const { jd: formattedJd, formatting: jdFormatting, refining: jdRefining } = useFormattedJd(job as any);
     const [mobilePanelView, setMobilePanelView] = useState<"editor" | "preview">("editor");
 
     /**
@@ -194,6 +194,13 @@ function ResumeStudioPageContent() {
             : activeDocument === "cover-letter"
                 ? Boolean(coverLetter)
                 : Boolean(draftEmail);
+
+    /** Saved rows hold a plain string; only apply it if it is a template we ship. */
+    const applySavedTemplate = (templateId?: string | null) => {
+        if (templateId && TEMPLATES.some((t) => t.id === templateId)) {
+            setSelectedTemplate(templateId as TemplateId);
+        }
+    };
 
     // --- DATA FETCHING ---
     useEffect(() => {
@@ -261,6 +268,7 @@ function ResumeStudioPageContent() {
                         setHasGenerated(true);
                         setCurrentResumeId(foundResume.id);
                         setCurrentResumeName(foundResume.name);
+                        applySavedTemplate(foundResume.templateId);
                         // Ideally load saved design settings too if we saved them
                     }
                 }
@@ -520,7 +528,8 @@ function ResumeStudioPageContent() {
                     jobId: currentJob.id,
                     content: formattedData,
                     resumeName: `Resume V${savedResumes.length + 1}`,
-                    masterProfileName: masterProfileName
+                    masterProfileName: masterProfileName,
+                    templateId: selectedTemplate
                 }),
             });
 
@@ -568,7 +577,8 @@ function ResumeStudioPageContent() {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     content: resumeData,
-                    name: name || currentResumeName
+                    name: name || currentResumeName,
+                    templateId: selectedTemplate
                 })
             });
             if (res.ok) {
@@ -587,6 +597,7 @@ function ResumeStudioPageContent() {
                     jobId: job.id,
                     content: resumeData,
                     resumeName: name || `${job.company} Resume V${savedResumes.length + 1}`,
+                    templateId: selectedTemplate,
                     masterProfileName: masterProfileName
                 })
             });
@@ -803,6 +814,63 @@ function ResumeStudioPageContent() {
         />
     );
 
+    /**
+     * Saves the cover letter or draft email as a PDF.
+     *
+     * These are plain text rather than a template, so they go through the
+     * route's html branch and carry no premium gate — there is no template
+     * involved to gate on.
+     */
+    const [docDownloading, setDocDownloading] = useState(false);
+
+    const downloadTextDocument = async (kind: "cover-letter" | "email") => {
+        const text = (kind === "cover-letter" ? coverLetter : draftEmail) || "";
+        if (!text.trim()) return;
+
+        const label = kind === "cover-letter" ? "Cover Letter" : "Draft Email";
+        const fileName = `${label} - ${job?.company || ""} - ${job?.jobTitle || ""}.pdf`
+            .replace(/[\\/:*?"<>|]/g, "-");
+
+        const escape = (t: string) =>
+            t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+        const html = `<!DOCTYPE html><html><head><meta charset="utf-8" />
+            <style>
+              @page { size: A4; margin: 22mm; }
+              body { font-family: Georgia, 'Times New Roman', serif; font-size: 11.5pt;
+                     line-height: 1.65; color: #1a1a1a; white-space: pre-wrap; }
+            </style></head><body>${escape(text)}</body></html>`;
+
+        setDocDownloading(true);
+        try {
+            const res = await fetch("/api/pdf/generate", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ html, filename: fileName }),
+            });
+            if (!res.ok) throw new Error("PDF request failed");
+
+            const url = URL.createObjectURL(await res.blob());
+            const link = document.createElement("a");
+            link.href = url;
+            link.download = fileName;
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            URL.revokeObjectURL(url);
+        } catch {
+            setDialogConfig({
+                isOpen: true,
+                type: "alert",
+                title: "Download failed",
+                description: `Could not build the ${label.toLowerCase()} PDF. Please try again in a moment.`,
+                variant: "destructive",
+            });
+        } finally {
+            setDocDownloading(false);
+        }
+    };
+
     const editorSections: EditorSection[] = !resumeData ? [] : [
         {
             id: "personal",
@@ -816,6 +884,7 @@ function ResumeStudioPageContent() {
                     <Input label="Phone" value={resumeData.contact?.phone || ""} onChange={(v) => updateContact('phone', v)} />
                     <Input label="Location" value={resumeData.contact?.location || ""} onChange={(v) => updateContact('location', v)} />
                     <Input label="LinkedIn" value={resumeData.contact?.linkedin || ""} onChange={(v) => updateContact('linkedin', v)} />
+                    <Input label="GitHub" value={resumeData.contact?.github || ""} onChange={(v) => updateContact('github', v)} />
                     <Input label="Website / Portfolio" value={resumeData.contact?.website || ""} onChange={(v) => updateContact('website', v)} />
                 </div>
             ),
@@ -1006,7 +1075,11 @@ function ResumeStudioPageContent() {
             id: "links",
             title: "Links",
             icon: LinkIcon,
-            body: listSection("links", "One link per line, e.g. GitHub - github.com/you"),
+            // GitHub, LinkedIn and the portfolio URL are fields in Personal
+            // Information — this is for anything else worth linking, so the
+            // example no longer points people at the free-text list for a
+            // field that exists.
+            body: listSection("links", "One link per line, e.g. Portfolio - dribbble.com/you"),
         },
         ...customSections.map((custom) => ({
             id: custom.id,
@@ -1052,6 +1125,7 @@ function ResumeStudioPageContent() {
                                         setHasGenerated(true);
                                         setCurrentResumeId(resume.id);
                                         setCurrentResumeName(resume.name);
+                                        applySavedTemplate(resume.templateId);
                                         setActiveDocument("resume");
                                         setMobilePanelView("preview");
                                     }}
@@ -1159,13 +1233,41 @@ function ResumeStudioPageContent() {
                             <span className="hidden sm:inline">Save</span>
                         </button>
 
-                        {/* DOWNLOAD BUTTON */}
+                        {/* DOWNLOAD BUTTON — for whichever document is on screen */}
+                        {activeDocument !== "resume" ? (
+                            <button
+                                onClick={() => downloadTextDocument(activeDocument === "cover-letter" ? "cover-letter" : "email")}
+                                disabled={docDownloading || !(activeDocument === "cover-letter" ? coverLetter : draftEmail)}
+                                className="flex items-center gap-1 bg-white text-black hover:bg-gray-200 transition px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                {docDownloading ? (
+                                    <><Loader2 className="h-3 w-3 animate-spin" /> Generating...</>
+                                ) : (
+                                    <><Download className="h-3 w-3" /> Download PDF</>
+                                )}
+                            </button>
+                        ) : (
                         <PdfDownloadButton
                             data={resumeData}
                             templateId={selectedTemplate}
                             designSettings={designSettings}
                             fileName={`${job.company.replace(/[^a-zA-Z0-9]/g, '_')}_Resume.pdf`}
+                            onUpgradeRequired={(info) =>
+                                setDialogConfig({
+                                    isOpen: true,
+                                    type: "alert",
+                                    title: info?.error || "This is a Pro template",
+                                    description:
+                                        (info?.message ||
+                                            "Downloading this template needs a Pro or Premium plan.") +
+                                        (info?.freeTemplates?.length
+                                            ? " Free templates: " + info.freeTemplates.join(", ") + "."
+                                            : ""),
+                                    variant: "default",
+                                })
+                            }
                         />
+                        )}
                     </div>
                 )}
             </div>
@@ -1278,7 +1380,7 @@ function ResumeStudioPageContent() {
                             <div className="flex-1 overflow-y-auto p-5 scrollbar-thin scrollbar-thumb-black/10 dark:scrollbar-thumb-white/10">
                                 {activeTab === "jd" && (
                                     <div className="rounded-xl border border-[var(--border-color)] bg-[var(--background)] p-4 w-full min-w-0">
-                                        <JobDescriptionBody job={job as any} jd={formattedJd} />
+                                        <JobDescriptionBody job={job as any} jd={formattedJd} refining={jdRefining} />
                                     </div>
                                 )}
 
@@ -1289,7 +1391,12 @@ function ResumeStudioPageContent() {
                                             These are the keywords this posting screens for. Generate a resume and the
                                             ATS report will score your document against them.
                                         </p>
-                                        {formattedJd && formattedJd.skills.length > 0 ? (
+                                        {jdRefining ? (
+                                            <div className="flex items-center gap-2 text-xs font-semibold text-[var(--primary)] py-2">
+                                                <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" />
+                                                <span>Pulling out the keywords…</span>
+                                            </div>
+                                        ) : formattedJd && formattedJd.skills.length > 0 ? (
                                             <SkillChips skills={formattedJd.skills} />
                                         ) : (
                                             <p className="text-[13px] text-[var(--text-secondary)]">
@@ -1697,12 +1804,22 @@ function ResumeStudioPageContent() {
                     ) : activeDocument === "resume" ? (
                         resumeData ? (
                             /* Using Interactive Preview with Canva-like editing */
-                            <InteractivePreviewPanel
-                                data={resumeData}
-                                templateId={activeTemplateId}
-                                designSettings={designSettings}
-                                onDataChange={(newData) => setResumeData(newData)}
-                            />
+                            <div className="flex-1 relative min-h-0">
+                                <InteractivePreviewPanel
+                                    data={resumeData}
+                                    templateId={activeTemplateId}
+                                    designSettings={designSettings}
+                                    onDataChange={(newData) => setResumeData(newData)}
+                                />
+                                {/* Says up front that this one costs money to take away,
+                                    rather than letting the refusal arrive at download. */}
+                                {TEMPLATES.find((t) => t.id === activeTemplateId)?.isPremium && (
+                                    <div className="absolute top-3 right-5 z-20 pointer-events-none flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-gradient-to-r from-amber-500 to-orange-500 text-white text-[11px] font-extrabold tracking-wide shadow-lg">
+                                        <Crown className="w-3 h-3" />
+                                        PRO
+                                    </div>
+                                )}
+                            </div>
                         ) : (
                             <div className="flex-1 flex flex-col items-center justify-center p-10 text-center text-[var(--foreground)] bg-[var(--background)]">
                                 <FileText className="w-16 h-16 text-[var(--border-color)] mb-4" />

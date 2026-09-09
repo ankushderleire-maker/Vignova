@@ -20,9 +20,16 @@ from app.limiter import limiter
 
 logger = logging.getLogger("app")
 
+_IS_DEV = os.getenv("ENVIRONMENT", "development") == "development"
+
+# The schema is disabled in production along with the docs UI. Turning off
+# docs_url alone still leaves /openapi.json served, which lists every route,
+# request model and response model on a host that is reachable from the
+# internet — a complete map of the API for anyone who asks for it.
 app = FastAPI(
-    docs_url="/docs" if os.getenv("ENVIRONMENT", "development") == "development" else None,
+    docs_url="/docs" if _IS_DEV else None,
     redoc_url=None,
+    openapi_url="/openapi.json" if _IS_DEV else None,
 )
 
 app.state.limiter = limiter
@@ -77,6 +84,7 @@ from app.routes.ats_ingest  import router as ats_ingest_router
 from app.routes.linkedin    import router as linkedin_router
 from app.routes.jd_format   import router as jd_format_router
 from app.routes.resume_assist import router as resume_assist_router
+from app.routes.outreach import router as outreach_router
 
 # Checkout and Payment
 from app.routes.checkout import router as checkout_router
@@ -99,6 +107,7 @@ app.include_router(ats_ingest_router)
 app.include_router(linkedin_router)
 app.include_router(jd_format_router)
 app.include_router(resume_assist_router)
+app.include_router(outreach_router)
 
 # Checkout and Payment
 app.include_router(checkout_router)

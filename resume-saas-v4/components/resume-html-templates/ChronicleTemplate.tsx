@@ -25,6 +25,8 @@ export const ChronicleTemplate: React.FC<HtmlTemplateProps> = ({ data, designSet
                     {data.contact?.phone && <div className="chr-contact">{data.contact.phone}</div>}
                     {data.contact?.location && <div className="chr-contact">{data.contact.location}</div>}
                     {data.contact?.linkedin && <div className="chr-contact">{data.contact.linkedin}</div>}
+                    {data.contact?.website && <div className="chr-contact">{data.contact.website}</div>}
+                    {data.contact?.github && <div className="chr-contact">{data.contact.github}</div>}
                 </div>
             </header>
 
@@ -119,7 +121,7 @@ export const ChronicleTemplate: React.FC<HtmlTemplateProps> = ({ data, designSet
                                 style={{ marginBottom: `${eduSettings.spacing / 2}px` }}>
                                 <div className="chr-entry-role" data-editable={`education-${i}-degree`}>{edu.degree}</div>
                                 <div className="chr-entry-org">{edu.field}</div>
-                                <div className="chr-entry-org" data-editable={`education-${i}-school`}>{edu.school}</div>
+                                <div className="chr-entry-org" data-editable={`education-${i}-school`}>{edu.school}{edu.grade ? ` · ${edu.grade}` : ''}</div>
                                 <div className="chr-edu-date">{edu.startDate} – {edu.endDate}</div>
                             </div>
                         ))}

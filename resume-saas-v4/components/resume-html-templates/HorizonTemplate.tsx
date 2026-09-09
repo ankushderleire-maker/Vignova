@@ -27,6 +27,7 @@ export const HorizonTemplate: React.FC<HtmlTemplateProps> = ({ data, designSetti
                     {data.contact?.phone && <span>{data.contact.phone}</span>}
                     {data.contact?.location && <span>{data.contact.location}</span>}
                     {data.contact?.linkedin && <span>{data.contact.linkedin}</span>}
+                    {data.contact?.github && <span>{data.contact.github}</span>}
                     {data.contact?.website && <span>{data.contact.website}</span>}
                 </div>
             </header>
@@ -105,7 +106,7 @@ export const HorizonTemplate: React.FC<HtmlTemplateProps> = ({ data, designSetti
                                     style={{ marginBottom: `${eduSettings.spacing / 2}px` }}>
                                     <div className="hz-entry-title" data-editable={`education-${i}-degree`}>{edu.degree}</div>
                                     <div className="hz-entry-sub">{edu.field}</div>
-                                    <div className="hz-entry-sub" data-editable={`education-${i}-school`}>{edu.school}</div>
+                                    <div className="hz-entry-sub" data-editable={`education-${i}-school`}>{edu.school}{edu.grade ? ` · ${edu.grade}` : ''}</div>
                                     <div className="hz-date-inline">{edu.startDate} – {edu.endDate}</div>
                                 </div>
                             ))}

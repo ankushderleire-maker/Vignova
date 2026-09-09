@@ -8,7 +8,7 @@ export async function GET() {
     const session = await getServerSession(authOptions);
 
     if (!(session?.user as any)?.id) {
-      return new NextResponse("Unauthorized", { status: 401 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     // Find the DEFAULT Master Profile for this user
@@ -40,7 +40,7 @@ export async function GET() {
     return NextResponse.json({ data: profile.parsed_data });
   } catch (error) {
     console.error("[PROFILE_GET]", error);
-    return new NextResponse("Internal Error", { status: 500 });
+    return NextResponse.json({ error: "Internal Error" }, { status: 500 });
   }
 }
 
@@ -49,7 +49,7 @@ export async function POST(req: Request) {
     const session = await getServerSession(authOptions);
 
     if (!(session?.user as any)?.id) {
-      return new NextResponse("Unauthorized", { status: 401 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const body = await req.json(); // This is the ResumeData object
@@ -89,6 +89,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("[PROFILE_POST]", error);
-    return new NextResponse("Internal Error", { status: 500 });
+    return NextResponse.json({ error: "Internal Error" }, { status: 500 });
   }
 }

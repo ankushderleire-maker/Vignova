@@ -28,6 +28,8 @@ export const AtlasTemplate: React.FC<HtmlTemplateProps> = ({ data, designSetting
                     {data.contact?.phone && <div className="atlas-contact-item">{data.contact.phone}</div>}
                     {data.contact?.location && <div className="atlas-contact-item">{data.contact.location}</div>}
                     {data.contact?.linkedin && <div className="atlas-contact-item">{data.contact.linkedin}</div>}
+                    {data.contact?.website && <div className="atlas-contact-item">{data.contact.website}</div>}
+                    {data.contact?.github && <div className="atlas-contact-item">{data.contact.github}</div>}
                 </div>
             </header>
 
@@ -111,7 +113,7 @@ export const AtlasTemplate: React.FC<HtmlTemplateProps> = ({ data, designSetting
                                     <div className="atlas-entry-content">
                                         <div className="atlas-entry-role" data-editable={`education-${i}-degree`}>{edu.degree}</div>
                                         <div className="atlas-entry-org">{edu.field}</div>
-                                        <div className="atlas-entry-org" data-editable={`education-${i}-school`}>{edu.school}</div>
+                                        <div className="atlas-entry-org" data-editable={`education-${i}-school`}>{edu.school}{edu.grade ? ` · ${edu.grade}` : ''}</div>
                                     </div>
                                 </div>
                             </div>

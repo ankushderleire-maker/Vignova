@@ -1,147 +1,199 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { BrainCircuit, ScanLine } from 'lucide-react';
+import { Loader2, Sparkles, WandSparkles } from 'lucide-react';
 
-const PREPARATION_STEPS = [
-    "Analyzing Master Profile...",
-    "Checking Job Description...",
-    "Writing Summary...",
-    "Preparing Skills...",
-    "Writing Projects...",
-    "Checking for ATS Compatibility...",
-    "Refining Resume..."
+/**
+ * The waiting state while a resume is generated.
+ *
+ * Two things it deliberately does:
+ *
+ * 1. The captions cycle, but the three steps beneath advance monotonically.
+ *    There is no real progress to report — generation is a single opaque
+ *    request — so the steps are paced against elapsed time and stop at the last
+ *    one rather than looping. A bar that resets to the beginning tells the user
+ *    the work restarted, which it did not.
+ * 2. The sheet behind is a recognisable resume, not an abstract shimmer, so it
+ *    is obvious what is being built.
+ */
+
+// Kept short: the card is 290px wide with an icon and a spinner on it, so
+// anything longer is truncated mid-word.
+const CAPTIONS = [
+    'Reading the job post…',
+    'Matching your profile…',
+    'Writing summary…',
+    'Selecting skills…',
+    'Rewriting experience…',
+    'Checking ATS fit…',
 ];
 
+const STEPS = ['Reading job post', 'Matching profile', 'Building resume'];
+
+/** Roughly when each step should light up, in seconds. */
+const STEP_AT = [0, 8, 20];
+
 export const AIPreparationAnimation = () => {
-    const [currentStep, setCurrentStep] = useState(0);
+    const [caption, setCaption] = useState(0);
+    const [elapsed, setElapsed] = useState(0);
 
     useEffect(() => {
-        const interval = setInterval(() => {
-            setCurrentStep((prev) => (prev + 1) % PREPARATION_STEPS.length);
-        }, 2500);
-        return () => clearInterval(interval);
+        const captions = setInterval(() => setCaption((c) => (c + 1) % CAPTIONS.length), 2600);
+        const clock = setInterval(() => setElapsed((s) => s + 1), 1000);
+        return () => {
+            clearInterval(captions);
+            clearInterval(clock);
+        };
     }, []);
+
+    // Never goes backwards, and never claims the last step is finished.
+    const reached = STEP_AT.reduce((acc, at, i) => (elapsed >= at ? i : acc), 0);
+
+    const line = (w: string, key: string, delay = 0) => (
+        <div
+            key={key}
+            className="h-[7px] rounded-full bg-[var(--border-color)]/70 animate-pulse"
+            style={{ width: w, animationDelay: `${delay}ms` }}
+        />
+    );
+
     return (
-        <div className="relative flex items-center justify-center w-full h-[400px]">
-            <motion.div
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ duration: 0.8 }}
-                className="relative w-full max-w-[320px] h-full max-h-[420px]"
-            >
-                {/* Glassmorphism Card Container */}
+        <div className="w-full flex flex-col items-center">
+            <div className="relative w-[300px] h-[318px] mb-9" aria-hidden="true">
+                {/* Soft halo, and a dashed ring that turns slowly behind the sheet. */}
+                <div className="absolute inset-0 -m-10 rounded-full bg-[var(--primary)]/10 blur-3xl" />
                 <motion.div
-                    animate={{
-                        boxShadow: [
-                            "0 0 10px 2px rgba(249,115,22,0.1)",
-                            "0 0 40px 5px rgba(249,115,22,0.4)",
-                            "0 0 10px 2px rgba(249,115,22,0.1)"
-                        ]
-                    }}
-                    transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-                    className="absolute inset-0 bg-gradient-to-br from-[var(--sidebar-bg)]/90 to-[var(--background)]/90 rounded-2xl border-2 border-[var(--primary)]/50 backdrop-blur-xl overflow-hidden"
+                    animate={{ rotate: 360 }}
+                    transition={{ duration: 40, repeat: Infinity, ease: 'linear' }}
+                    className="absolute inset-x-2 inset-y-6 rounded-full border border-dashed border-[var(--primary)]/25"
+                />
+
+                <Sparkles className="absolute -left-1 top-24 w-5 h-5 text-[var(--primary)]/60" />
+                <Sparkles className="absolute -right-1 top-40 w-4 h-4 text-[var(--primary)]/45" />
+                <Sparkles className="absolute left-8 bottom-10 w-3.5 h-3.5 text-[var(--primary)]/35" />
+
+                {/* The resume sheet */}
+                <motion.div
+                    initial={{ opacity: 0, y: 12 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.6 }}
+                    className="absolute inset-x-5 inset-y-0 rounded-2xl bg-[var(--sidebar-bg)] border border-[var(--border-color)] shadow-[0_24px_60px_-24px_rgba(38,22,84,0.35)] p-5 overflow-hidden"
                 >
+                    <div className="flex items-center justify-between mb-3">
+                        <span className="text-[11px] font-extrabold tracking-[0.14em] bg-[linear-gradient(110deg,#861cf6_0%,#5141f5_45%,#157bdc_100%)] bg-clip-text text-transparent">
+                            VIGNOVA
+                        </span>
+                        <span className="text-[9px] font-bold tracking-[0.2em] text-[var(--text-secondary)]/60">RESUME</span>
+                    </div>
 
-                    {/* Animated Scanning Beam */}
-                    <motion.div
-                        animate={{
-                            top: ["-10%", "120%"],
-                            opacity: 1
-                        }}
-                        transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-                        className="absolute left-0 right-0 h-24 bg-gradient-to-b from-transparent via-[var(--primary)]/10 to-transparent z-20 pointer-events-none"
-                    />
-                    <motion.div
-                        animate={{
-                            top: ["-10%", "120%"],
-                            opacity: 1
-                        }}
-                        transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-                        className="absolute left-0 right-0 h-[2px] bg-[var(--primary)]/50 shadow-[0_0_15px_var(--primary)] z-30"
-                    />
-
-                    {/* Resume Skeleton Content */}
-                    <div className="p-6 space-y-6 relative z-10 h-full flex flex-col">
-                        {/* Header Skeleton */}
-                        <div className="flex gap-4 items-center border-b border-black/5 dark:border-white/5 pb-4">
-                            <div className="w-12 h-12 rounded-full bg-[var(--primary)]/10 flex items-center justify-center overflow-hidden shrink-0 relative">
-                                <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-[var(--primary)]/30 to-[var(--primary)]/10" />
-                            </div>
-                            <div className="space-y-2 flex-1">
-                                <div className="h-4 bg-black/10 dark:bg-white/10 w-2/3 rounded animate-pulse" />
-                                <div className="h-2 bg-black/5 dark:bg-white/5 w-1/3 rounded" />
+                    {/* Identity block */}
+                    <div className="flex items-start gap-3 mb-3">
+                        <div className="w-10 h-10 rounded-full bg-[var(--border-color)]/70 shrink-0" />
+                        <div className="flex-1 space-y-2 pt-1">
+                            {line('72%', 'n1')}
+                            {line('46%', 'n2', 120)}
+                            <div className="flex gap-2 pt-1">
+                                {line('38%', 'c1', 200)}
+                                {line('30%', 'c2', 260)}
                             </div>
                         </div>
+                    </div>
 
-                        {/* Body Content Skeleton */}
-                        <div className="space-y-6 flex-1">
-                            {/* Summary Box */}
-                            <div className="space-y-3">
-                                <div className="h-2.5 bg-[var(--primary)]/20 w-1/4 rounded border-l-2 border-[var(--primary)] pl-2" />
-                                <div className="space-y-2 pl-3 border-l border-black/5 dark:border-white/5">
-                                    <div className="h-1.5 bg-black/10 dark:bg-white/10 w-full rounded animate-pulse" />
-                                    <div className="h-1.5 bg-black/10 dark:bg-white/10 w-5/6 rounded animate-pulse" style={{ animationDelay: '100ms' }} />
-                                    <div className="h-1.5 bg-black/10 dark:bg-white/10 w-4/6 rounded animate-pulse" style={{ animationDelay: '200ms' }} />
-                                </div>
-                            </div>
+                    <SectionLabel>EXPERIENCE</SectionLabel>
+                    <div className="space-y-2 mb-16">
+                        {line('90%', 'e1', 300)}
+                        {line('78%', 'e2', 360)}
+                    </div>
 
-                            {/* Experience Box */}
-                            <div className="space-y-3">
-                                <div className="h-2.5 bg-[var(--primary)]/20 w-1/3 rounded border-l-2 border-[var(--primary)] pl-2" />
-                                <div className="space-y-2 pl-3 border-l border-black/5 dark:border-white/5">
-                                    <div className="flex justify-between items-center mb-1">
-                                        <div className="h-2 bg-black/20 dark:bg-white/20 w-1/3 rounded" />
-                                        <div className="h-1.5 bg-black/5 dark:bg-white/5 w-1/5 rounded" />
-                                    </div>
-                                    <div className="h-1.5 bg-black/10 dark:bg-white/10 w-11/12 rounded animate-pulse" style={{ animationDelay: '300ms' }} />
-                                    <div className="h-1.5 bg-black/10 dark:bg-white/10 w-full rounded animate-pulse" style={{ animationDelay: '400ms' }} />
-                                </div>
-                            </div>
-
-                            {/* Skills Box */}
-                            <div className="space-y-3">
-                                <div className="h-2.5 bg-[var(--primary)]/20 w-1/4 rounded border-l-2 border-[var(--primary)] pl-2" />
-                                <div className="flex flex-wrap gap-2 pl-3 border-l border-black/5 dark:border-white/5">
-                                    <div className="h-4 w-12 bg-black/5 dark:bg-white/5 rounded block" />
-                                    <div className="h-4 w-16 bg-[var(--primary)]/10 rounded block animate-pulse" />
-                                    <div className="h-4 w-10 bg-black/5 dark:bg-white/5 rounded block" />
-                                    <div className="h-4 w-14 bg-black/5 dark:bg-white/5 rounded block" />
-                                </div>
-                            </div>
-                        </div>
+                    <SectionLabel>SKILLS</SectionLabel>
+                    <div className="space-y-2">
+                        {line('96%', 's1', 420)}
+                        {line('84%', 's2', 480)}
+                        {line('66%', 's3', 540)}
                     </div>
                 </motion.div>
 
-                {/* Central Floating Badge with Dynamic Text */}
+                {/* The status card, floating over the sheet */}
                 <motion.div
-                    animate={{ y: [0, -8, 0] }}
-                    transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
-                    className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-[var(--sidebar-bg)] border border-[var(--border-color)] p-4 rounded-2xl shadow-[0_0_40px_rgba(34,197,94,0.1)] flex flex-col items-center gap-3 backdrop-blur-xl z-50 min-w-[320px]"
+                    animate={{ y: [0, -7, 0] }}
+                    transition={{ duration: 4.5, repeat: Infinity, ease: 'easeInOut' }}
+                    className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[290px] rounded-2xl bg-[var(--sidebar-bg)] border border-[var(--border-color)] shadow-[0_18px_44px_-16px_rgba(38,22,84,0.4)] px-4 py-3.5 flex items-center gap-3.5"
                 >
-                    <div className="p-3 bg-[var(--primary)]/10 rounded-xl relative">
-                        <div className="absolute inset-0 bg-[var(--primary)]/20 rounded-xl blur-md animate-pulse"></div>
-                        <BrainCircuit className="w-8 h-8 text-[var(--primary)] relative z-10" />
+                    <div className="w-12 h-12 rounded-xl bg-[var(--primary)]/12 flex items-center justify-center shrink-0">
+                        <WandSparkles className="w-[22px] h-[22px] text-[var(--primary)]" />
                     </div>
-                    <div className="text-center w-full overflow-visible">
-                        <div className="text-[var(--foreground)] font-bold text-sm mb-1">AI Preparation</div>
-                        <div className="h-4 relative w-full flex justify-center">
+
+                    <div className="min-w-0 flex-1">
+                        <div className="text-[15px] font-bold text-[var(--foreground)] leading-tight">AI Preparation</div>
+                        <div className="relative h-4 mt-0.5">
                             <AnimatePresence mode="wait">
                                 <motion.div
-                                    key={currentStep}
-                                    initial={{ y: 10, opacity: 0 }}
+                                    key={caption}
+                                    initial={{ y: 8, opacity: 0 }}
                                     animate={{ y: 0, opacity: 1 }}
-                                    exit={{ y: -10, opacity: 0 }}
-                                    transition={{ duration: 0.3 }}
-                                    className="text-xs text-[var(--primary)] font-mono whitespace-nowrap absolute"
+                                    exit={{ y: -8, opacity: 0 }}
+                                    transition={{ duration: 0.28 }}
+                                    className="absolute inset-0 text-[13px] text-[var(--primary)] font-medium truncate"
                                 >
-                                    {PREPARATION_STEPS[currentStep]}
+                                    {CAPTIONS[caption]}
                                 </motion.div>
                             </AnimatePresence>
                         </div>
                     </div>
-                </motion.div>
 
-            </motion.div>
+                    <Loader2 className="w-5 h-5 text-[var(--primary)] animate-spin shrink-0" />
+                </motion.div>
+            </div>
+
+            {/* Three steps, mirroring the extension overlay so both surfaces
+                describe the same work the same way. */}
+            <ol className="flex items-start justify-center w-full max-w-[400px] list-none m-0 p-0">
+                {STEPS.map((label, i) => {
+                    const done = i < reached;
+                    const active = i === reached;
+                    return (
+                        <li key={label} className="relative flex-1 text-center">
+                            {i > 0 && (
+                                <span
+                                    className={`absolute top-[13px] right-1/2 w-full h-[2px] transition-colors duration-500 ${
+                                        done || active ? 'bg-[var(--primary)]' : 'bg-[var(--border-color)]'
+                                    }`}
+                                />
+                            )}
+                            <span
+                                className={`relative z-10 block w-7 h-7 mx-auto mb-2.5 rounded-full border-[3px] box-border transition-colors duration-300 ${
+                                    done
+                                        ? 'bg-[var(--primary)] border-[var(--primary)]'
+                                        : active
+                                          ? 'bg-[var(--background)] border-[var(--primary)] border-t-transparent animate-spin'
+                                          : 'bg-[var(--background)] border-[var(--border-color)]'
+                                }`}
+                            >
+                                {done && (
+                                    <svg viewBox="0 0 24 24" className="w-full h-full p-[3px]" fill="none" stroke="#fff" strokeWidth={3.5} strokeLinecap="round" strokeLinejoin="round">
+                                        <path d="M4.5 12.5l5 5 10-11" />
+                                    </svg>
+                                )}
+                            </span>
+                            <span
+                                className={`block text-[12.5px] font-bold leading-tight ${
+                                    done || active ? 'text-[var(--foreground)]' : 'text-[var(--text-secondary)]'
+                                }`}
+                            >
+                                {label}
+                            </span>
+                        </li>
+                    );
+                })}
+            </ol>
         </div>
     );
 };
+
+function SectionLabel({ children }: { children: React.ReactNode }) {
+    return (
+        <div className="flex items-center gap-1.5 mb-2">
+            <span className="w-1 h-3 rounded-full bg-[var(--primary)]/60" />
+            <span className="text-[9px] font-extrabold tracking-[0.16em] text-[var(--text-secondary)]/80">{children}</span>
+        </div>
+    );
+}

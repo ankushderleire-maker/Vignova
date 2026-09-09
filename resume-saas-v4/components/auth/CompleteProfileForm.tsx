@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
+import { COUNTRIES, flagOf } from "@/lib/countries";
 
 export function CompleteProfileForm() {
     const router = useRouter();
@@ -49,12 +50,11 @@ export function CompleteProfileForm() {
                     className="w-full bg-white/[0.03] border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-white/20 focus:bg-white/[0.06] transition-all appearance-none"
                 >
                     <option value="" disabled className="bg-zinc-900 text-white">Select Country</option>
-                    <option value="US" className="bg-zinc-900 text-white">United States (US)</option>
-                    <option value="IN" className="bg-zinc-900 text-white">India (IN)</option>
-                    <option value="GB" className="bg-zinc-900 text-white">United Kingdom (GB)</option>
-                    <option value="CA" className="bg-zinc-900 text-white">Canada (CA)</option>
-                    <option value="AU" className="bg-zinc-900 text-white">Australia (AU)</option>
-                    <option value="IE" className="bg-zinc-900 text-white">Ireland (IE)</option>
+                    {COUNTRIES.map((c) => (
+                        <option key={c.code} value={c.code} className="bg-zinc-900 text-white">
+                            {flagOf(c.code)}  {c.name}
+                        </option>
+                    ))}
                 </select>
             </div>
 

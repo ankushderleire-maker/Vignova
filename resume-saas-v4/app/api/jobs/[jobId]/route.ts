@@ -11,7 +11,7 @@ export async function PATCH(
 ) {
   try {
     const session = await getServerSession(authOptions);
-    if (!(session?.user as any)?.id) return new NextResponse("Unauthorized", { status: 401 });
+    if (!(session?.user as any)?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const { jobId } = await params;
     const body = await req.json();
@@ -45,7 +45,7 @@ export async function PATCH(
     return NextResponse.json(updatedJob);
   } catch (error) {
     console.error("[JOB_PATCH]", error);
-    return new NextResponse("Internal Error", { status: 500 });
+    return NextResponse.json({ error: "Internal Error" }, { status: 500 });
   }
 }
 
@@ -56,7 +56,7 @@ export async function DELETE(
 ) {
   try {
     const session = await getServerSession(authOptions);
-    if (!(session?.user as any)?.id) return new NextResponse("Unauthorized", { status: 401 });
+    if (!(session?.user as any)?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const { jobId } = await params;
 
@@ -70,6 +70,6 @@ export async function DELETE(
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("[JOB_DELETE]", error);
-    return new NextResponse("Internal Error", { status: 500 });
+    return NextResponse.json({ error: "Internal Error" }, { status: 500 });
   }
 }

@@ -77,23 +77,37 @@ export interface TemplateMetadata {
     description: string;
     thumbnail: string;
     isPremium?: boolean;
+    /**
+     * How the page reads, which is the only structural choice that matters
+     * to an ATS: does the content flow in one column, or is it split across
+     * two?
+     *
+     * Judged on whether whole sections sit side by side, not on whether the
+     * markup uses a grid — several single-column templates use a narrow
+     * gutter for dates or labels beside each section, which a parser still
+     * reads top to bottom.
+     */
+    layout: "single" | "two";
 }
 
 export const TEMPLATES: TemplateMetadata[] = [
     {
         id: 'modern',
+        layout: "single",
         name: 'Modern',
         description: 'Clean contemporary design',
         thumbnail: '/templates/modern-thumb.png'
     },
     {
         id: 'classic',
+        layout: "single",
         name: 'Classic',
         description: 'Traditional professional look',
         thumbnail: '/templates/classic-thumb.png'
     },
     {
         id: 'creative',
+        layout: "two",
         name: 'Creative',
         description: 'Bold and colorful design',
         thumbnail: '/templates/creative-thumb.png',
@@ -101,12 +115,14 @@ export const TEMPLATES: TemplateMetadata[] = [
     },
     {
         id: 'professional',
+        layout: "two",
         name: 'Professional',
         description: 'Executive-level template',
         thumbnail: '/templates/professional-thumb.png'
     },
     {
         id: 'minimal',
+        layout: "single",
         name: 'Minimal',
         description: 'Simple and elegant',
         thumbnail: '/templates/minimal-thumb.png',
@@ -114,6 +130,7 @@ export const TEMPLATES: TemplateMetadata[] = [
     },
     {
         id: 'executive',
+        layout: "two",
         name: 'Executive',
         description: 'Corporate navy & gold design',
         thumbnail: '/templates/executive-thumb.png',
@@ -121,18 +138,21 @@ export const TEMPLATES: TemplateMetadata[] = [
     },
     {
         id: 'elegant',
+        layout: "single",
         name: 'Elegant',
         description: 'Refined serif with teal accents',
         thumbnail: '/templates/elegant-thumb.png'
     },
     {
         id: 'tech',
+        layout: "single",
         name: 'Tech',
         description: 'Developer-focused terminal style',
         thumbnail: '/templates/tech-thumb.png'
     },
     {
         id: 'corporate',
+        layout: "two",
         name: 'Corporate',
         description: 'Dark sidebar corporate layout',
         thumbnail: '/templates/corporate-thumb.png',
@@ -140,6 +160,7 @@ export const TEMPLATES: TemplateMetadata[] = [
     },
     {
         id: 'luxe',
+        layout: "single",
         name: 'Luxe',
         description: 'Premium black & gold design',
         thumbnail: '/templates/luxe-thumb.png',
@@ -147,30 +168,35 @@ export const TEMPLATES: TemplateMetadata[] = [
     },
     {
         id: 'nordic',
+        layout: "single",
         name: 'Nordic',
         description: 'Clean Scandinavian aesthetic',
         thumbnail: '/templates/nordic-thumb.png'
     },
     {
         id: 'bold',
+        layout: "single",
         name: 'Bold',
         description: 'Strong typography with red accents',
         thumbnail: '/templates/bold-thumb.png'
     },
     {
         id: 'compact',
+        layout: "single",
         name: 'Compact',
         description: 'Dense info-packed layout',
         thumbnail: '/templates/compact-thumb.png'
     },
     {
         id: 'accent',
+        layout: "single",
         name: 'Accent',
         description: 'Colorful section borders',
         thumbnail: '/templates/accent-thumb.png'
     },
     {
         id: 'diamond',
+        layout: "two",
         name: 'Diamond',
         description: 'Emerald geometric two-column',
         thumbnail: '/templates/diamond-thumb.png',
@@ -178,18 +204,21 @@ export const TEMPLATES: TemplateMetadata[] = [
     },
     {
         id: 'cascade',
+        layout: "two",
         name: 'Cascade',
         description: 'Indigo sidebar with clean main column',
         thumbnail: '/templates/cascade-thumb.png',
     },
     {
         id: 'horizon',
+        layout: "two",
         name: 'Horizon',
         description: 'Teal gradient header, skill chips',
         thumbnail: '/templates/horizon-thumb.png',
     },
     {
         id: 'atlas',
+        layout: "single",
         name: 'Atlas',
         description: 'Swiss grid design with red accents',
         thumbnail: '/templates/atlas-thumb.png',
@@ -197,6 +226,7 @@ export const TEMPLATES: TemplateMetadata[] = [
     },
     {
         id: 'prism',
+        layout: "two",
         name: 'Prism',
         description: 'Purple gradient, rounded badges',
         thumbnail: '/templates/prism-thumb.png',
@@ -204,36 +234,42 @@ export const TEMPLATES: TemplateMetadata[] = [
     },
     {
         id: 'chronicle',
+        layout: "single",
         name: 'Chronicle',
         description: 'Timeline layout with amber accents',
         thumbnail: '/templates/chronicle-thumb.png',
     },
     {
         id: 'europass',
+        layout: "two",
         name: 'Europass',
         description: 'Official EU Europass CV format',
         thumbnail: '/templates/europass-thumb.png',
     },
     {
         id: 'cambridge',
+        layout: "single",
         name: 'Cambridge',
         description: 'Classic British serif CV, no colour',
         thumbnail: '/templates/cambridge-thumb.png',
     },
     {
         id: 'berlin',
+        layout: "two",
         name: 'Berlin',
         description: 'German Lebenslauf — structured & formal',
         thumbnail: '/templates/berlin-thumb.png',
     },
     {
         id: 'geneva',
+        layout: "single",
         name: 'Geneva',
         description: 'Swiss minimal label-column layout',
         thumbnail: '/templates/geneva-thumb.png',
     },
     {
         id: 'milano',
+        layout: "two",
         name: 'Milano',
         description: 'Italian elegant serif with gold accents',
         thumbnail: '/templates/milano-thumb.png',

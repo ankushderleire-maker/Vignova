@@ -33,6 +33,12 @@ export const CompactTemplate: React.FC<HtmlTemplateProps> = ({ data, designSetti
                         {data.contact?.linkedin && (
                             <a href={`https://${data.contact.linkedin}`} className="link" data-editable="linkedin">LinkedIn</a>
                         )}
+                        {data.contact?.website && (
+                            <a href={`https://${data.contact.website}`} className="link" data-editable="website">Website</a>
+                        )}
+                        {data.contact?.github && (
+                            <a href={`https://${data.contact.github}`} className="link" data-editable="github">GitHub</a>
+                        )}
                     </div>
                 </div>
             </header>
@@ -99,7 +105,7 @@ export const CompactTemplate: React.FC<HtmlTemplateProps> = ({ data, designSetti
                             <div className="exp-header">
                                 <span className="role" data-editable={`experience-${index}-role`}>{exp.role}</span>
                                 <span className="spacer"></span>
-                                <span className="company" data-editable={`experience-${index}-company`}>{exp.company}</span>
+                                <span className="company" data-editable={`experience-${index}-company`}>{exp.company}{exp.location ? ` · ${exp.location}` : ''}</span>
                                 <span className="date" data-editable={`experience-${index}-date`}>
                                     {exp.startDate} - {exp.endDate || 'Present'}
                                 </span>
@@ -121,9 +127,9 @@ export const CompactTemplate: React.FC<HtmlTemplateProps> = ({ data, designSetti
                     <h2 className="section-title">Education</h2>
                     {data.education.map((edu, index) => (
                         <div key={edu.id || index} className="education-item no-break" data-section={`education-${index}`}>
-                            <span className="degree" data-editable={`education-${index}-degree`}>{edu.degree}</span>
+                            <span className="degree" data-editable={`education-${index}-degree`}>{edu.degree}{edu.field ? ` · ${edu.field}` : ''}</span>
                             <span className="sep"> | </span>
-                            <span className="school" data-editable={`education-${index}-school`}>{edu.school}</span>
+                            <span className="school" data-editable={`education-${index}-school`}>{edu.school}{edu.grade ? ` · ${edu.grade}` : ''}</span>
                             <span className="sep"> | </span>
                             <span className="date" data-editable={`education-${index}-date`}>{edu.startDate} - {edu.endDate}</span>
                         </div>
@@ -218,7 +224,7 @@ ${BASE_STYLES}
 }
 
 .compact-template .skill-item {
-    font-size: 13px;
+    font-size: 14px;
     color: #333;
     font-weight: 500;
 }

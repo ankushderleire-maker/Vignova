@@ -25,6 +25,7 @@ export const PrismTemplate: React.FC<HtmlTemplateProps> = ({ data, designSetting
                     {data.contact?.phone && <span className="prism-contact-item">✆ {data.contact.phone}</span>}
                     {data.contact?.location && <span className="prism-contact-item">⌖ {data.contact.location}</span>}
                     {data.contact?.linkedin && <span className="prism-contact-item">in {data.contact.linkedin}</span>}
+                    {data.contact?.github && <span className="prism-contact-item">in {data.contact.github}</span>}
                     {data.contact?.website && <span className="prism-contact-item">⊕ {data.contact.website}</span>}
                 </div>
             </header>
@@ -107,7 +108,7 @@ export const PrismTemplate: React.FC<HtmlTemplateProps> = ({ data, designSetting
                                     style={{ marginBottom: `${eduSettings.spacing / 2}px` }}>
                                     <div className="prism-entry-role" data-editable={`education-${i}-degree`}>{edu.degree}</div>
                                     <div className="prism-entry-org">{edu.field}</div>
-                                    <div className="prism-entry-org" data-editable={`education-${i}-school`}>{edu.school}</div>
+                                    <div className="prism-entry-org" data-editable={`education-${i}-school`}>{edu.school}{edu.grade ? ` · ${edu.grade}` : ''}</div>
                                     <div className="prism-date-small">{edu.startDate} – {edu.endDate}</div>
                                 </div>
                             ))}

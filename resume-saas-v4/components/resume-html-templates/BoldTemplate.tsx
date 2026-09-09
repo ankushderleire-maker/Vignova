@@ -32,6 +32,12 @@ export const BoldTemplate: React.FC<HtmlTemplateProps> = ({ data, designSettings
                     {data.contact?.linkedin && (
                         <a href={`https://${data.contact.linkedin}`} className="link" data-editable="linkedin">LinkedIn</a>
                     )}
+                    {data.contact?.website && (
+                        <a href={`https://${data.contact.website}`} className="link" data-editable="website">Website</a>
+                    )}
+                    {data.contact?.github && (
+                        <a href={`https://${data.contact.github}`} className="link" data-editable="github">GitHub</a>
+                    )}
                 </div>
             </header>
 
@@ -55,7 +61,7 @@ export const BoldTemplate: React.FC<HtmlTemplateProps> = ({ data, designSettings
                             <div className="exp-header">
                                 <div>
                                     <div className="role" data-editable={`experience-${index}-role`}>{exp.role}</div>
-                                    <div className="company" data-editable={`experience-${index}-company`}>{exp.company}</div>
+                                    <div className="company" data-editable={`experience-${index}-company`}>{exp.company}{exp.location ? ` · ${exp.location}` : ''}</div>
                                 </div>
                                 <div className="date" data-editable={`experience-${index}-date`}>
                                     {exp.startDate} — {exp.endDate || 'Present'}
@@ -119,10 +125,10 @@ export const BoldTemplate: React.FC<HtmlTemplateProps> = ({ data, designSettings
                     {data.education.map((edu, index) => (
                         <div key={edu.id || index} className="education-item no-break" data-section={`education-${index}`}>
                             <div className="edu-header">
-                                <div className="degree" data-editable={`education-${index}-degree`}>{edu.degree}</div>
+                                <div className="degree" data-editable={`education-${index}-degree`}>{edu.degree}{edu.field ? ` · ${edu.field}` : ''}</div>
                                 <div className="date" data-editable={`education-${index}-date`}>{edu.startDate} - {edu.endDate}</div>
                             </div>
-                            <div className="school" data-editable={`education-${index}-school`}>{edu.school}</div>
+                            <div className="school" data-editable={`education-${index}-school`}>{edu.school}{edu.grade ? ` · ${edu.grade}` : ''}</div>
                         </div>
                     ))}
                 </section>
@@ -284,7 +290,7 @@ ${BASE_STYLES}
 }
 
 .bold-template .skill-block {
-    font-size: 13px;
+    font-size: 14px;
     padding: 5px 12px;
     background: #fef2f2;
     border: 2px solid #e74c3c;

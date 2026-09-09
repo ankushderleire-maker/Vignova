@@ -11,6 +11,7 @@ import {
     Gift,
     GraduationCap,
     ListChecks,
+    Loader2,
     MapPin,
     Sparkles,
     Users,
@@ -110,7 +111,70 @@ export function useFormattedJd(job: JobLike | null) {
         }).data;
     }, [ready, job?.description, job?.company, job?.location, job?.salary]);
 
-    return { jd, formatting };
+    // `formatting` alone isn't enough to decide what to show: a job that has
+    // been formatted before still re-checks, and hiding a finished description
+    // behind a spinner for that would be worse than showing nothing new. The
+    // loading state belongs only to the first pass, when all we have is the
+    // parser's rough guess.
+    return { jd, formatting, refining: formatting && !ready };
+}
+
+/**
+ * Shown while the AI is still structuring a job description.
+ *
+ * The hook hands back a parser fallback immediately, so without this the panel
+ * filled with rough, mis-sectioned text and then silently rearranged itself
+ * once the AI answered — which reads as a glitch rather than as progress.
+ */
+export function JdRefiningState() {
+    const [step, setStep] = useState(0);
+    const stages = [
+        "Reading the posting",
+        "Finding responsibilities and requirements",
+        "Pulling out skills and keywords",
+    ];
+
+    useEffect(() => {
+        const t = setInterval(() => setStep((s) => (s + 1) % stages.length), 2200);
+        return () => clearInterval(t);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    return (
+        <div className="py-10 flex flex-col items-center text-center">
+            <div className="relative mb-5">
+                <div className="absolute inset-0 rounded-2xl bg-[var(--primary)]/20 blur-xl animate-pulse" />
+                <div className="relative w-14 h-14 rounded-2xl bg-[var(--primary)]/10 border border-[var(--primary)]/25 flex items-center justify-center">
+                    <Sparkles className="w-6 h-6 text-[var(--primary)]" />
+                </div>
+            </div>
+
+            <h4 className="text-sm font-bold text-[var(--foreground)] mb-1.5">Analysing this job description</h4>
+            <p className="text-[13px] text-[var(--text-secondary)] mb-5 max-w-[320px] leading-relaxed">
+                We&apos;re restructuring the posting into sections so the key details and keywords are easy to scan.
+            </p>
+
+            <div className="flex items-center gap-2 text-xs font-semibold text-[var(--primary)] mb-7">
+                <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" />
+                <span>{stages[step]}…</span>
+            </div>
+
+            {/* A skeleton of the layout that is about to appear, so the panel
+                does not jump when the real content lands. */}
+            <div className="w-full max-w-[420px] space-y-4" aria-hidden="true">
+                <div className="grid grid-cols-2 gap-3">
+                    {[0, 1, 2, 3].map((i) => (
+                        <div key={i} className="h-11 rounded-lg bg-[var(--border-color)]/40 animate-pulse" style={{ animationDelay: `${i * 90}ms` }} />
+                    ))}
+                </div>
+                <div className="flex flex-wrap gap-2 justify-center pt-1">
+                    {[54, 38, 46, 62, 34, 50].map((w, i) => (
+                        <div key={i} className="h-6 rounded-full bg-[var(--border-color)]/40 animate-pulse" style={{ width: w, animationDelay: `${i * 70}ms` }} />
+                    ))}
+                </div>
+            </div>
+        </div>
+    );
 }
 
 export function BulletSection({
@@ -225,8 +289,21 @@ export function CopyButton({ text }: { text: string }) {
 }
 
 /** The full structured body: prose, bullet sections, key info and skills. */
-export function JobDescriptionBody({ job, jd }: { job: JobLike; jd: FormattedJd | null }) {
+export function JobDescriptionBody({
+    job,
+    jd,
+    refining,
+}: {
+    job: JobLike;
+    jd: FormattedJd | null;
+    /** First pass still running — the jd here is only the parser fallback. */
+    refining?: boolean;
+}) {
     const cells = keyInfoCells(jd, job);
+
+    if (refining) {
+        return <JdRefiningState />;
+    }
 
     if (!jd) {
         return <p className="text-[13px] text-[var(--text-secondary)]">No job description saved for this role.</p>;
@@ -238,6 +315,24 @@ export function JobDescriptionBody({ job, jd }: { job: JobLike; jd: FormattedJd 
                 <h4 className="text-sm font-bold text-[var(--foreground)]">Job Description</h4>
                 <CopyButton text={job.description || ""} />
             </div>
+
+            {/* Key info and keywords lead.
+                They used to sit under the full description, which meant scrolling
+                past every bullet to reach the two things people check first —
+                whether the contract and location suit them, and which keywords
+                the posting screens for. */}
+            {cells.length > 0 && (
+                <div className="mb-4 pb-4 border-b border-[var(--border-color)]">
+                    <KeyInfoGrid cells={cells} />
+                </div>
+            )}
+
+            {jd.skills.length > 0 && (
+                <div className="mb-4 pb-4 border-b border-[var(--border-color)]">
+                    <h4 className="text-sm font-bold text-[var(--foreground)] mb-2.5">Skills &amp; Keywords</h4>
+                    <SkillChips skills={jd.skills} />
+                </div>
+            )}
 
             <div className="space-y-2.5">
                 {jd.overview.map((paragraph, i) => (
@@ -251,19 +346,6 @@ export function JobDescriptionBody({ job, jd }: { job: JobLike; jd: FormattedJd 
             <BulletSection title="Requirements" icon={Award} items={jd.requirements} />
             <BulletSection title="Nice to have" icon={Sparkles} items={jd.niceToHave} />
             <BulletSection title="Benefits" icon={Gift} items={jd.benefits} />
-
-            {cells.length > 0 && (
-                <div className="pt-4 mt-4 border-t border-[var(--border-color)]">
-                    <KeyInfoGrid cells={cells} />
-                </div>
-            )}
-
-            {jd.skills.length > 0 && (
-                <div className="pt-4 mt-4 border-t border-[var(--border-color)]">
-                    <h4 className="text-sm font-bold text-[var(--foreground)] mb-2.5">Skills &amp; Keywords</h4>
-                    <SkillChips skills={jd.skills} />
-                </div>
-            )}
         </>
     );
 }

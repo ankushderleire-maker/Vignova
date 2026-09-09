@@ -1,6 +1,8 @@
 // HTML Resume Templates
 // These templates render to HTML/CSS for perfect text handling and PDF generation
 
+import { composeSections } from './composeSections';
+
 export { ClassicTemplate, CLASSIC_STYLES, generateClassicHtml } from './ClassicTemplate';
 export { ModernTemplate, MODERN_STYLES, generateModernHtml } from './ModernTemplate';
 export { CreativeTemplate, CREATIVE_STYLES, generateCreativeHtml } from './CreativeTemplate';
@@ -118,8 +120,12 @@ export const HTML_TEMPLATE_GENERATORS: Record<TemplateId, (data: any, designSett
 };
 
 /**
- * Get the HTML generator for a template
+ * Get the HTML generator for a template.
+ *
+ * The generator is wrapped so every caller — preview, PDF, thumbnails and the
+ * extension — gets the sections each template omits. See composeSections.
  */
 export function getTemplateGenerator(templateId: string): (data: any, designSettings?: any) => string {
-    return HTML_TEMPLATE_GENERATORS[templateId as TemplateId] || generateClassicHtml;
+    const generate = HTML_TEMPLATE_GENERATORS[templateId as TemplateId] || generateClassicHtml;
+    return (data: any, designSettings?: any) => composeSections(generate(data, designSettings), data);
 }

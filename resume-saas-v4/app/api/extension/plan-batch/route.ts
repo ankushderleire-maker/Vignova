@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getExtensionUser } from "@/lib/extensionAuth";
 import { withCors, handleCorsOptions } from "@/lib/extensionCors";
+import { checkAiAccess } from "@/lib/extensionPlan";
 
 export async function OPTIONS() {
     return handleCorsOptions();
@@ -12,6 +13,11 @@ export async function POST(req: Request) {
         if (auth.error) {
             return withCors(NextResponse.json({ error: auth.error }, { status: auth.status }));
         }
+
+        // The field planner calls a model on every page, so autofill is
+        // Pro-and-up — the same gate the popup applies to the button.
+        const denied = checkAiAccess(auth.subscription, "Autofill");
+        if (denied) return denied;
 
         const body = await req.json();
         const AI_BACKEND_URL = process.env.AI_BACKEND_URL || "http://localhost:8000";

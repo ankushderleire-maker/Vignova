@@ -4,6 +4,9 @@ import { getExtensionUser } from "@/lib/extensionAuth";
 import { getTemplateGenerator } from "@/components/resume-html-templates";
 import { generatePdfFromHtml } from "@/lib/pdf/puppeteer";
 import { withCors, handleCorsOptions } from "@/lib/extensionCors";
+import { findExistingWork, findJobByUrl, duplicateResponse } from "@/lib/extensionDuplicate";
+import { spendCredit, creditBalance } from "@/lib/credits";
+import { checkAiAccess } from "@/lib/extensionPlan";
 
 // CORS preflight
 export async function OPTIONS() {
@@ -43,7 +46,7 @@ export async function POST(req: Request) {
 
         // ─── 2. Validate Input ───
         const body = await req.json();
-        const { jobDescription, jobTitle, company, jobUrl, source = "EXTENSION" } = body;
+        const { jobDescription, jobTitle, company, jobUrl, force = false, source = "EXTENSION" } = body;
 
         if (!jobDescription || !jobTitle || !company) {
             return withCors(NextResponse.json(
@@ -52,16 +55,24 @@ export async function POST(req: Request) {
             ));
         }
 
-        // ─── 3. Check Credits ───
-        if (subscription!.credits_remaining <= 0) {
-            return withCors(NextResponse.json(
-                { error: "Insufficient credits. Please upgrade or wait for reset.", credits_remaining: 0 },
-                { status: 403 }
-            ));
+        // ─── 3. Already generated? ───
+        // Asked before the credit check so a repeat visit to a posting can
+        // never cost a credit on its own. The extension turns this into a
+        // "generate again?" prompt and retries with force: true.
+        if (!force) {
+            const existing = await findExistingWork(userId, jobUrl);
+            if (existing) {
+                return withCors(NextResponse.json(duplicateResponse(existing), { status: 409 }));
+            }
         }
 
-        // ─── 4. Fetch Default Master Profile ───
-        // ─── 4. Fetch Default Master Profile (fallback to any profile) ───
+        // ─── 4. Plan and credits ───
+        // Tailoring calls a model, so it is Pro-and-up. Free accounts keep
+        // the match score, job tracking and autofill.
+        const denied = checkAiAccess(subscription, "Tailor Resume");
+        if (denied) return denied;
+
+        // ─── 5. Fetch Default Master Profile (fallback to any profile) ───
         let profile = await db.master_profiles.findFirst({
             where: {
                 user_id: userId,
@@ -86,22 +97,30 @@ export async function POST(req: Request) {
 
         const masterProfile = profile.parsed_data as any;
 
-        // ─── 5. Save Job to DB ───
-        const job = await db.jobApplication.create({
-            data: {
-                userId,
-                company,
-                jobTitle,
-                description: jobDescription,
-                jobUrl: jobUrl || "",
-                location: "",
-                status: "TAILORING",
-                source: "extension",
-                sourceUrl: jobUrl || "",
-            },
-        });
+        // ─── 6. Save Job to DB ───
+        // Regenerating updates the row we already have. Creating a second one
+        // would show the same posting twice in the tracker.
+        const tracked = await findJobByUrl(userId, jobUrl);
+        const job = tracked
+            ? await db.jobApplication.update({
+                where: { id: tracked.id },
+                data: { company, jobTitle, description: jobDescription, status: "TAILORING" },
+            })
+            : await db.jobApplication.create({
+                data: {
+                    userId,
+                    company,
+                    jobTitle,
+                    description: jobDescription,
+                    jobUrl: jobUrl || "",
+                    location: "",
+                    status: "TAILORING",
+                    source: "extension",
+                    sourceUrl: jobUrl || "",
+                },
+            });
 
-        // ─── 6. Call AI Backend ───
+        // ─── 7. Call AI Backend ───
         const AI_BACKEND_URL = process.env.AI_BACKEND_URL || "http://localhost:8000";
 
         const aiResponse = await fetch(`${AI_BACKEND_URL}/api/generate-tailored-resume`, {
@@ -128,7 +147,7 @@ export async function POST(req: Request) {
         const aiResult = await aiResponse.json();
         const aiData = aiResult.data;
 
-        // ─── 7. Format Resume Data ───
+        // ─── 8. Format Resume Data ───
         const resumeData = {
             fullName: aiData.fullName || masterProfile.fullName,
             jobTitle: aiData.jobTitle || jobTitle,
@@ -138,6 +157,10 @@ export async function POST(req: Request) {
                 location: aiData.location || masterProfile.location || "",
                 linkedin: aiData.linkedin || masterProfile.linkedin || "",
                 website: aiData.website || "",
+                // The profile form collects a GitHub URL and every template can now
+                // show one, but it was never copied into the contact block, so what
+                // the user typed never reached the page.
+                github: aiData.github || masterProfile.github || "",
             },
             summary: aiData.summary,
             skills: aiData.skills?.technical
@@ -173,7 +196,7 @@ export async function POST(req: Request) {
             })) || [],
         };
 
-        // ─── 8. Save Resume to DB ───
+        // ─── 9. Save Resume to DB ───
         const savedResume = await db.generatedResume.create({
             data: {
                 userId,
@@ -185,7 +208,7 @@ export async function POST(req: Request) {
             },
         });
 
-        // ─── 9. Generate PDF ───
+        // ─── 10. Generate PDF ───
         let pdfBase64 = null;
         try {
             // Determine template based on extension settings
@@ -220,17 +243,17 @@ export async function POST(req: Request) {
             // PDF generation failed but resume was still created - non-fatal
         }
 
-        // ─── 10. Deduct Credit (Atomic to prevent race conditions) ───
-        await db.subscriptions.update({
-            where: { id: subscription!.id },
-            data: { credits_remaining: { decrement: 1 } },
-        });
-
         // ─── 11. Update Job Status ───
+        // Ahead of the charge, and tolerant of failure: a job row that will
+        // not update is not worth landing in the catch below with the
+        // credit already taken.
         await db.jobApplication.update({
             where: { id: job.id },
             data: { status: "SAVED" }, // Standardize status for dashboard
-        });
+        }).catch((err) => console.error("[EXTENSION_GENERATE] status update failed", err));
+
+        // ─── 12. Charge, last, once nothing else can fail ───
+        const spent = await spendCredit(userId);
 
         return withCors(NextResponse.json({
             success: true,
@@ -238,7 +261,7 @@ export async function POST(req: Request) {
             resumeId: savedResume.id,
             resumeData,
             pdfBase64,
-            credits_remaining: subscription!.credits_remaining - 1,
+            credits_remaining: spent.ok ? spent.remaining : await creditBalance(userId),
         }));
 
     } catch (error) {

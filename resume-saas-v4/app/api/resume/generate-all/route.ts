@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { db } from "@/lib/db";
+import { spendCredit, creditBalance } from "@/lib/credits";
 
 export const maxDuration = 300;
 
@@ -149,18 +150,16 @@ INSTRUCTIONS:
             return NextResponse.json({ error: "All generation tasks failed." }, { status: 502 });
         }
 
-        // Deduct 1 credit
-        await db.subscriptions.update({
-            where: { id: sub.id },
-            data: { credits_remaining: { decrement: 1 } },
-        });
+        // Charged last, and atomically: the balance is decided by the
+        // database rather than by arithmetic on a value read earlier.
+        const spent = await spendCredit(userId);
 
         return NextResponse.json({
             success: true,
             data: resumeData,
             coverLetter,
             draftEmail,
-            credits_remaining: sub.credits_remaining - 1
+            credits_remaining: spent.ok ? spent.remaining : await creditBalance(userId)
         });
 
     } catch (error) {

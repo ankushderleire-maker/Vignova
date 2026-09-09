@@ -109,6 +109,98 @@ async function probeWebSession() {
 }
 
 // ─── Message Router ───
+
+// ─── Force-update check ────────────────────────────────────────────────
+/**
+ * Asks the server whether this build is still allowed to run.
+ *
+ * The Chrome Web Store updates on its own schedule and gives us no way to
+ * retire a build, so an extension with a broken API contract can keep calling
+ * us for days. The admin sets a minimum version; anything below it stops
+ * offering its features and shows an update screen instead.
+ *
+ * Checked lazily — when the popup opens or a content script starts — rather
+ * than on an alarm, so the extension does not need the "alarms" permission
+ * just for this. Cached for six hours, and every failure fails open: a server
+ * we cannot reach must never lock a working extension.
+ */
+const UPDATE_CHECK_TTL_MS = 6 * 60 * 60 * 1000;
+
+async function getUpdateState({ force = false } = {}) {
+    const version = chrome.runtime.getManifest().version;
+    const cached = await chrome.storage.local.get(["vignova_update_state"]);
+    const state = cached.vignova_update_state;
+
+    if (
+        !force &&
+        state &&
+        state.version === version &&
+        Date.now() - (state.checkedAt || 0) < UPDATE_CHECK_TTL_MS
+    ) {
+        return state;
+    }
+
+    try {
+        const res = await fetch(
+            `${Vignova_API_BASE}/api/extension/version?v=${encodeURIComponent(version)}`
+        );
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+
+        const fresh = {
+            version,
+            blocked: !!data.blocked,
+            updateAvailable: !!data.updateAvailable,
+            latest: data.latest || null,
+            installUrl: data.installUrl || "https://chromewebstore.google.com/search/vignova",
+            message: data.message || "",
+            checkedAt: Date.now(),
+        };
+        await chrome.storage.local.set({ vignova_update_state: fresh });
+        return fresh;
+    } catch (err) {
+        // Fail open, and keep any previous answer rather than inventing one.
+        return (
+            state || {
+                version,
+                blocked: false,
+                updateAvailable: false,
+                latest: null,
+                installUrl: "https://chromewebstore.google.com/search/vignova",
+                message: "",
+                checkedAt: 0,
+            }
+        );
+    }
+}
+
+/**
+ * Turns a non-ok API response into the shape the popup and content scripts
+ * expect.
+ *
+ * Two of these are not really errors and must not be shown as one:
+ * `upgradeRequired` means the account needs a paid plan or is out of
+ * credits, and `duplicate` means the job already has this generated. Both
+ * get their own prompt instead of a red failure message.
+ */
+function apiFailure(data, fallback) {
+    if (data && data.upgradeRequired) {
+        return {
+            success: false,
+            upgradeRequired: true,
+            outOfCredits: !!data.outOfCredits,
+            plan: data.plan || null,
+            feature: data.feature || null,
+            message: data.message || data.error || fallback,
+            error: data.error || fallback,
+        };
+    }
+    if (data && data.duplicate) {
+        return { success: false, duplicate: true, existing: data.existing, message: data.message };
+    }
+    return { success: false, error: (data && data.error) || fallback };
+}
+
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
     // Website-session lookup, read-only (login view uses this for "Continue as…")
@@ -147,6 +239,27 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     }
 
     // Auth status check (from content scripts)
+    if (message.type === "GET_UPDATE_STATE") {
+        getUpdateState({ force: !!message.force }).then(sendResponse);
+        return true;
+    }
+
+    // The injected bar's login button sends this. There was no listener, so
+    // pressing it did nothing; MV3 has no API to open the toolbar popup, and
+    // the panel is in-page anyway, so this toggles it the way the icon does.
+    if (message.type === "OPEN_POPUP") {
+        const tabId = sender?.tab?.id;
+        if (tabId) {
+            chrome.tabs.sendMessage(tabId, { type: "TOGGLE_DASHBOARD" }).catch(() => {
+                chrome.tabs.create({ url: "https://app.vignova.io/dashboard" });
+            });
+        } else {
+            chrome.tabs.create({ url: "https://app.vignova.io/dashboard" });
+        }
+        sendResponse({ success: true });
+        return true;
+    }
+
     if (message.type === "GET_AUTH_STATUS") {
         chrome.storage.local.get(["vignova_token", "vignova_user"], (result) => {
             sendResponse({
@@ -195,7 +308,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                     });
                     sendResponse({ success: true, ...data });
                 } else {
-                    sendResponse({ success: false, error: data.error || "Generation failed" });
+                    sendResponse(apiFailure(data, "Generation failed"));
                 }
             } catch (err) {
                 sendResponse({ success: false, error: "Cannot connect to Vignova server." });
@@ -229,7 +342,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                     });
                     sendResponse({ success: true, ...data });
                 } else {
-                    sendResponse({ success: false, error: data.error || "Generation failed" });
+                    sendResponse(apiFailure(data, "Generation failed"));
                 }
             } catch (err) {
                 sendResponse({ success: false, error: "Cannot connect to Vignova server." });
@@ -256,8 +369,60 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                 if (response.ok) {
                     sendResponse({ success: true, ...data });
                 } else {
-                    sendResponse({ success: false, error: data.error || "Failed to save job" });
+                    sendResponse(apiFailure(data, "Failed to save job"));
                 }
+            } catch (err) {
+                sendResponse({ success: false, error: "Cannot connect to Vignova server." });
+            }
+        });
+        return true;
+    }
+
+    // ─── API Proxy: Outreach (recruiter message / application email) ───
+    // The dashboard route holds the master profile and the internal key; the
+    // extension only says which job it is looking at.
+    if (message.type === "API_OUTREACH") {
+        chrome.storage.local.get(["vignova_token"], async (result) => {
+            try {
+                const response = await fetch(`${Vignova_API_BASE}/api/extension/outreach`, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "Authorization": `Bearer ${result.vignova_token}`,
+                    },
+                    body: JSON.stringify(message.data),
+                });
+
+                const data = await response.json();
+                if (response.ok) {
+                    sendResponse({ success: true, ...data });
+                } else {
+                    sendResponse(apiFailure(data, "Could not write that."));
+                }
+            } catch (err) {
+                sendResponse({ success: false, error: "Cannot connect to Vignova server." });
+            }
+        });
+        return true;
+    }
+
+    // ─── API Proxy: Set application status ───
+    if (message.type === "API_SET_STATUS") {
+        chrome.storage.local.get(["vignova_token"], async (result) => {
+            try {
+                const response = await fetch(`${Vignova_API_BASE}/api/extension/job-status`, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "Authorization": `Bearer ${result.vignova_token}`,
+                    },
+                    body: JSON.stringify(message.data),
+                });
+
+                const data = await response.json();
+                sendResponse(response.ok
+                    ? { success: true, ...data }
+                    : apiFailure(data, "Could not set status."));
             } catch (err) {
                 sendResponse({ success: false, error: "Cannot connect to Vignova server." });
             }
@@ -278,7 +443,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                 if (response.ok) {
                     sendResponse({ success: true, profiles: data.profiles || [] });
                 } else {
-                    sendResponse({ success: false, error: data.error || "Failed to load profiles" });
+                    sendResponse(apiFailure(data, "Failed to load profiles"));
                 }
             } catch (err) {
                 sendResponse({ success: false, error: "Cannot connect to Vignova server." });
@@ -305,7 +470,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                 if (response.ok) {
                     sendResponse({ success: true, ...data });
                 } else {
-                    sendResponse({ success: false, error: data.error || "Failed to set profile" });
+                    sendResponse(apiFailure(data, "Failed to set profile"));
                 }
             } catch (err) {
                 sendResponse({ success: false, error: "Cannot connect to Vignova server." });
@@ -403,7 +568,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                     await chrome.storage.local.set({ vignova_agent_profile: data.profile });
                     sendResponse({ success: true, profile: data.profile, profileName: data.profileName });
                 } else {
-                    sendResponse({ success: false, error: data.error || "Failed to fetch profile" });
+                    sendResponse(apiFailure(data, "Failed to fetch profile"));
                 }
             } catch (err) {
                 sendResponse({ success: false, error: "Cannot connect to server" });
@@ -430,7 +595,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                 if (response.ok) {
                     sendResponse({ success: true, ...data });
                 } else {
-                    sendResponse({ success: false, error: data.error || "Failed to calculate score" });
+                    sendResponse(apiFailure(data, "Failed to calculate score"));
                 }
             } catch (err) {
                 sendResponse({ success: false, error: "Cannot connect to server" });
@@ -498,7 +663,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                 if (response.ok) {
                     sendResponse(data);
                 } else {
-                    sendResponse({ success: false, error: data.error || "Failed to fetch jobs" });
+                    sendResponse(apiFailure(data, "Failed to fetch jobs"));
                 }
             } catch (err) {
                 sendResponse({ success: false, error: "Cannot connect to server" });
@@ -522,7 +687,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                 if (response.ok) {
                     sendResponse(data);
                 } else {
-                    sendResponse({ success: false, error: data.error || "Failed to fetch documents" });
+                    sendResponse(apiFailure(data, "Failed to fetch documents"));
                 }
             } catch (err) {
                 sendResponse({ success: false, error: "Cannot connect to server" });
@@ -547,7 +712,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                 if (response.ok) {
                     sendResponse(data);
                 } else {
-                    sendResponse({ success: false, error: data.error || "Failed to download document" });
+                    sendResponse(apiFailure(data, "Failed to download document"));
                 }
             } catch (err) {
                 sendResponse({ success: false, error: "Cannot connect to server" });
@@ -610,7 +775,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                 if (response.ok) {
                     sendResponse({ success: true, ...data });
                 } else {
-                    sendResponse({ success: false, error: data.error || "Failed to generate cover letter" });
+                    sendResponse(apiFailure(data, "Failed to generate cover letter"));
                 }
             } catch (err) {
                 sendResponse({ success: false, error: "Cannot connect to server." });
@@ -635,7 +800,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                 if (response.ok) {
                     sendResponse({ success: true, questions: data.questions || [] });
                 } else {
-                    sendResponse({ success: false, error: data.error || "Failed to generate interview questions" });
+                    sendResponse(apiFailure(data, "Failed to generate interview questions"));
                 }
             } catch (err) {
                 sendResponse({ success: false, error: "Cannot connect to server." });

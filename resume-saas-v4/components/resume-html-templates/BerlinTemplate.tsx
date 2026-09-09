@@ -25,6 +25,7 @@ export const BerlinTemplate: React.FC<HtmlTemplateProps> = ({ data, designSettin
                     {data.contact?.phone    && <div className="brl-contact-item"><span className="brl-ci-label">T</span>{data.contact.phone}</div>}
                     {data.contact?.location && <div className="brl-contact-item"><span className="brl-ci-label">A</span>{data.contact.location}</div>}
                     {data.contact?.linkedin && <div className="brl-contact-item"><span className="brl-ci-label">in</span>{data.contact.linkedin}</div>}
+                    {data.contact?.github && <div className="brl-contact-item"><span className="brl-ci-label">gh</span>{data.contact.github}</div>}
                     {data.contact?.website  && <div className="brl-contact-item"><span className="brl-ci-label">W</span>{data.contact.website}</div>}
                 </div>
             </header>
@@ -80,7 +81,7 @@ export const BerlinTemplate: React.FC<HtmlTemplateProps> = ({ data, designSettin
                                     <div className="brl-entry-role" data-editable={`education-${i}-degree`}>
                                         {edu.degree}{edu.field ? `, ${edu.field}` : ''}
                                     </div>
-                                    <div className="brl-entry-org" data-editable={`education-${i}-school`}>{edu.school}</div>
+                                    <div className="brl-entry-org" data-editable={`education-${i}-school`}>{edu.school}{edu.grade ? ` · ${edu.grade}` : ''}</div>
                                 </div>
                             </div>
                         </div>

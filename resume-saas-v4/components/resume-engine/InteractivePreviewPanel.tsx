@@ -535,15 +535,32 @@ export const InteractivePreviewPanel: React.FC<InteractivePreviewPanelProps> = (
     const [blobUrl, setBlobUrl] = useState('');
     const [initialUrl, setInitialUrl] = useState<string | null>(null);
 
+    // Rebuilding the document reloads the iframe, so it is debounced: every
+    // keystroke in the editor changes `data`, and reloading on each one left
+    // the preview permanently blank — most visibly when adding a custom
+    // section, where you type into a brand-new title and body.
+    //
+    // The old object URL is also released a beat later rather than in the
+    // cleanup. `location.replace` is asynchronous, so revoking synchronously
+    // on the next render pulled the document out from under an iframe that was
+    // still fetching it.
     useEffect(() => {
-        const blob = new Blob([htmlContent], { type: 'text/html' });
-        const url = URL.createObjectURL(blob);
-        setBlobUrl(url);
-        if (!initialUrl) setInitialUrl(url);
-        if (iframeRef.current?.contentWindow) {
-            iframeRef.current.contentWindow.location.replace(url);
-        }
-        return () => URL.revokeObjectURL(url);
+        const timer = setTimeout(() => {
+            const blob = new Blob([htmlContent], { type: 'text/html' });
+            const url = URL.createObjectURL(blob);
+
+            setBlobUrl((previous) => {
+                if (previous) setTimeout(() => URL.revokeObjectURL(previous), 2000);
+                return url;
+            });
+            setInitialUrl((first) => first ?? url);
+
+            if (iframeRef.current?.contentWindow) {
+                iframeRef.current.contentWindow.location.replace(url);
+            }
+        }, 250);
+
+        return () => clearTimeout(timer);
     }, [htmlContent]);
 
     // ── Render ────────────────────────────────────────────────────────────

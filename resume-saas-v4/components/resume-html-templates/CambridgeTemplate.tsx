@@ -25,6 +25,8 @@ export const CambridgeTemplate: React.FC<HtmlTemplateProps> = ({ data, designSet
                         data.contact?.phone,
                         data.contact?.location,
                         data.contact?.linkedin,
+                        data.contact?.website,
+                        data.contact?.github,
                     ].filter(Boolean).join('  |  ')}
                 </div>
                 <div className="cam-rule" />
@@ -80,7 +82,7 @@ export const CambridgeTemplate: React.FC<HtmlTemplateProps> = ({ data, designSet
                                     <span className="cam-entry-role" data-editable={`education-${i}-degree`}>{edu.degree}</span>
                                     {edu.field && <span className="cam-entry-sep">&nbsp;in {edu.field}</span>}
                                     <span className="cam-entry-sep">,&nbsp;</span>
-                                    <span className="cam-entry-org" data-editable={`education-${i}-school`}>{edu.school}</span>
+                                    <span className="cam-entry-org" data-editable={`education-${i}-school`}>{edu.school}{edu.grade ? ` · ${edu.grade}` : ''}</span>
                                 </div>
                                 <span className="cam-entry-date">{edu.startDate}–{edu.endDate}</span>
                             </div>

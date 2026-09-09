@@ -41,7 +41,7 @@
     }
 
     const BUTTON_ID = "vignova-linkedin-tailor-btn";
-    const SAVE_BUTTON_ID = "vignova-linkedin-save-btn";
+    const LETTER_BUTTON_ID = "vignova-linkedin-letter-btn";
     const CONTAINER_ID = "vignova-linkedin-container";
 
     let isProcessing = false;
@@ -55,6 +55,22 @@
             if (match) jobId = match[1];
         }
         return jobId;
+    }
+
+    /**
+     * The posting's stable URL, whatever page it is being viewed from.
+     *
+     * On the search view the address bar says /jobs/search/?currentJobId=123,
+     * so sending window.location.href tracked the search page instead of the
+     * job — every posting in one search collapsed to a single row, and the
+     * status dropdown could never find the job the generate buttons had
+     * created. Everything that sends a jobUrl uses this.
+     */
+    function canonicalJobUrl() {
+        const id = getJobIdFromUrl();
+        return id
+            ? `https://www.linkedin.com/jobs/view/${id}/`
+            : window.location.href.split("?")[0];
     }
 
     let currentJobId = getJobIdFromUrl();
@@ -168,8 +184,9 @@
             const applyBtn = document.querySelector(".jobs-apply-button--top-card") || 
                              document.querySelector(".jobs-s-apply");
             if (applyBtn && applyBtn.parentElement) {
+                // The row itself, so we insert after it rather than inside it.
                 target = applyBtn.parentElement;
-                insertMethod = 'append';
+                insertMethod = 'after';
             }
         }
 
@@ -182,18 +199,23 @@
                               document.querySelector('button[aria-label*="Apply"]');
             
             if (actionBtn) {
-                // Find a common container. Usually they are flex containers.
+                // Walk up to the row that holds all the action buttons, then sit
+                // below it. Never inside — that is what squeezed Apply and Save.
                 target = actionBtn.closest("div");
-                insertMethod = 'append';
-                
-                // If it's a wrapper with just the button, go up one level to be alongside other buttons
                 if (target && target.parentElement && target.children.length === 1) {
                     target = target.parentElement;
                 }
+                insertMethod = 'after';
             }
         }
 
         if (!target) return;
+
+        // Inserting "after" a node that is itself a flex item still leaves us
+        // inside that row — and a 100%-wide item in a nowrap row overflows and
+        // draws over Apply/Save instead of wrapping. Climb out to the first
+        // ancestor whose parent lays out normally, and insert after that.
+        target = escapeFlexContext(target);
 
         // Don't inject if already exists
         if (document.getElementById(CONTAINER_ID)) return;
@@ -205,7 +227,6 @@
         container.className = "vignova-injected-container";
 
         if (insertMethod === 'after' && target.parentNode) {
-            // Insert after the target element
             target.parentNode.insertBefore(container, target.nextSibling);
         } else {
             target.appendChild(container);
@@ -222,6 +243,17 @@
         if (isRenderingUI) return;
         if (!hasValidExtensionContext()) return;
         isRenderingUI = true;
+
+        // A build the admin has retired stops offering its features. The
+        // check fails open, so an unreachable server changes nothing.
+        const updateState = await chrome.runtime
+            .sendMessage({ type: "GET_UPDATE_STATE" })
+            .catch(() => null);
+        if (updateState && updateState.blocked) {
+            renderUpdateRequired();
+            isRenderingUI = false;
+            return;
+        }
 
         // Check Auth
         const authStatus = await new Promise((resolve) => {
@@ -249,40 +281,119 @@
             container.appendChild(loginBtn);
         } else {
             // Render Action Buttons
-            renderActionButtons(container);
+            renderActionButtons(container, Vignova_Plan.isPaid(authStatus.user));
         }
 
         isRenderingUI = false;
     }
 
-    function renderActionButtons(container) {
+    /**
+     * Replaces the bar with an update notice.
+     *
+     * A retired build should not keep offering buttons that will fail, but
+     * silently vanishing looks like the extension broke, so it says why.
+     */
+    function renderUpdateRequired() {
+        const container = document.getElementById(CONTAINER_ID);
+        if (!container) return;
+        container.textContent = "";
+
+        const logo = document.createElement("img");
+        logo.src = chrome.runtime.getURL("icons/logo.png");
+        logo.style.cssText = "height:34px;width:auto;object-fit:contain;margin-right:10px;flex:0 0 auto;";
+        container.appendChild(logo);
+
+        const note = document.createElement("span");
+        note.className = "vignova-update-note";
+        note.textContent = "Vignova needs updating to keep working.";
+        container.appendChild(note);
+
+        const btn = document.createElement("button");
+        btn.className = "vignova-tailor-btn";
+        btn.textContent = "Update";
+        btn.addEventListener("click", () => {
+            chrome.runtime.sendMessage({ type: "GET_UPDATE_STATE" }, (state) => {
+                window.open(state?.installUrl || "https://chromewebstore.google.com/search/vignova", "_blank");
+            });
+        });
+        container.appendChild(btn);
+    }
+
+    /**
+     * Briefly confirms a status change on the dropdown itself.
+     *
+     * Opening the whole overlay to say "Saved" would be heavier than the
+     * action deserves, but with no feedback at all people press it twice.
+     */
+    function flashStatusSaved(select, created) {
+        const note = document.createElement("span");
+        note.className = "vignova-status-flash";
+        note.textContent = created ? "Saved to tracker" : "Status updated";
+        select.insertAdjacentElement("afterend", note);
+        setTimeout(() => note.remove(), 2600);
+    }
+
+    /**
+     * Turns an AI button into an upgrade prompt.
+     *
+     * The lock is only cosmetic — the server refuses these routes on a
+     * free plan regardless. This just stops the button lying about what
+     * pressing it will do.
+     */
+    function markUpgradeButton(btn, feature) {
+        btn.classList.add("vignova-btn-locked");
+        btn.title = feature + " needs a Pro plan. Your match score and job tracking stay free.";
+        btn.addEventListener("click", () => {
+            Vignova_Overlay.showLoading();
+            Vignova_Overlay.showUpgrade({
+                feature,
+                message: feature + " needs a Pro or Premium plan. Upgrade to use it \u2014 the match score, job tracking and status updates stay free.",
+            });
+        });
+    }
+
+    /**
+     * @param {boolean} isPaid  Pro or Premium. Free accounts keep the match
+     *   score and the status dropdown; the two AI buttons become an invite
+     *   to upgrade rather than buttons that fail when pressed.
+     */
+    function renderActionButtons(container, isPaid) {
         // 1. Tailor Button
         const tailorBtn = document.createElement("button");
         tailorBtn.id = BUTTON_ID;
         tailorBtn.className = "vignova-tailor-btn";
         setBtnContent(tailorBtn, "vignova-btn-icon", "⚡", "Tailor Resume");
-        tailorBtn.addEventListener("click", handleTailorClick);
+        if (isPaid) {
+            tailorBtn.addEventListener("click", handleTailorClick);
+        } else {
+            markUpgradeButton(tailorBtn, "Tailor Resume");
+        }
 
-        // 2. Save Button
+        // 2. Cover Letter Button
         const saveBtn = document.createElement("button");
-        saveBtn.id = SAVE_BUTTON_ID;
+        saveBtn.id = LETTER_BUTTON_ID;
         saveBtn.className = "vignova-save-btn";
-        setBtnContent(saveBtn, "vignova-btn-icon", "💾", "Save to Dashboard");
+        setBtnContent(saveBtn, "vignova-btn-icon", "✉️", "Cover Letter");
         saveBtn.style.marginLeft = "8px";
-        saveBtn.addEventListener("click", handleSaveClick);
+        if (isPaid) {
+            saveBtn.addEventListener("click", handleCoverLetterClick);
+        } else {
+            markUpgradeButton(saveBtn, "Cover Letter");
+        }
 
         // Check stored state
-        checkJobState(window.location.href, tailorBtn, saveBtn);
+        // Canonical, because that is the key the generate handlers write under.
+        checkJobState(canonicalJobUrl(), tailorBtn, saveBtn);
 
         // Add Vignova Branding Logo
         const logoImg = document.createElement("img");
         logoImg.src = chrome.runtime.getURL("icons/logo.png");
-        logoImg.style.height = "24px";
+        logoImg.style.height = "34px";
         logoImg.style.width = "auto";
         logoImg.style.objectFit = "contain";
-        logoImg.style.marginLeft = "4px";
-        logoImg.style.marginRight = "8px";
-        logoImg.style.borderRadius = "2px";
+        logoImg.style.marginLeft = "2px";
+        logoImg.style.marginRight = "10px";
+        logoImg.style.flex = "0 0 auto";
         logoImg.title = "Vignova AI";
         container.appendChild(logoImg);
 
@@ -296,8 +407,63 @@
         scoreBadge.title = "Calculating Match Score...";
 
         container.appendChild(scoreBadge);
+
+        // ─── Application status ───
+        // Lives here rather than in the popup: the status only means something
+        // when there is a job on screen, and only once that job is tracked.
+        const statusSelect = document.createElement("select");
+        statusSelect.className = "vignova-status-select";
+        statusSelect.title = "Set application status";
+        statusSelect.innerHTML = `
+            <option value="">Status…</option>
+            <option value="SAVED">Saved</option>
+            <option value="APPLIED">Applied</option>
+            <option value="INTERVIEW">Interviewing</option>
+            <option value="OFFER">Offer</option>
+            <option value="REJECTED">Rejected</option>`;
+        statusSelect.addEventListener("change", async () => {
+            const status = statusSelect.value;
+            if (!status) return;
+            const previous = statusSelect.dataset.current || "";
+            statusSelect.disabled = true;
+            try {
+                // The job details go with the status so an untracked posting
+                // is saved rather than refused — picking "Saved" on a job you
+                // have not tailored is the obvious way to add it.
+                let job = {};
+                try { job = (await scrapeLinkedInJob()) || {}; } catch { job = {}; }
+                const res = await chrome.runtime.sendMessage({
+                    type: "API_SET_STATUS",
+                    data: {
+                        jobUrl: canonicalJobUrl(),
+                        status,
+                        jobTitle: job.jobTitle,
+                        company: job.company,
+                        location: job.location,
+                        description: job.jobDescription,
+                    },
+                });
+                if (res?.success) {
+                    statusSelect.dataset.current = status;
+                    flashStatusSaved(statusSelect, res.created);
+                } else {
+                    Vignova_Overlay.showError(
+                        res?.error || "Could not set status.",
+                        null,
+                        "Couldn't update status"
+                    );
+                    statusSelect.value = previous;
+                }
+            } catch {
+                statusSelect.value = previous;
+            } finally {
+                statusSelect.disabled = false;
+            }
+        });
+
         container.appendChild(tailorBtn);
         container.appendChild(saveBtn);
+        container.appendChild(statusSelect);
 
         // Fetch Score
         fetchAndDisplayScore(scoreBadge);
@@ -421,12 +587,12 @@
                     </div>
                     <div class="vignova-tt-row">
                         <span class="vignova-tt-label">Keywords</span>
-                        <div class="vignova-tt-bar-bg"><div class="vignova-tt-bar-fill" style="width: ${kw}%; background: #10b981;"></div></div>
+                        <div class="vignova-tt-bar-bg"><div class="vignova-tt-bar-fill" style="width: ${kw}%; background: #8b5cf6;"></div></div>
                         <span class="vignova-tt-val">${kw}%</span>
                     </div>
                     <div class="vignova-tt-row">
                         <span class="vignova-tt-label">Domain Fit</span>
-                        <div class="vignova-tt-bar-bg"><div class="vignova-tt-bar-fill" style="width: ${domainRel}%; background: ${domainRel >= 80 ? '#10b981' : domainRel >= 50 ? '#f59e0b' : '#ef4444'};"></div></div>
+                        <div class="vignova-tt-bar-bg"><div class="vignova-tt-bar-fill" style="width: ${domainRel}%; background: ${domainRel >= 80 ? '#8b5cf6' : domainRel >= 50 ? '#f59e0b' : '#ef4444'};"></div></div>
                         <span class="vignova-tt-val">${domainRel}%</span>
                     </div>
                     ${matchedKeywordsHtml}
@@ -512,76 +678,93 @@
                 tailorBtn.title = "You have already tailored a resume for this job.";
             }
 
-            if (data?.saved) {
-                setBtnContent(saveBtn, "vignova-btn-icon", "👁️", "View in Dashboard");
-                saveBtn.classList.add("success");
-                saveBtn.onclick = () => {
-                    window.open(`${Vignova_API_BASE}/dashboard`, "_blank");
-                };
+            if (data?.tailored) {
+                setBtnContent(saveBtn, "vignova-btn-icon", "✉️", "Cover Letter");
             }
         });
     }
 
-    // ─── Handle Save Click ───
-    async function handleSaveClick() {
-        const btn = document.getElementById(SAVE_BUTTON_ID);
-        if (btn.classList.contains("success")) return; // Already saved/view mode
+    /** Walks up until the node's parent is not a flex/grid container. */
+    function escapeFlexContext(node) {
+        let el = node;
+        let hops = 0;
+        while (el && el.parentElement && hops < 6) {
+            const display = getComputedStyle(el.parentElement).display;
+            if (!/(^|inline-)(flex|grid)$/.test(display)) return el;
+            el = el.parentElement;
+            hops += 1;
+        }
+        return el || node;
+    }
+
+    // ─── Handle Cover Letter Click ───
+    // Runs the same application-pack generation as Tailor Resume (which is what
+    // creates the job row server-side) and opens the overlay on the letter.
+    async function handleCoverLetterClick() {
+        if (isProcessing) return;
+        isProcessing = true;
+        const btn = document.getElementById(LETTER_BUTTON_ID);
 
         btn.disabled = true;
-        setBtnContent(btn, "vignova-btn-spinner", "", "Saving...");
+        setBtnContent(btn, "vignova-btn-spinner", "", "Writing...");
+        Vignova_Overlay.showLoading();
 
         const jobData = await scrapeLinkedInJob();
-        // jobUrl might be complex, sanitize or use standard
-        const jobId = getJobIdFromUrl();
-        const currentUrl = jobId ? `https://www.linkedin.com/jobs/view/${jobId}/` : window.location.href.split('?')[0]; // Removing query params usually safer for ID
+        if (!jobData.jobDescription) {
+            Vignova_Overlay.showError("Could not find the job description. Refresh page.");
+            resetButton();
+            isProcessing = false;
+            return;
+        }
+
+        const currentUrl = canonicalJobUrl();
 
         try {
-            const result = await chrome.runtime.sendMessage({
-                type: "API_SAVE_JOB",
-                data: {
-                    jobTitle: jobData.jobTitle,
-                    company: jobData.company,
-                    location: jobData.location,
-                    jobUrl: currentUrl,
-                    description: jobData.jobDescription,
-                    source: "LINKEDIN"
-                }
+            // Goes through Vignova_Generate so an earlier generation for
+            // this posting asks "generate again?" instead of spending a
+            // second credit without saying anything.
+            const result = await Vignova_Generate.run({
+                jobDescription: jobData.jobDescription,
+                jobTitle: jobData.jobTitle,
+                company: jobData.company,
+                jobUrl: currentUrl,
+                source: "LINKEDIN",
             });
 
             if (result.success) {
-                // Save state
-                const update = {};
-                update[currentUrl] = { saved: true };
-                // We need to merge with existing state (e.g. tailored)
+                const fileName = `${(jobData.company || "Resume").replace(/[^a-zA-Z0-9]/g, "_")}_Resume.pdf`;
+                Vignova_Overlay.showAllResults(
+                    result.pdfBase64,
+                    result.coverLetter,
+                    result.draftEmail,
+                    fileName,
+                    result.credits_remaining,
+                    "coverletter"
+                );
+
+                setBtnContent(btn, "vignova-btn-icon", "✉️", "Cover Letter");
+                btn.disabled = false;
+
                 chrome.storage.local.get([currentUrl], (current) => {
                     const existing = current[currentUrl] || {};
                     chrome.storage.local.set({
-                        [currentUrl]: { ...existing, saved: true, jobId: result.jobId }
+                        [currentUrl]: { ...existing, tailored: true }
                     }, () => stampJobListCards());
                 });
-
-                setBtnContent(btn, "vignova-btn-icon", "👁️", "View in Dashboard");
-                btn.classList.add("success");
-                btn.disabled = false;
-                btn.onclick = () => {
-                    // Redirect to dashboard (maybe specific job page later?)
-                    window.open("https://app.vignova.io/dashboard", "_blank");
-                };
             } else {
-                setBtnContent(btn, null, null, "❌ Failed");
-                setTimeout(() => {
-                    setBtnContent(btn, "vignova-btn-icon", "💾", "Save to Vignova Dashboard");
-                    btn.disabled = false;
-                }, 2000);
-                alert("Failed to save: " + result.error);
+                if (!result.cancelled) Vignova_Overlay.showError(result.error || "Failed.");
+                setBtnContent(btn, "vignova-btn-icon", "✉️", "Cover Letter");
+                btn.disabled = false;
             }
         } catch (err) {
             console.error(err);
-            setBtnContent(btn, null, null, "❌ Error");
+            Vignova_Overlay.showError("Connection failed.");
+            setBtnContent(btn, "vignova-btn-icon", "✉️", "Cover Letter");
             btn.disabled = false;
+        } finally {
+            isProcessing = false;
         }
     }
-
 
     // ─── Handle Tailor Button Click ───
     async function handleTailorClick() {
@@ -600,19 +783,18 @@
             return;
         }
 
-        const jobId = getJobIdFromUrl();
-        const currentUrl = jobId ? `https://www.linkedin.com/jobs/view/${jobId}/` : window.location.href.split('?')[0];
+        const currentUrl = canonicalJobUrl();
 
         try {
-            const result = await chrome.runtime.sendMessage({
-                type: "API_GENERATE_ALL",
-                data: {
-                    jobDescription: jobData.jobDescription,
-                    jobTitle: jobData.jobTitle,
-                    company: jobData.company,
-                    jobUrl: currentUrl,
-                    source: "LINKEDIN",
-                },
+            // Goes through Vignova_Generate so an earlier generation for
+            // this posting asks "generate again?" instead of spending a
+            // second credit without saying anything.
+            const result = await Vignova_Generate.run({
+                jobDescription: jobData.jobDescription,
+                jobTitle: jobData.jobTitle,
+                company: jobData.company,
+                jobUrl: currentUrl,
+                source: "LINKEDIN",
             });
 
             if (result.success) {
@@ -636,7 +818,7 @@
                 });
 
             } else {
-                Vignova_Overlay.showError(result.error || "Failed.", () => { resetButton(); handleTailorClick(); });
+                if (!result.cancelled) Vignova_Overlay.showError(result.error || "Failed.", () => { resetButton(); handleTailorClick(); });
                 resetButton();
             }
         } catch (err) {
