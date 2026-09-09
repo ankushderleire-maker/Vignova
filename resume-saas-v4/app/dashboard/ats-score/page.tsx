@@ -463,10 +463,14 @@ function AtsScoreContent() {
         if (!isPremium || !hasCredits) return;
         setIsLoadingAi(true);
         setAiError("");
+        // Reserved before the work so an empty balance cannot start it, and
+        // handed back below if the report never arrives.
+        let creditTaken = false;
         try {
             // Deduct credit
             const creditRes = await fetch("/api/credits/deduct", { method: "POST" });
             if (!creditRes.ok) { setAiError("No credits remaining."); setIsLoadingAi(false); return; }
+            creditTaken = true;
 
             const formData = new FormData();
             formData.append("jd_text", lastJdText);
@@ -498,7 +502,18 @@ function AtsScoreContent() {
             fetchSubscription();
         } catch (e: any) {
             console.error(e);
-            setAiError(e.message || "Failed to generate AI report.");
+            if (creditTaken) {
+                await fetch("/api/credits/refund", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ reason: "ats-report: " + (e?.message || "failed") }),
+                }).catch(() => { /* the server logs a failed refund */ });
+                fetchSubscription();
+            }
+            setAiError(
+                (e.message || "Failed to generate AI report.") +
+                " Your credit has not been used."
+            );
         } finally { setIsLoadingAi(false); }
     };
 

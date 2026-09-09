@@ -5,6 +5,7 @@ import { getTemplateGenerator } from "@/components/resume-html-templates";
 import { generatePdfFromHtml } from "@/lib/pdf/puppeteer";
 import { withCors, handleCorsOptions } from "@/lib/extensionCors";
 import { findExistingWork, findJobByUrl, duplicateResponse } from "@/lib/extensionDuplicate";
+import { spendCredit, creditBalance } from "@/lib/credits";
 import { checkAiAccess } from "@/lib/extensionPlan";
 
 // CORS preflight
@@ -242,17 +243,17 @@ export async function POST(req: Request) {
             // PDF generation failed but resume was still created - non-fatal
         }
 
-        // ─── 11. Deduct Credit (Atomic to prevent race conditions) ───
-        await db.subscriptions.update({
-            where: { id: subscription!.id },
-            data: { credits_remaining: { decrement: 1 } },
-        });
-
-        // ─── 12. Update Job Status ───
+        // ─── 11. Update Job Status ───
+        // Ahead of the charge, and tolerant of failure: a job row that will
+        // not update is not worth landing in the catch below with the
+        // credit already taken.
         await db.jobApplication.update({
             where: { id: job.id },
             data: { status: "SAVED" }, // Standardize status for dashboard
-        });
+        }).catch((err) => console.error("[EXTENSION_GENERATE] status update failed", err));
+
+        // ─── 12. Charge, last, once nothing else can fail ───
+        const spent = await spendCredit(userId);
 
         return withCors(NextResponse.json({
             success: true,
@@ -260,7 +261,7 @@ export async function POST(req: Request) {
             resumeId: savedResume.id,
             resumeData,
             pdfBase64,
-            credits_remaining: subscription!.credits_remaining - 1,
+            credits_remaining: spent.ok ? spent.remaining : await creditBalance(userId),
         }));
 
     } catch (error) {

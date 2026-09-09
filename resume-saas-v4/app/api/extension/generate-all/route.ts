@@ -5,6 +5,7 @@ import { getTemplateGenerator } from "@/components/resume-html-templates";
 import { generatePdfFromHtml } from "@/lib/pdf/puppeteer";
 import { withCors, handleCorsOptions } from "@/lib/extensionCors";
 import { findExistingWork, findJobByUrl, duplicateResponse } from "@/lib/extensionDuplicate";
+import { spendCredit, creditBalance } from "@/lib/credits";
 import { checkAiAccess } from "@/lib/extensionPlan";
 
 export async function OPTIONS() {
@@ -342,25 +343,36 @@ INSTRUCTIONS:
             });
         }
 
-        // ─── 13. Deduct 1 credit ───
-        await db.subscriptions.update({
-            where: { id: subscription!.id },
-            data: { credits_remaining: { decrement: 1 } },
-        });
-
-        // ─── 14. Update job status ───
-        await db.jobApplication.update({
-            where: { id: job.id },
-            data: { status: "SAVED" },
-        });
-
-        // At least the resume must have succeeded
+        // ─── 13. Nothing came back? Charge nothing. ───
+        // This check used to sit *after* the deduction, so a run where all
+        // three generations failed still cost a credit and then answered
+        // 502.
         if (!resumeData && !coverLetter && !draftEmail) {
+            await db.jobApplication.update({
+                where: { id: job.id },
+                data: { status: "SAVED" },
+            }).catch(() => { /* the job row is not worth failing over here */ });
+
             return withCors(NextResponse.json(
-                { error: "All generation tasks failed. Please try again." },
+                {
+                    error: "We could not generate anything for this job. No credit was used.",
+                    creditCharged: false,
+                },
                 { status: 502 }
             ));
         }
+
+        // ─── 14. Update job status ───
+        // Ahead of the charge, and tolerant of failure: a job row that will
+        // not update is not worth landing in the catch below with the
+        // credit already taken.
+        await db.jobApplication.update({
+            where: { id: job.id },
+            data: { status: "SAVED" },
+        }).catch((err) => console.error("[EXTENSION_GENERATE_ALL] status update failed", err));
+
+        // ─── 15. Charge, last, once nothing else can fail ───
+        const spent = await spendCredit(userId);
 
         return withCors(NextResponse.json({
             success: true,
@@ -370,7 +382,7 @@ INSTRUCTIONS:
             pdfBase64,
             coverLetter,
             draftEmail,
-            credits_remaining: subscription!.credits_remaining - 1,
+            credits_remaining: spent.ok ? spent.remaining : await creditBalance(userId),
         }));
 
     } catch (error) {

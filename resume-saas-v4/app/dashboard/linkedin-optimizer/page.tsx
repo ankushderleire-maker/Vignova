@@ -24,6 +24,7 @@ import {
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import LinkedInProfileView, { summarizeProfile } from "@/components/linkedin/LinkedInProfileView";
+import { cleanSkills, sanitizeLinkedInProfile } from "@/lib/linkedin-skills";
 
 interface LinkedInAnalysisResult {
     id: string;
@@ -87,14 +88,10 @@ const profileTextForScore = (profile: any) => [
     profile?.about,
     ...(Array.isArray(profile?.experience) ? profile.experience.map((exp: any) => [exp?.title, exp?.company, exp?.description, exp?.associatedSkills].filter(Boolean).join(" ")) : []),
     ...(Array.isArray(profile?.projects) ? profile.projects.map((project: any) => [project?.title, project?.description, project?.associatedWith, ...(Array.isArray(project?.skills) ? project.skills : [])].filter(Boolean).join(" ")) : []),
-    ...(Array.isArray(profile?.skills) ? profile.skills.map((skill: any) => typeof skill === "string" ? skill : skill?.name || skill?.title || "") : []),
+    ...cleanSkills(profile?.skills),
 ].filter(Boolean).join(" ");
 
-const profileSkills = (profile: any) => (
-    Array.isArray(profile?.skills)
-        ? profile.skills.map((skill: any) => typeof skill === "string" ? skill : skill?.name || skill?.title || "").filter(Boolean)
-        : []
-);
+const profileSkills = (profile: any) => cleanSkills(profile?.skills);
 
 const estimateKeywordScoreWithoutMaster = (profile: any) => {
     const skills = profileSkills(profile);
@@ -196,12 +193,12 @@ export default function LinkedInOptimizerPage() {
 }
 
 /**
- * The stages we walk through while the Apify run is in flight. They are
- * cosmetic — the scrape is a single opaque job — but they tell the user what
- * is actually happening instead of showing a bare spinner for a minute.
+ * The stages we walk through while the import is in flight. They are
+ * cosmetic — it is a single opaque job — but they tell the user what is
+ * actually happening instead of showing a bare spinner for a minute.
  */
 const FETCH_STAGES = [
-    { label: "Opening a secure channel", hint: "Handing your profile URL to our scraping service", icon: Shield },
+    { label: "Opening a secure channel", hint: "Passing your profile URL to our servers", icon: Shield },
     { label: "Locating your profile", hint: "Finding the public page behind that URL", icon: Search },
     { label: "Reading headline & about", hint: "Pulling the sections recruiters see first", icon: UserCircle },
     { label: "Extracting experience", hint: "Roles, dates, descriptions and impact", icon: Briefcase },
@@ -229,10 +226,15 @@ function LinkedInOptimizerContent() {
     const [elapsed, setElapsed] = useState(0);
 
     const [copiedText, setCopiedText] = useState("");
-    const handleCopy = (text: string) => {
-        navigator.clipboard.writeText(text);
-        setCopiedText(text);
-        setTimeout(() => setCopiedText(""), 2000);
+    const handleCopy = async (text: string) => {
+        try {
+            await navigator.clipboard.writeText(text);
+            setCopiedText(text);
+            setTimeout(() => setCopiedText(current => current === text ? "" : current), 2000);
+        } catch {
+            setCopiedText("");
+            alert("Couldn't copy to the clipboard. Please select and copy the text manually.");
+        }
     };
 
     const [isOptimizing, setIsOptimizing] = useState(false);
@@ -354,9 +356,9 @@ function LinkedInOptimizerContent() {
     };
 
     /**
-     * Kicks off the scrape on our own API (which owns the scraping provider
+     * Kicks off the import on our own API (which owns the provider
      * credentials) and then polls it until the profile is back. The browser
-     * never touches the scraping service directly.
+     * never touches the provider directly, and never learns its name.
      */
     const handleConnect = async () => {
         setError("");
@@ -386,7 +388,7 @@ function LinkedInOptimizerContent() {
         const masterProfileId = selectedMasterProfile;
 
         try {
-            const startRes = await fetch("/api/linkedin/scrape", {
+            const startRes = await fetch("/api/linkedin/connect", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ linkedinUrl: finalUrl, masterProfileId }),
@@ -394,19 +396,19 @@ function LinkedInOptimizerContent() {
             if (runTokenRef.current !== token) return;
 
             const startData = await startRes.json().catch(() => ({}));
-            if (!startRes.ok || !startData?.runId) {
+            if (!startRes.ok || !startData?.ref) {
                 failScrape(startData?.error || "Could not start the LinkedIn scan. Please try again.");
                 return;
             }
 
-            await pollScrape(token, startData.runId, finalUrl, masterProfileId);
+            await pollImport(token, startData.ref, finalUrl, masterProfileId);
         } catch (err: any) {
             if (runTokenRef.current !== token) return;
             failScrape(err?.message || "Could not reach the server. Please try again.");
         }
     };
 
-    const pollScrape = async (token: number, runId: string, url: string, masterProfileId: string) => {
+    const pollImport = async (token: number, ref: string, url: string, masterProfileId: string) => {
         const deadline = Date.now() + MAX_WAIT_MS;
 
         while (runTokenRef.current === token) {
@@ -420,10 +422,10 @@ function LinkedInOptimizerContent() {
 
             let data: any;
             try {
-                const res = await fetch("/api/linkedin/scrape/status", {
+                const res = await fetch("/api/linkedin/connect/status", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ runId, linkedinUrl: url, masterProfileId }),
+                    body: JSON.stringify({ ref, linkedinUrl: url, masterProfileId }),
                 });
                 if (runTokenRef.current !== token) return;
 
@@ -437,17 +439,17 @@ function LinkedInOptimizerContent() {
                 continue;
             }
 
-            if (data?.status === "SUCCEEDED" && data?.result) {
+            if (data?.status === "ready" && data?.profile) {
                 stopFetchTimers();
                 setStageIndex(FETCH_STAGES.length - 1);
-                setResult(data.result);
+                setResult(data.profile);
                 setAiReport(null);
                 setViewMode("current");
                 setStep("result");
                 return;
             }
 
-            if (data?.status === "FAILED") {
+            if (data?.status === "failed") {
                 failScrape(data?.error || "We couldn't read that LinkedIn profile.");
                 return;
             }
@@ -476,12 +478,16 @@ function LinkedInOptimizerContent() {
         if (!result) return;
         setShowCreditModal(false);
         setIsOptimizing(true);
+        // Reserved before the rewrite so an empty balance cannot start it, and
+        // handed back below if the rewrite fails.
+        let creditTaken = false;
         try {
             const creditRes = await fetch("/api/credits/deduct", { method: "POST" });
             if (!creditRes.ok) {
                 if (creditRes.status === 403) throw new Error("Insufficient Credits to perform this action.");
                 throw new Error("Failed to deduct credit.");
             }
+            creditTaken = true;
 
             const res = await fetch("/api/linkedin/optimize", {
                 method: "POST",
@@ -500,7 +506,14 @@ function LinkedInOptimizerContent() {
             setAiReport(await res.json());
             setViewMode("optimized");
         } catch (err: any) {
-            alert(err.message);
+            if (creditTaken) {
+                await fetch("/api/credits/refund", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ reason: "linkedin-optimize: " + (err?.message || "failed") }),
+                }).catch(() => { /* the server logs a failed refund */ });
+            }
+            setError((err?.message || "Optimisation failed.") + " Your credit has not been used.");
         } finally {
             setIsOptimizing(false);
         }
@@ -621,7 +634,7 @@ function LinkedInOptimizerContent() {
                             <div className="flex items-start gap-2.5 p-3 rounded-lg bg-[#0a66c2]/5 border border-[#0a66c2]/20">
                                 <Shield className="w-4 h-4 text-[#0a66c2] shrink-0 mt-0.5" />
                                 <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
-                                    Fetching happens on our servers through a secure profile API. Your browser never talks to LinkedIn or to any third-party scraper directly.
+                                    Fetching happens on our servers through a secure profile API. Your browser never talks to LinkedIn directly.
                                 </p>
                             </div>
 
@@ -799,14 +812,14 @@ function LinkedInOptimizerContent() {
                           }))
                         : scraped;
 
-                const currentProfile = result.rawProfileData;
+                const currentProfile = sanitizeLinkedInProfile(result.rawProfileData) || {};
                 const optimizedProfile = aiReport
-                    ? {
+                    ? sanitizeLinkedInProfile({
                           ...result.rawProfileData,
                           ...aiReport,
                           experience: mergeByIndex(result.rawProfileData?.experience, aiReport.experience),
                           education: mergeByIndex(result.rawProfileData?.education, aiReport.education),
-                      }
+                      })
                     : null;
                 const profile = viewMode === "optimized" && optimizedProfile
                     ? optimizedProfile
