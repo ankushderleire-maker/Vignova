@@ -180,7 +180,7 @@ function ResumeStudioPageContent() {
 
     // Structured JD from the formatter agent; falls back to the parser while
     // the agent answers, so this panel is never empty.
-    const { jd: formattedJd, formatting: jdFormatting } = useFormattedJd(job as any);
+    const { jd: formattedJd, formatting: jdFormatting, refining: jdRefining } = useFormattedJd(job as any);
     const [mobilePanelView, setMobilePanelView] = useState<"editor" | "preview">("editor");
 
     /**
@@ -827,6 +827,7 @@ function ResumeStudioPageContent() {
                     <Input label="Phone" value={resumeData.contact?.phone || ""} onChange={(v) => updateContact('phone', v)} />
                     <Input label="Location" value={resumeData.contact?.location || ""} onChange={(v) => updateContact('location', v)} />
                     <Input label="LinkedIn" value={resumeData.contact?.linkedin || ""} onChange={(v) => updateContact('linkedin', v)} />
+                    <Input label="GitHub" value={resumeData.contact?.github || ""} onChange={(v) => updateContact('github', v)} />
                     <Input label="Website / Portfolio" value={resumeData.contact?.website || ""} onChange={(v) => updateContact('website', v)} />
                 </div>
             ),
@@ -1017,7 +1018,11 @@ function ResumeStudioPageContent() {
             id: "links",
             title: "Links",
             icon: LinkIcon,
-            body: listSection("links", "One link per line, e.g. GitHub - github.com/you"),
+            // GitHub, LinkedIn and the portfolio URL are fields in Personal
+            // Information — this is for anything else worth linking, so the
+            // example no longer points people at the free-text list for a
+            // field that exists.
+            body: listSection("links", "One link per line, e.g. Portfolio - dribbble.com/you"),
         },
         ...customSections.map((custom) => ({
             id: custom.id,
@@ -1290,7 +1295,7 @@ function ResumeStudioPageContent() {
                             <div className="flex-1 overflow-y-auto p-5 scrollbar-thin scrollbar-thumb-black/10 dark:scrollbar-thumb-white/10">
                                 {activeTab === "jd" && (
                                     <div className="rounded-xl border border-[var(--border-color)] bg-[var(--background)] p-4 w-full min-w-0">
-                                        <JobDescriptionBody job={job as any} jd={formattedJd} />
+                                        <JobDescriptionBody job={job as any} jd={formattedJd} refining={jdRefining} />
                                     </div>
                                 )}
 
@@ -1301,7 +1306,12 @@ function ResumeStudioPageContent() {
                                             These are the keywords this posting screens for. Generate a resume and the
                                             ATS report will score your document against them.
                                         </p>
-                                        {formattedJd && formattedJd.skills.length > 0 ? (
+                                        {jdRefining ? (
+                                            <div className="flex items-center gap-2 text-xs font-semibold text-[var(--primary)] py-2">
+                                                <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" />
+                                                <span>Pulling out the keywords…</span>
+                                            </div>
+                                        ) : formattedJd && formattedJd.skills.length > 0 ? (
                                             <SkillChips skills={formattedJd.skills} />
                                         ) : (
                                             <p className="text-[13px] text-[var(--text-secondary)]">
