@@ -9,7 +9,7 @@ import {
     Bold, Italic, Target, Copy, Mail, Sparkles, ChevronRight, Send, ArrowRight, Rocket,
     ExternalLink, MapPin, CalendarDays, Repeat, BarChart3, Search, SlidersHorizontal,
     X, Plus, RefreshCw, GraduationCap, Wrench, LayoutGrid, Globe, FolderKanban, Check,
-    Award, Users, Link as LinkIcon, Crown
+    Award, Users, Link as LinkIcon, Crown, Download
 } from "lucide-react";
 import { AIPreparationAnimation } from "@/components/resume-engine/AIPreparationAnimation";
 
@@ -814,6 +814,63 @@ function ResumeStudioPageContent() {
         />
     );
 
+    /**
+     * Saves the cover letter or draft email as a PDF.
+     *
+     * These are plain text rather than a template, so they go through the
+     * route's html branch and carry no premium gate — there is no template
+     * involved to gate on.
+     */
+    const [docDownloading, setDocDownloading] = useState(false);
+
+    const downloadTextDocument = async (kind: "cover-letter" | "email") => {
+        const text = (kind === "cover-letter" ? coverLetter : draftEmail) || "";
+        if (!text.trim()) return;
+
+        const label = kind === "cover-letter" ? "Cover Letter" : "Draft Email";
+        const fileName = `${label} - ${job?.company || ""} - ${job?.jobTitle || ""}.pdf`
+            .replace(/[\\/:*?"<>|]/g, "-");
+
+        const escape = (t: string) =>
+            t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+        const html = `<!DOCTYPE html><html><head><meta charset="utf-8" />
+            <style>
+              @page { size: A4; margin: 22mm; }
+              body { font-family: Georgia, 'Times New Roman', serif; font-size: 11.5pt;
+                     line-height: 1.65; color: #1a1a1a; white-space: pre-wrap; }
+            </style></head><body>${escape(text)}</body></html>`;
+
+        setDocDownloading(true);
+        try {
+            const res = await fetch("/api/pdf/generate", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ html, filename: fileName }),
+            });
+            if (!res.ok) throw new Error("PDF request failed");
+
+            const url = URL.createObjectURL(await res.blob());
+            const link = document.createElement("a");
+            link.href = url;
+            link.download = fileName;
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            URL.revokeObjectURL(url);
+        } catch {
+            setDialogConfig({
+                isOpen: true,
+                type: "alert",
+                title: "Download failed",
+                description: `Could not build the ${label.toLowerCase()} PDF. Please try again in a moment.`,
+                variant: "destructive",
+            });
+        } finally {
+            setDocDownloading(false);
+        }
+    };
+
     const editorSections: EditorSection[] = !resumeData ? [] : [
         {
             id: "personal",
@@ -1176,7 +1233,20 @@ function ResumeStudioPageContent() {
                             <span className="hidden sm:inline">Save</span>
                         </button>
 
-                        {/* DOWNLOAD BUTTON */}
+                        {/* DOWNLOAD BUTTON — for whichever document is on screen */}
+                        {activeDocument !== "resume" ? (
+                            <button
+                                onClick={() => downloadTextDocument(activeDocument === "cover-letter" ? "cover-letter" : "email")}
+                                disabled={docDownloading || !(activeDocument === "cover-letter" ? coverLetter : draftEmail)}
+                                className="flex items-center gap-1 bg-white text-black hover:bg-gray-200 transition px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                {docDownloading ? (
+                                    <><Loader2 className="h-3 w-3 animate-spin" /> Generating...</>
+                                ) : (
+                                    <><Download className="h-3 w-3" /> Download PDF</>
+                                )}
+                            </button>
+                        ) : (
                         <PdfDownloadButton
                             data={resumeData}
                             templateId={selectedTemplate}
@@ -1197,6 +1267,7 @@ function ResumeStudioPageContent() {
                                 })
                             }
                         />
+                        )}
                     </div>
                 )}
             </div>
