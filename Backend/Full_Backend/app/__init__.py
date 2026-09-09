@@ -20,9 +20,16 @@ from app.limiter import limiter
 
 logger = logging.getLogger("app")
 
+_IS_DEV = os.getenv("ENVIRONMENT", "development") == "development"
+
+# The schema is disabled in production along with the docs UI. Turning off
+# docs_url alone still leaves /openapi.json served, which lists every route,
+# request model and response model on a host that is reachable from the
+# internet — a complete map of the API for anyone who asks for it.
 app = FastAPI(
-    docs_url="/docs" if os.getenv("ENVIRONMENT", "development") == "development" else None,
+    docs_url="/docs" if _IS_DEV else None,
     redoc_url=None,
+    openapi_url="/openapi.json" if _IS_DEV else None,
 )
 
 app.state.limiter = limiter

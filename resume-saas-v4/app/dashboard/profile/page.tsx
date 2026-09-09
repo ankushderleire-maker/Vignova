@@ -5,9 +5,10 @@ import {
   User, Briefcase, GraduationCap, Code2,
   Plus, Trash2, Save, Loader2, Link as LinkIcon,
   Mail, Phone, MapPin, Globe, Layout, X, ChevronDown, Check, Crown, FileText,
-  FolderGit2, Award, Languages, Upload, AlertTriangle, CheckCircle2, AlertCircle
+  FolderGit2, Award, Languages, Upload, AlertTriangle, CheckCircle2, AlertCircle, Linkedin
 } from "lucide-react";
 import { DotLottieReact } from '@lottiefiles/dotlottie-react';
+import { linkedInToProfile, type ImportSummary } from "@/lib/linkedin-to-profile";
 
 // --- TYPES & SCHEMA (Matches Database) ---
 type Experience = { id: string; company: string; role: string; location: string; startDate: string; endDate: string; description: string; };
@@ -53,6 +54,7 @@ type ProfileContextType = {
   createNewProfile: (name?: string, parsed_data?: any) => Promise<void>;
   deleteProfile: (id: string) => Promise<void>;
   loadFromPdf: (file: File) => Promise<void>;
+  loadFromLinkedIn: (url: string) => Promise<ImportSummary>;
   subscription: any;
   showFeedback: (
     type: "confirm" | "success" | "error" | "loading" | "analyzing",
@@ -229,6 +231,76 @@ function ProfileProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  /**
+   * Fills the form from a public LinkedIn profile.
+   *
+   * Same two-step as the optimizer: start the import, then poll until the
+   * profile comes back. It is a slow job (tens of seconds), so the caller
+   * shows progress rather than blocking on a spinner.
+   *
+   * Nothing is saved here — the form is populated and the user reviews it,
+   * exactly as with a PDF import, because LinkedIn data is often out of
+   * date and overwriting a profile silently would be worse than useless.
+   */
+  const loadFromLinkedIn = async (url: string): Promise<ImportSummary> => {
+    const startRes = await fetch("/api/linkedin/connect", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ linkedinUrl: url }),
+    });
+    const startData = await startRes.json().catch(() => ({}));
+    if (!startRes.ok || !startData?.ref) {
+      throw new Error(startData?.error || "Could not start the LinkedIn import.");
+    }
+
+    const deadline = Date.now() + 4 * 60 * 1000;
+    while (Date.now() < deadline) {
+      await new Promise((r) => setTimeout(r, 2500));
+
+      let data: any;
+      try {
+        const res = await fetch("/api/linkedin/connect/status", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ref: startData.ref, linkedinUrl: url }),
+        });
+        data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data?.error || "We lost track of that import.");
+      } catch (err: any) {
+        // A single dropped poll shouldn't kill a minute-long job.
+        if (err?.message) continue;
+        continue;
+      }
+
+      if (data?.status === "ready" && data?.profile) {
+        const { profile, summary } = linkedInToProfile(data.profile.rawProfileData || data.profile);
+        // Merged over what is already there rather than replacing it, so an
+        // email and phone typed by hand survive an import that cannot
+        // supply them.
+        setData((prev) => ({
+          ...INITIAL_STATE,
+          ...prev,
+          ...Object.fromEntries(
+            Object.entries(profile).filter(([, v]) =>
+              Array.isArray(v) ? v.length > 0 : typeof v === "object" ? true : Boolean(v)
+            )
+          ),
+          skills: {
+            technical: profile.skills.technical || prev.skills.technical,
+            soft: prev.skills.soft,
+          },
+        }));
+        return summary;
+      }
+
+      if (data?.status === "failed") {
+        throw new Error(data?.error || "We couldn't read that LinkedIn profile.");
+      }
+    }
+
+    throw new Error("The import is taking longer than expected. Please try again in a moment.");
+  };
+
   useEffect(() => {
     if (!selectedProfileId) return;
     setIsLoading(true);
@@ -284,7 +356,7 @@ function ProfileProvider({ children }: { children: React.ReactNode }) {
   const removeListItem = (list: "experience" | "education" | "projects" | "certifications" | "languages", index: number) => setData(prev => ({ ...prev, [list]: prev[list].filter((_, i) => i !== index) as any }));
 
   return (
-    <ProfileContext.Provider value={{ data, updateField, updateNested, addListItem, updateListItem, removeListItem, activeSection, setActiveSection, isSaving, handleSave, isLoading, profiles, selectedProfileId, setSelectedProfileId, createNewProfile, deleteProfile, loadFromPdf, subscription, showFeedback, hideFeedback }}>
+    <ProfileContext.Provider value={{ data, updateField, updateNested, addListItem, updateListItem, removeListItem, activeSection, setActiveSection, isSaving, handleSave, isLoading, profiles, selectedProfileId, setSelectedProfileId, createNewProfile, deleteProfile, loadFromPdf, loadFromLinkedIn, subscription, showFeedback, hideFeedback }}>
       {children}
 
       {/* GLOBAL FEEDBACK MODAL */}
@@ -981,12 +1053,156 @@ function ProfileCreationModal({ isOpen, onClose }: { isOpen: boolean; onClose: (
   );
 }
 
+/**
+ * Collects a LinkedIn URL and fills the form from it.
+ *
+ * A modal rather than an inline field because the import runs for tens of
+ * seconds and replaces most of the form: it needs somewhere to show progress
+ * and, afterwards, what it actually found, so the user can tell an import that
+ * worked from one that returned an empty profile.
+ */
+function LinkedInImportModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
+  const { loadFromLinkedIn, handleSave, showFeedback } = useProfile();
+  const [url, setUrl] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [elapsed, setElapsed] = useState(0);
+
+  useEffect(() => {
+    if (!busy) return;
+    const t = setInterval(() => setElapsed((s) => s + 1), 1000);
+    return () => clearInterval(t);
+  }, [busy]);
+
+  useEffect(() => {
+    if (isOpen) { setUrl(""); setError(""); setElapsed(0); }
+  }, [isOpen]);
+
+  if (!isOpen) return null;
+
+  const run = async () => {
+    const trimmed = url.trim();
+    if (!trimmed.includes("linkedin.com/in/")) {
+      setError("Enter a profile URL that looks like https://www.linkedin.com/in/your-name");
+      return;
+    }
+    setError("");
+    setBusy(true);
+    setElapsed(0);
+    try {
+      const summary = await loadFromLinkedIn(
+        trimmed.startsWith("http") ? trimmed : `https://${trimmed}`
+      );
+
+      const found = [
+        summary.experience && `${summary.experience} role${summary.experience === 1 ? "" : "s"}`,
+        summary.education && `${summary.education} education entr${summary.education === 1 ? "y" : "ies"}`,
+        summary.skills && `${summary.skills} skill${summary.skills === 1 ? "" : "s"}`,
+        summary.projects && `${summary.projects} project${summary.projects === 1 ? "" : "s"}`,
+        summary.certifications && `${summary.certifications} certification${summary.certifications === 1 ? "" : "s"}`,
+        summary.languages && `${summary.languages} language${summary.languages === 1 ? "" : "s"}`,
+      ].filter(Boolean).join(", ");
+
+      onClose();
+      showFeedback(
+        "confirm",
+        "Imported from LinkedIn",
+        found
+          ? `Brought in ${found}. LinkedIn doesn't publish an email or phone number, so add those yourself. Review the form and save if it looks right.`
+          : "That profile came back empty. It may be private, or LinkedIn may be showing a limited version of it.",
+        () => handleSave({ silentSuccess: true }),
+        { confirmLabel: "Save", cancelLabel: "Review first", iconType: "success" }
+      );
+    } catch (err: any) {
+      setError(err?.message || "Could not import that profile.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+      <div className="w-full max-w-md bg-[var(--sidebar-bg)] border border-[var(--border-color)] rounded-2xl shadow-2xl p-6 relative">
+        <button
+          onClick={onClose}
+          disabled={busy}
+          className="absolute top-4 right-4 text-[var(--text-secondary)] hover:text-[var(--foreground)] transition-colors disabled:opacity-40"
+        >
+          <X className="w-5 h-5" />
+        </button>
+
+        <div className="flex items-center gap-3 mb-1">
+          <div className="w-10 h-10 rounded-xl bg-[#0a66c2]/10 border border-[#0a66c2]/20 flex items-center justify-center shrink-0">
+            <Linkedin className="w-5 h-5 text-[#0a66c2]" />
+          </div>
+          <h3 className="text-lg font-bold text-[var(--foreground)] font-heading">Import from LinkedIn</h3>
+        </div>
+        <p className="text-xs text-[var(--text-secondary)] mb-5 leading-relaxed">
+          We read the public version of your profile and fill this form in. Nothing is saved
+          until you review it.
+        </p>
+
+        <label className="block text-[11px] font-bold uppercase tracking-wider text-[var(--text-secondary)] mb-1.5">
+          Profile URL
+        </label>
+        <input
+          type="url"
+          value={url}
+          onChange={(e) => setUrl(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter" && !busy) run(); }}
+          disabled={busy}
+          placeholder="https://www.linkedin.com/in/your-name"
+          className="w-full bg-[var(--background)] border border-[var(--border-color)] rounded-xl px-4 py-2.5 text-sm text-[var(--foreground)] placeholder:text-[var(--text-secondary)]/60 focus:outline-none focus:border-[var(--primary)]/60 transition-colors disabled:opacity-50"
+        />
+
+        {error && (
+          <div className="mt-3 flex items-start gap-2 text-xs text-red-500">
+            <AlertCircle className="w-4 h-4 shrink-0 mt-px" />
+            <span>{error}</span>
+          </div>
+        )}
+
+        {busy && (
+          <div className="mt-4 flex items-center gap-2.5 text-xs text-[var(--text-secondary)]">
+            <Loader2 className="w-4 h-4 animate-spin text-[var(--primary)] shrink-0" />
+            <span>Reading your profile… {elapsed}s. This usually takes under a minute.</span>
+          </div>
+        )}
+
+        <p className="mt-4 text-[11px] text-[var(--text-secondary)]/80 leading-relaxed">
+          Your profile needs to be publicly visible. Existing details you have typed — including
+          your email and phone, which LinkedIn does not publish — are kept.
+        </p>
+
+        <div className="flex gap-2 mt-5">
+          <button
+            onClick={onClose}
+            disabled={busy}
+            className="flex-1 py-2.5 rounded-xl border border-[var(--border-color)] text-sm font-bold text-[var(--text-secondary)] hover:bg-black/5 dark:hover:bg-white/5 transition-colors disabled:opacity-40"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={run}
+            disabled={busy || !url.trim()}
+            className="flex-1 py-2.5 rounded-xl bg-[var(--primary)] text-white text-sm font-bold hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+          >
+            {busy && <Loader2 className="w-4 h-4 animate-spin" />}
+            {busy ? "Importing…" : "Import"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function MainContent() {
   const { activeSection, isLoading, profiles, selectedProfileId, setSelectedProfileId, deleteProfile, loadFromPdf, showFeedback, handleSave } = useProfile();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [isLinkedInOpen, setIsLinkedInOpen] = useState(false);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -1061,6 +1277,7 @@ function MainContent() {
   return (
     <div id="tour-profile" className="flex-1 flex flex-col font-ui w-full min-w-0">
       <ProfileCreationModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
+      <LinkedInImportModal isOpen={isLinkedInOpen} onClose={() => setIsLinkedInOpen(false)} />
 
       {/* HEADER BAR: SECTION TITLE & PROFILE SELECTOR */}
       <div className="flex flex-row items-center justify-between gap-4 mb-6 pb-4 border-b border-[var(--border-color)]/50">
@@ -1099,6 +1316,16 @@ function MainContent() {
                 <span className="hidden xl:inline">Delete</span>
               </button>
             )}
+
+            <button
+              onClick={() => setIsLinkedInOpen(true)}
+              disabled={isUploading}
+              className="flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-bold text-[#0a66c2] bg-[#0a66c2]/10 hover:bg-[#0a66c2]/20 border border-[#0a66c2]/25 rounded-lg transition-colors shrink-0 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              title="Fill this profile from your public LinkedIn page"
+            >
+              <Linkedin className="w-4 h-4" />
+              <span className="hidden lg:inline">Import from LinkedIn</span>
+            </button>
 
             <label className={`flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-bold text-[var(--text-secondary)] bg-transparent hover:bg-black/5 dark:hover:bg-white/10 border border-[var(--border-color)] rounded-lg transition-colors hover:border-gray-500 shrink-0 ${isUploading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}>
               {isUploading ? <Loader2 className="w-4 h-4 animate-spin text-[var(--primary)]" /> : <Upload className="w-4 h-4" />}
