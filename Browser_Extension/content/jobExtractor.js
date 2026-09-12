@@ -7,6 +7,24 @@
     const clean = (text, limit = 200) => String(text || '').replace(/\s+/g, ' ').trim().slice(0, limit);
     const find = (root, selectors) => selectors.split('|').map(s => Array.from(root.querySelectorAll(s)).find(visible)).find(Boolean);
     const text = (root, selectors) => clean(find(root, selectors)?.innerText);
+    const isBadTitle = value => {
+        const candidate = clean(value, 300).toLowerCase();
+        return !candidate || candidate.length < 3 || /^\d+\s+notifications?$/.test(candidate) || candidate === 'jobs based on your preferences' || candidate === 'job role';
+    };
+    const titleFromCurrentJobLink = (jobId, root) => {
+        const selectors = jobId
+            ? [`a[href*="/jobs/view/${jobId}"]`, `a[href*="currentJobId=${jobId}"]`]
+            : ['a[href*="/jobs/view/"]'];
+        for (const scope of [root, document].filter(Boolean)) {
+            for (const selector of selectors) {
+                for (const link of Array.from(scope.querySelectorAll(selector))) {
+                    const candidate = clean(link.innerText || link.textContent || link.getAttribute('aria-label'), 300);
+                    if (!isBadTitle(candidate)) return candidate;
+                }
+            }
+        }
+        return '';
+    };
     const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
     const logoFromSchema = schema => {
         const raw = schema?.hiringOrganization?.logo || schema?.image;
@@ -93,7 +111,12 @@
             return { error: 'Select a Monster job and open its full job description, then try again. You can also paste a job description.', selectedJobUrl: selectedJobUrl || null };
         }
         const schema = structuredJob(monster && !url.pathname.startsWith('/job-openings/') ? url.searchParams.get('id') || '' : '');
-        const title = text(root, '[data-testid="jobTitle"]|.job-details-jobs-unified-top-card__job-title h1|.job-details-jobs-unified-top-card__job-title|.job-details-jobs-unified-top-card__job-title-link|.job-details-jobs-unified-top-card__title-container h1|.job-details-jobs-unified-top-card__title-container h2|.jobs-unified-top-card__job-title|[data-testid="jobsearch-JobInfoHeader-title"]|h1.jobsearch-JobInfoHeader-title|h1|.posting-headline h2') || clean(schema?.title);
+        const linkedinJobId = linkedin ? url.searchParams.get('currentJobId') || url.pathname.match(/\/jobs\/view\/(\d+)/)?.[1] || '' : '';
+        const titleSelectors = linkedin
+            ? '[data-testid="jobTitle"]|.job-details-jobs-unified-top-card__job-title h1|.job-details-jobs-unified-top-card__job-title|.job-details-jobs-unified-top-card__job-title-link|.job-details-jobs-unified-top-card__title-container h1|.job-details-jobs-unified-top-card__title-container h2|.jobs-unified-top-card__job-title|[class*="job-title"]'
+            : '[data-testid="jobTitle"]|.job-details-jobs-unified-top-card__job-title h1|.job-details-jobs-unified-top-card__job-title|.job-details-jobs-unified-top-card__job-title-link|.job-details-jobs-unified-top-card__title-container h1|.job-details-jobs-unified-top-card__title-container h2|.jobs-unified-top-card__job-title|[data-testid="jobsearch-JobInfoHeader-title"]|h1.jobsearch-JobInfoHeader-title|h1|.posting-headline h2';
+        let title = text(root, titleSelectors) || clean(schema?.title);
+        if (linkedin && isBadTitle(title)) title = titleFromCurrentJobLink(linkedinJobId, root);
         const company = text(root, '[data-testid="company"]|.job-details-jobs-unified-top-card__company-name|.jobs-unified-top-card__company-name|.job-details-jobs-unified-top-card__primary-description a[href*="/company/"]|.jobs-unified-top-card__subtitle-primary-grouping a[href*="/company/"]|[data-testid="inlineHeader-companyName"]|[data-company-name]|.company-name|.company') || clean(schema?.hiringOrganization?.name);
         const addresses = [].concat(schema?.jobLocation || []).map(place => place?.address).filter(Boolean);
         const address = addresses[0];
@@ -104,7 +127,7 @@
         if (!description && !monster && !linkedin && title && company) description = find(root, 'article|main')?.innerText || '';
         if (!title || clean(description, 20000).length < 50) return { error: 'The job description is not available yet. Open the full posting, wait for it to load, or paste the description.', selectedJobUrl: selectedJobUrl || null };
         if (linkedin) {
-            const id = url.searchParams.get('currentJobId') || url.pathname.match(/\/jobs\/view\/(\d+)/)?.[1];
+            const id = linkedinJobId;
             if (id) { url.pathname = '/jobs/view/' + id + '/'; url.search = ''; }
         }
         if (/(^|\.)indeed\.com$/.test(url.hostname)) {
