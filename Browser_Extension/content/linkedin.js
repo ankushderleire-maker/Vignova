@@ -28,6 +28,17 @@
         return typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.id;
     }
 
+    function removeInjectedLinkedInUI() {
+        document.getElementById(CONTAINER_ID)?.remove();
+        document.querySelectorAll(".vignova-score-badge,.vg-match-panel,.vignova-card-badge").forEach(el => el.remove());
+    }
+
+    const _contextHeartbeat = setInterval(() => {
+        if (hasValidExtensionContext()) return;
+        clearInterval(_contextHeartbeat);
+        removeInjectedLinkedInUI();
+    }, 3000);
+
 
     function setBtnContent(btn, iconClass, iconStr, text) {
         btn.textContent = "";
@@ -143,10 +154,7 @@
             // If the user clicked a new job, remove the old badge container
             if (newJobId && newJobId !== currentJobId) {
                 currentJobId = newJobId;
-                const oldContainer = document.getElementById(CONTAINER_ID);
-                if (oldContainer) {
-                    oldContainer.remove();
-                }
+                removeInjectedLinkedInUI();
             }
 
             if (!document.getElementById(BUTTON_ID)) {
@@ -532,6 +540,35 @@
         return "";
     }
 
+    function cleanScrapedTitle(value) {
+        return String(value || "")
+            .replace(/\s+/g, " ")
+            .replace(/\s+·\s+.*$/, "")
+            .trim();
+    }
+
+    function isBadJobTitle(value) {
+        const text = cleanScrapedTitle(value).toLowerCase();
+        return !text || text.length < 3 || /^\d+\s+notifications?$/.test(text) || text === "jobs based on your preferences" || text === "job role";
+    }
+
+    function titleFromCurrentJobLink(jobId, root) {
+        const selectors = jobId
+            ? [`a[href*="/jobs/view/${jobId}"]`, `a[href*="currentJobId=${jobId}"]`]
+            : ['a[href*="/jobs/view/"]'];
+        const scopeList = [root, document].filter(Boolean);
+        for (const scope of scopeList) {
+            for (const selector of selectors) {
+                const links = Array.from(scope.querySelectorAll(selector));
+                for (const link of links) {
+                    const text = cleanScrapedTitle(link.innerText || link.textContent || link.getAttribute("aria-label"));
+                    if (!isBadJobTitle(text)) return text;
+                }
+            }
+        }
+        return "";
+    }
+
     // ─── Extract salary / deadline from JD text ───
     function extractJobMeta(text) {
         if (!text) return {};
@@ -817,18 +854,21 @@
             root.querySelector('.job-details-jobs-unified-top-card__job-title-link') ||
             root.querySelector("h2.t-24") ||
             root.querySelector("h1.t-24") ||
-            root.querySelector("h1") ||
-            root.querySelector("h2") ||
+            root.querySelector(".job-details-jobs-unified-top-card__title-container h1") ||
+            root.querySelector(".job-details-jobs-unified-top-card__title-container h2") ||
+            root.querySelector("[class*='job-title']") ||
             document.querySelector(".job-details-jobs-unified-top-card__container--two-pane h2");
 
-        if (!jobTitleEl && jobId) {
+        if ((!jobTitleEl || isBadJobTitle(jobTitleEl.innerText || jobTitleEl.textContent)) && jobId) {
             // Fallback: Find links containing the /jobs/view/jobId in href to avoid matching "Hybrid" badges
             const anchors = Array.from(document.querySelectorAll(`a[href*="/jobs/view/${jobId}"]`)).filter(a => a.innerText?.trim());
             if (anchors.length > 0) {
                 jobTitleEl = anchors[0];
             }
         }
-        const jobTitle = jobTitleEl?.innerText?.trim() || "Job Role";
+        const jobTitle = !isBadJobTitle(jobTitleEl?.innerText || jobTitleEl?.textContent)
+            ? cleanScrapedTitle(jobTitleEl.innerText || jobTitleEl.textContent)
+            : titleFromCurrentJobLink(jobId, root) || "Job Role";
 
         let companyEl = root.querySelector('.job-details-jobs-unified-top-card__company-name') ||
                         root.querySelector('.jobs-unified-top-card__company-name') ||
