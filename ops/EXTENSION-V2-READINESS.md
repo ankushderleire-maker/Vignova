@@ -51,9 +51,9 @@ Unauthenticated GET checks on September 11 are recorded in `ops/artifacts/extens
 - Whole Next.js `tsc --noEmit`: passed.
 - JavaScript syntax, manifest/resources, popup IDs, Python syntax and final ZIP integrity are checked while packaging. Screenshots in `ops/artifacts/extension-v2/` contain synthetic fixture data, not production accounts.
 
-Current test package: `VignovaExtension_v2.0.0_TEST_ONLY.zip`, 39 files, SHA-256 `fbe7ca610665841c276000a930292edaa692315ca432ecdf88139caa47e69116`.
+Current test package: `VignovaExtension_v2.0.0_TEST_ONLY.zip`, 39 files, SHA-256 `6bcd57e31c43e0f62d0d68a276ea24c2d8d11c0eba61ca70639b496d1e7441e5`.
 
-Chrome Web Store update package for the existing listing: `VignovaExtension_v2.0.0.zip`, 39 files, SHA-256 `fbe7ca610665841c276000a930292edaa692315ca432ecdf88139caa47e69116`.
+Chrome Web Store update package for the existing listing: `VignovaExtension_v2.0.0.zip`, 39 files, SHA-256 `6bcd57e31c43e0f62d0d68a276ea24c2d8d11c0eba61ca70639b496d1e7441e5`.
 
 These tests do **not** prove real paid AI generation or a production PDF download. No production deployment, real account writes, application submission or store upload occurred.
 
