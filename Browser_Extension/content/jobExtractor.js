@@ -7,6 +7,7 @@
     const clean = (text, limit = 200) => String(text || '').replace(/\s+/g, ' ').trim().slice(0, limit);
     const find = (root, selectors) => selectors.split('|').map(s => Array.from(root.querySelectorAll(s)).find(visible)).find(Boolean);
     const text = (root, selectors) => clean(find(root, selectors)?.innerText);
+    const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
     const logoFromSchema = schema => {
         const raw = schema?.hiringOrganization?.logo || schema?.image;
         const value = Array.isArray(raw) ? raw[0] : raw;
@@ -45,25 +46,64 @@
         if (selectedId) return jobs.find(j => String(j.url || j.identifier?.value || '').includes(selectedId)) || null;
         return jobs.length === 1 ? jobs[0] : null;
     }
-    function extract() {
-        const url = new URL(location.href), monster = /(^|\.)monster\./i.test(url.hostname);
-        const detail = find(document, '[data-testid="svx-job-view-wrapper"]|[data-testid="job-view"]|#JobView|#jobsearch-ViewjobPaneWrapper|.jobsearch-JobComponent|.jobs-search__job-details--container|.jobs-details__main-content|.job-view-layout');
+    async function prepareLinkedInDetail(root) {
+        if (!/(^|\.)linkedin\.com$/i.test(location.hostname)) return;
+        const containers = [
+            root,
+            document.querySelector('.jobs-search__job-details--container'),
+            document.querySelector('.jobs-details__main-content'),
+            document.scrollingElement,
+        ].filter(Boolean);
+        for (const button of Array.from(root.querySelectorAll('button'))) {
+            const label = clean(button.innerText || button.textContent || '', 80).toLowerCase();
+            if ((label === 'see more' || label === 'show more' || label.includes('show more') || label.includes('see more')) && visible(button)) {
+                try { button.click(); } catch { /* ignore */ }
+            }
+        }
+        if (!find(root, '#job-details|.jobs-description__content|.jobs-description|.jobs-box__html-content|article.jobs-description__container|[class*="jobs-description"]')) {
+            for (const el of containers) {
+                try {
+                    el.scrollTop = Math.max(el.scrollTop || 0, 650);
+                    el.dispatchEvent(new Event('scroll', { bubbles: true }));
+                } catch { /* ignore */ }
+            }
+        }
+        await wait(350);
+    }
+    function descriptionFromAboutHeading(root) {
+        const headings = Array.from(root.querySelectorAll('h2,h3')).filter(visible);
+        const heading = headings.find(h => /about the job|job description|about this role/i.test(h.textContent || ''));
+        if (!heading) return '';
+        const candidates = [
+            heading.nextElementSibling,
+            heading.parentElement?.nextElementSibling,
+            heading.closest('section,article,div')?.nextElementSibling,
+            heading.closest('section,article,div'),
+        ].filter(Boolean);
+        const best = candidates.find(el => clean(el.innerText || el.textContent || '', 20000).length >= 50);
+        return best ? best.innerText || best.textContent || '' : '';
+    }
+    async function extract() {
+        const url = new URL(location.href), monster = /(^|\.)monster\./i.test(url.hostname), linkedin = /(^|\.)linkedin\.com$/i.test(url.hostname);
+        const detail = find(document, '[data-testid="svx-job-view-wrapper"]|[data-testid="job-view"]|#JobView|#jobsearch-ViewjobPaneWrapper|.jobsearch-JobComponent|.jobs-search__job-details--container|.jobs-details__main-content|.job-details-jobs-unified-top-card__container--two-pane|.job-view-layout|.scaffold-layout__detail');
         const root = detail || document;
+        await prepareLinkedInDetail(root);
         // A search results page is not a job description. Never copy its list or pick an arbitrary first job.
         if (monster && !url.pathname.startsWith('/job-openings/') && !detail) {
             return { error: 'Select a Monster job and open its full job description, then try again. You can also paste a job description.', selectedJobUrl: selectedJobUrl || null };
         }
         const schema = structuredJob(monster && !url.pathname.startsWith('/job-openings/') ? url.searchParams.get('id') || '' : '');
-        const title = text(root, '[data-testid="jobTitle"]|.job-details-jobs-unified-top-card__job-title h1|.job-details-jobs-unified-top-card__job-title|.jobs-unified-top-card__job-title|[data-testid="jobsearch-JobInfoHeader-title"]|h1.jobsearch-JobInfoHeader-title|h1|.posting-headline h2') || clean(schema?.title);
-        const company = text(root, '[data-testid="company"]|.job-details-jobs-unified-top-card__company-name|.jobs-unified-top-card__company-name|[data-testid="inlineHeader-companyName"]|[data-company-name]|.company-name|.company') || clean(schema?.hiringOrganization?.name);
+        const title = text(root, '[data-testid="jobTitle"]|.job-details-jobs-unified-top-card__job-title h1|.job-details-jobs-unified-top-card__job-title|.job-details-jobs-unified-top-card__job-title-link|.job-details-jobs-unified-top-card__title-container h1|.job-details-jobs-unified-top-card__title-container h2|.jobs-unified-top-card__job-title|[data-testid="jobsearch-JobInfoHeader-title"]|h1.jobsearch-JobInfoHeader-title|h1|.posting-headline h2') || clean(schema?.title);
+        const company = text(root, '[data-testid="company"]|.job-details-jobs-unified-top-card__company-name|.jobs-unified-top-card__company-name|.job-details-jobs-unified-top-card__primary-description a[href*="/company/"]|.jobs-unified-top-card__subtitle-primary-grouping a[href*="/company/"]|[data-testid="inlineHeader-companyName"]|[data-company-name]|.company-name|.company') || clean(schema?.hiringOrganization?.name);
         const addresses = [].concat(schema?.jobLocation || []).map(place => place?.address).filter(Boolean);
         const address = addresses[0];
         const jobLocation = text(root, '[data-testid="jobDetailLocation"]|[data-testid="svx-jobview-location-value"]|.job-details-jobs-unified-top-card__primary-description-container|.jobs-unified-top-card__bullet|[data-testid="inlineHeader-companyLocation"]|[data-testid="job-location"]|.location|.posting-categories .location') || [address?.addressLocality, address?.addressRegion, address?.addressCountry].filter(Boolean).join(', ');
-        let description = find(root, '[data-testid="description-clamp-wrapper"]|[data-testid="svx-description-container-inner"]|#jobDescriptionText|.jobs-description__content|.jobs-description-content__text|#job-details|[data-testid="job-description"]|.job-description|#job-description|.posting-page .content|.section-wrapper')?.innerText || '';
+        let description = find(root, '[data-testid="description-clamp-wrapper"]|[data-testid="svx-description-container-inner"]|#jobDescriptionText|#job-details|.jobs-description__content|.jobs-description|.jobs-box__html-content|.jobs-description-content__text|.jobs-description-content|article.jobs-description__container|[data-testid="job-description"]|[class*="jobs-description"]|.job-description|#job-description|.posting-page .content|.section-wrapper')?.innerText || '';
+        if (!description && linkedin) description = descriptionFromAboutHeading(root);
         if (!description && schema?.description) description = new DOMParser().parseFromString(schema.description, 'text/html').body.textContent || '';
-        if (!description && !monster && title && company) description = find(root, 'article|main')?.innerText || '';
+        if (!description && !monster && !linkedin && title && company) description = find(root, 'article|main')?.innerText || '';
         if (!title || clean(description, 20000).length < 50) return { error: 'The job description is not available yet. Open the full posting, wait for it to load, or paste the description.', selectedJobUrl: selectedJobUrl || null };
-        if (/(^|\.)linkedin\.com$/.test(url.hostname)) {
+        if (linkedin) {
             const id = url.searchParams.get('currentJobId') || url.pathname.match(/\/jobs\/view\/(\d+)/)?.[1];
             if (id) { url.pathname = '/jobs/view/' + id + '/'; url.search = ''; }
         }
@@ -85,7 +125,7 @@
     window.Vignova_JobPage = { extract };
     chrome.runtime.onMessage.addListener((message, _sender, reply) => {
         if (message.type !== 'EXTRACT_JOB_DETAILS') return;
-        try { reply({ success: true, job: extract() }); }
-        catch { reply({ success: false, error: 'The job could not be read. Open its full description and try again.' }); }
+        extract().then(job => reply({ success: true, job })).catch(() => reply({ success: false, error: 'The job could not be read. Open its full description and try again.' }));
+        return true;
     });
 })();
