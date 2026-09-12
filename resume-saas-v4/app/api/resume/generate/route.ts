@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { db } from "@/lib/db";
+import { spendCredit } from "@/lib/credits";
 
 export const maxDuration = 300;
 
@@ -45,13 +46,10 @@ export async function POST(req: Request) {
         );
     }
 
-    // 3. Generation succeeded — deduct credit atomically
+    // 3. Generation succeeded — charge for it, atomically and last, so a
+    //    concurrent request cannot spend the same credit twice.
     const data = await backendRes.json();
-
-    await db.subscriptions.update({
-        where: { id: sub.id },
-        data: { credits_remaining: { decrement: 1 } },
-    });
+    await spendCredit(userId);
 
     return NextResponse.json(data);
 }

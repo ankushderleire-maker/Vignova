@@ -1,0 +1,648 @@
+/* The landing page typeface, so the injected bar matches the overlay.
+   Relative URL: Chrome rewrites it to the extension origin on injection. */
+@font-face {
+    font-family: Geist;
+    font-style: normal;
+    font-weight: 100 900;
+    font-display: swap;
+    src: url('../assets/geist-latin.woff2') format('woff2');
+}
+
+/* ─── NEW CONTAINER STYLE ─── */
+/* Our own block on its own line, below LinkedIn's action row rather than inside
+   it. `display: flex` (not inline-flex) with a full-width basis is what keeps it
+   out of their flex row, where it used to squeeze Apply and Save. */
+.vignova-injected-container {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    align-items: center !important;
+    /* The brand's purple-to-blue, not the pure black this used to be. */
+    background: linear-gradient(110deg, #f3ecff 0%, #ece9ff 45%, #e6f1ff 100%) !important;
+    border: 1px solid rgba(108, 75, 234, 0.22) !important;
+    padding: 10px 12px !important;
+    border-radius: 12px !important;
+    gap: 8px !important;
+    margin: 12px 0 !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+    clear: both !important;
+    position: relative !important;
+    z-index: 10 !important;
+    box-shadow: 0 1px 3px rgba(52, 37, 100, 0.06) !important;
+}
+
+@media (prefers-color-scheme: dark) {
+    .vignova-injected-container {
+        background: linear-gradient(110deg, #1e1830 0%, #1b1a33 45%, #17203a 100%) !important;
+        border-color: rgba(167, 139, 250, 0.28) !important;
+    }
+}
+
+.vignova-brand-mark {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 30px !important;
+    height: 30px !important;
+    flex: 0 0 30px !important;
+    margin: 0 2px !important;
+    border-radius: 7px !important;
+    background: rgba(108, 75, 234, 0.12) !important;
+    color: #5b21d6 !important;
+    font: 800 18px/1 Geist, Arial, Helvetica, sans-serif !important;
+}
+
+.vignova-injected-container--fallback {
+    position: fixed !important;
+    right: 24px !important;
+    bottom: 24px !important;
+    z-index: 2147483646 !important;
+    margin: 0 !important;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.28) !important;
+}
+
+/* Hide Emojis to match reference */
+.vignova-btn-icon {
+    display: none !important;
+}
+
+/* Main Tailor Button */
+.vignova-tailor-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background-color: #6c4bea !important;
+    color: #ffffff !important;
+    font-weight: 700;
+    font-size: 12px;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    padding: 8px 14px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+    border: none !important;
+    box-shadow: none !important;
+    z-index: 9999;
+    font-family: Geist, Arial, Helvetica, sans-serif;
+    line-height: 1.5;
+}
+
+.vignova-tailor-btn:hover {
+    filter: brightness(0.95);
+    transform: translateY(-1px);
+}
+
+.vignova-tailor-btn svg {
+    display: none;
+}
+
+/* Save Job Button */
+.vignova-save-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background-color: #ffffff !important;
+    color: #4b3aa8 !important;
+    font-weight: 700;
+    font-size: 12px;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    padding: 8px 14px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+    border: 1px solid rgba(108, 75, 234, 0.3) !important;
+    box-shadow: none !important;
+    z-index: 9999;
+    font-family: Geist, Arial, Helvetica, sans-serif;
+    line-height: 1.5;
+}
+
+.vignova-save-btn:hover {
+    filter: brightness(0.95);
+    transform: translateY(-1px);
+}
+
+/* Success State for Tailor Button (Resume Created) */
+.vignova-tailor-btn.success {
+    background-color: rgba(139, 92, 246, 0.1);
+    border-color: rgba(139, 92, 246, 0.3);
+    color: #8b5cf6;
+    cursor: default;
+}
+
+/* Success State for Save Button (View in Dashboard) */
+.vignova-save-btn.success {
+    background-color: rgba(139, 92, 246, 0.1);
+    border-color: rgba(139, 92, 246, 0.3);
+    color: #8b5cf6;
+}
+
+/* Login Button State */
+.vignova-btn-login {
+    background-color: #1c1c1e !important;
+    color: #fbbf24 !important;
+    border: 1px solid #3f3f46 !important;
+    font-weight: 700 !important;
+    letter-spacing: 0.03em;
+}
+
+.vignova-btn-login:hover {
+    background-color: #27272a !important;
+    border-color: #fbbf24 !important;
+    box-shadow: 0 0 8px rgba(251, 191, 36, 0.2) !important;
+}
+
+
+/* Loading State */
+.vignova-tailor-btn.loading,
+.vignova-tailor-btn.loading {
+    opacity: 0.7;
+    cursor: wait;
+}
+
+/* Match Score Badge (Now strictly matching the image) */
+.vignova-score-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 12px;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    /* Score bands stay semantic (see .low/.medium/.high below) — this is the
+       neutral resting state before a score has been calculated. */
+    color: #4b3aa8 !important;
+    background-color: rgba(108, 75, 234, 0.12) !important;
+    border-radius: 8px;
+    padding: 8px 12px;
+    min-width: max-content;
+    border: none !important;
+    box-shadow: none !important;
+    position: relative;
+    cursor: help;
+    transition: all 0.3s ease;
+    font-family: Geist, Arial, Helvetica, sans-serif;
+}
+
+/* HTML Tooltip Container (Global Body Attached) */
+.vignova-tooltip-content.global-tooltip {
+    position: fixed;
+    background-color: #050b06;
+    /* Very dark background to match site theme */
+    background-image:
+        linear-gradient(to right, rgba(139, 92, 246, 0.15) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(139, 92, 246, 0.15) 1px, transparent 1px);
+    background-size: 24px 24px;
+    border: 1px solid #7c3aed;
+    border-radius: 8px;
+    padding: 16px;
+    width: 260px;
+    /* Slightly wider for better text fit */
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.8), 0 10px 10px -5px rgba(0, 0, 0, 0.5);
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.2s cubic-bezier(0.16, 1, 0.3, 1), transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    transform: translateX(-10px);
+    /* Start slightly left for pop-out effect */
+    z-index: 2147483647;
+    /* Absolute maximum z-index */
+    color: #f4f4f5 !important;
+    pointer-events: none;
+    /* Don't block clicks */
+    text-align: left;
+    font-family: Geist, Arial, Helvetica, sans-serif !important;
+    font-weight: normal !important;
+    line-height: 1.4 !important;
+    word-wrap: break-word;
+}
+
+/* Tooltip Arrow (Pointing Left) */
+.vignova-tooltip-content.global-tooltip::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    right: 100%;
+    transform: translateY(-50%);
+    border-width: 8px;
+    border-style: solid;
+    border-color: transparent #050b06 transparent transparent;
+    /* Match the dark base background */
+}
+
+/* Show Tooltip Animated state added via JS .show class */
+.vignova-tooltip-content.global-tooltip.show {
+    opacity: 1 !important;
+    visibility: visible !important;
+    transform: translateX(0);
+    /* Animate right */
+}
+
+/* Tooltip Internals */
+.vignova-tt-header {
+    font-size: 14px !important;
+    font-weight: 700 !important;
+    margin-bottom: 12px !important;
+    color: #ffffff !important;
+    border-bottom: 1px solid #3f3f46;
+    padding-bottom: 8px !important;
+    line-height: 1.2 !important;
+}
+
+.vignova-tt-row {
+    margin-bottom: 12px !important;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.vignova-tt-row:last-child {
+    margin-bottom: 0 !important;
+}
+
+.vignova-tt-label {
+    display: block;
+    width: 100%;
+    font-size: 11px !important;
+    color: #a1a1aa !important;
+    margin-bottom: 6px !important;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 600 !important;
+}
+
+.vignova-tt-bar-bg {
+    flex-grow: 1;
+    height: 8px;
+    background: #27272a;
+    border-radius: 4px;
+    overflow: hidden;
+    position: relative;
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+.vignova-tt-bar-fill {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.vignova-tt-val {
+    width: 35px;
+    text-align: right;
+    font-size: 12px !important;
+    font-weight: 700 !important;
+    margin-left: 8px;
+    color: #e4e4e7 !important;
+}
+
+/* Keyword Pills — matched (green) */
+.vignova-kw-pill {
+    background-color: rgba(139, 92, 246, 0.12);
+    border: 1px solid rgba(139, 92, 246, 0.4);
+    color: #6ee7b7;
+    padding: 3px 9px;
+    border-radius: 12px;
+    font-size: 10px !important;
+    font-weight: 600 !important;
+    text-transform: capitalize;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+}
+
+/* Missing keyword pills — red */
+.vignova-kw-missing {
+    background-color: rgba(239, 68, 68, 0.12) !important;
+    border: 1px solid rgba(239, 68, 68, 0.4) !important;
+    color: #fca5a5 !important;
+}
+
+/* Badge — one tint per tier. Light pills, because the panel behind them is now
+   light; the dark blocks these replaced were built for the old black bar. */
+.vignova-score-badge.very-high,
+.vignova-score-badge.high {
+    background-color: rgba(16, 185, 129, 0.14) !important;
+    color: #047857 !important;
+    border: 1px solid rgba(16, 185, 129, 0.35) !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+}
+.vignova-score-badge.medium {
+    background-color: rgba(245, 158, 11, 0.16) !important;
+    color: #b45309 !important;
+    border: 1px solid rgba(245, 158, 11, 0.38) !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+}
+.vignova-score-badge.low,
+.vignova-score-badge.very-low {
+    background-color: rgba(239, 68, 68, 0.14) !important;
+    color: #b91c1c !important;
+    border: 1px solid rgba(239, 68, 68, 0.35) !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+}
+
+@media (prefers-color-scheme: dark) {
+    .vignova-score-badge.very-high,
+    .vignova-score-badge.high { color: #6ee7b7 !important; }
+    .vignova-score-badge.medium { color: #fcd34d !important; }
+    .vignova-score-badge.low,
+    .vignova-score-badge.very-low { color: #fca5a5 !important; }
+    .vignova-score-badge { color: #cbbcff !important; }
+}
+
+.vignova-score-loading {
+    width: 16px;
+    height: 16px;
+    border: 2px solid #555;
+    border-top-color: #fff;
+    border-radius: 50%;
+    animation: vignova-spin 1s linear infinite;
+}
+
+@keyframes vignova-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* ─── JD Source Highlight (applied to the scraped element on the page) ─── */
+.vignova-jd-highlight {
+    outline: 2px solid #6366f1 !important;
+    outline-offset: 6px !important;
+    background-color: rgba(99, 102, 241, 0.04) !important;
+    border-radius: 6px !important;
+    transition: outline 0.25s ease, background-color 0.25s ease !important;
+    scroll-margin-top: 80px !important;
+}
+
+/* ─── JD Review Panel ─── */
+.vignova-jdr-panel {
+    display: block !important;
+    width: 100% !important;
+    max-width: 640px !important;
+    background: #111111 !important;
+    border: 1px solid #6366f1 !important;
+    border-radius: 10px !important;
+    padding: 0 !important;
+    margin-top: 10px !important;
+    margin-bottom: 6px !important;
+    box-shadow: 0 4px 24px rgba(99, 102, 241, 0.18), 0 1px 4px rgba(0,0,0,0.5) !important;
+    font-family: Geist, Arial, Helvetica, sans-serif !important;
+    animation: vignova-jdr-in 0.18s cubic-bezier(0.16, 1, 0.3, 1) both !important;
+    overflow: hidden !important;
+    z-index: 9998 !important;
+    position: relative !important;
+    box-sizing: border-box !important;
+}
+
+@keyframes vignova-jdr-in {
+    from { opacity: 0; transform: translateY(-6px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+.vignova-jdr-header {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    padding: 12px 14px !important;
+    border-bottom: 1px solid #2a2a3a !important;
+    gap: 10px !important;
+}
+
+.vignova-jdr-header-left {
+    display: flex !important;
+    align-items: center !important;
+    gap: 10px !important;
+    min-width: 0 !important;
+}
+
+.vignova-jdr-dot {
+    display: inline-block !important;
+    width: 8px !important;
+    height: 8px !important;
+    min-width: 8px !important;
+    background: #6366f1 !important;
+    border-radius: 50% !important;
+    box-shadow: 0 0 6px #6366f1 !important;
+}
+
+.vignova-jdr-title {
+    font-size: 12px !important;
+    font-weight: 700 !important;
+    color: #e5e7eb !important;
+    line-height: 1.3 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.4px !important;
+}
+
+.vignova-jdr-subtitle {
+    font-size: 11px !important;
+    font-weight: 400 !important;
+    color: #6b7280 !important;
+    line-height: 1.3 !important;
+    margin-top: 1px !important;
+}
+
+.vignova-jdr-cancel-x {
+    background: none !important;
+    border: none !important;
+    color: #6b7280 !important;
+    font-size: 14px !important;
+    cursor: pointer !important;
+    padding: 2px 6px !important;
+    border-radius: 4px !important;
+    line-height: 1 !important;
+    transition: color 0.15s, background 0.15s !important;
+    flex-shrink: 0 !important;
+}
+.vignova-jdr-cancel-x:hover {
+    color: #f3f4f6 !important;
+    background: rgba(255,255,255,0.08) !important;
+}
+
+.vignova-jdr-textarea {
+    display: block !important;
+    width: 100% !important;
+    min-height: 160px !important;
+    max-height: 320px !important;
+    background: #0a0a0a !important;
+    color: #d1d5db !important;
+    border: none !important;
+    border-bottom: 1px solid #2a2a3a !important;
+    border-radius: 0 !important;
+    padding: 12px 14px !important;
+    font-size: 12px !important;
+    font-family: Geist, Arial, Helvetica, sans-serif !important;
+    line-height: 1.6 !important;
+    resize: vertical !important;
+    outline: none !important;
+    box-shadow: none !important;
+    box-sizing: border-box !important;
+    overflow-y: auto !important;
+}
+.vignova-jdr-textarea:focus {
+    border-bottom-color: #6366f1 !important;
+    outline: none !important;
+}
+
+.vignova-jdr-footer {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    padding: 10px 14px !important;
+    gap: 10px !important;
+}
+
+.vignova-jdr-char-count {
+    font-size: 11px !important;
+    color: #4b5563 !important;
+    font-variant-numeric: tabular-nums !important;
+    flex-shrink: 0 !important;
+}
+
+.vignova-jdr-actions {
+    display: flex !important;
+    gap: 8px !important;
+    align-items: center !important;
+}
+
+.vignova-jdr-btn-cancel {
+    background: none !important;
+    border: 1px solid #3f3f46 !important;
+    color: #9ca3af !important;
+    font-size: 12px !important;
+    font-weight: 600 !important;
+    padding: 6px 14px !important;
+    border-radius: 6px !important;
+    cursor: pointer !important;
+    font-family: inherit !important;
+    transition: background 0.15s, color 0.15s !important;
+    line-height: 1 !important;
+}
+.vignova-jdr-btn-cancel:hover {
+    background: rgba(255,255,255,0.06) !important;
+    color: #f3f4f6 !important;
+}
+
+.vignova-jdr-btn-generate {
+    background: #6366f1 !important;
+    border: none !important;
+    color: #ffffff !important;
+    font-size: 12px !important;
+    font-weight: 700 !important;
+    padding: 6px 16px !important;
+    border-radius: 6px !important;
+    cursor: pointer !important;
+    font-family: inherit !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.3px !important;
+    transition: background 0.15s, transform 0.1s !important;
+    line-height: 1 !important;
+    box-shadow: 0 2px 8px rgba(99, 102, 241, 0.35) !important;
+}
+.vignova-jdr-btn-generate:hover {
+    background: #4f46e5 !important;
+    transform: translateY(-1px) !important;
+}
+.vignova-jdr-btn-generate:active {
+    transform: translateY(0) !important;
+}
+
+/* Application status, shown beside the Vignova actions on a job posting.
+   Only meaningful once the job is tracked, which the server enforces. */
+.vignova-status-select {
+    height: 32px;
+    margin-left: 8px;
+    padding: 0 8px;
+    border: 1px solid rgba(139, 92, 246, 0.35);
+    border-radius: 8px;
+    background: #ffffff;
+    color: #3d3552;
+    font-size: 12px;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    vertical-align: middle;
+}
+
+.vignova-status-select:hover:not(:disabled) {
+    border-color: #8b5cf6;
+}
+
+.vignova-status-select:disabled {
+    opacity: 0.6;
+    cursor: default;
+}
+
+/* The panel is light, so these have to be legible on it in either OS theme. */
+@media (prefers-color-scheme: dark) {
+    .vignova-save-btn {
+        background-color: rgba(255, 255, 255, 0.06) !important;
+        color: #cbbcff !important;
+        border-color: rgba(167, 139, 250, 0.35) !important;
+    }
+    .vignova-status-select {
+        background: rgba(255, 255, 255, 0.06) !important;
+        color: #e6e2f5 !important;
+        border-color: rgba(167, 139, 250, 0.35) !important;
+    }
+}
+
+/* An AI button on a free plan: still legible, visibly not available yet.
+   Cosmetic only — the server refuses these routes regardless. */
+.vignova-tailor-btn.vignova-btn-locked,
+.vignova-save-btn.vignova-btn-locked {
+    background-color: #ffffff !important;
+    background-image: none !important;
+    color: #6b6880 !important;
+    border: 1px dashed rgba(108, 75, 234, 0.45) !important;
+    box-shadow: none !important;
+}
+
+.vignova-tailor-btn.vignova-btn-locked::after,
+.vignova-save-btn.vignova-btn-locked::after {
+    content: "PRO";
+    margin-left: 7px;
+    padding: 2px 5px;
+    border-radius: 4px;
+    background: rgba(108, 75, 234, 0.14);
+    color: #5b21d6;
+    font-size: 9px;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    vertical-align: middle;
+}
+
+/* Shown in place of the buttons when this build has been retired. */
+.vignova-update-note {
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
+    font-family: Geist, Arial, Helvetica, sans-serif !important;
+    font-size: 13px !important;
+    font-weight: 600 !important;
+    color: #4a4f6a !important;
+}
+
+/* Brief confirmation after a status change, shown beside the dropdown. */
+.vignova-status-flash {
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 5px !important;
+    margin-left: 8px !important;
+    padding: 5px 10px !important;
+    border-radius: 7px !important;
+    background: rgba(59, 135, 109, 0.12) !important;
+    color: #2f6d57 !important;
+    font-family: Geist, Arial, Helvetica, sans-serif !important;
+    font-size: 12px !important;
+    font-weight: 700 !important;
+    white-space: nowrap !important;
+    animation: vignova-flash-in 0.25s ease !important;
+}
+
+@keyframes vignova-flash-in {
+    from { opacity: 0; transform: translateY(3px); }
+    to { opacity: 1; transform: translateY(0); }
+}

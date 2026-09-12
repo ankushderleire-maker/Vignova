@@ -95,6 +95,10 @@ model JobApplication {
   jobTitle         String
   location         String?
   jobUrl           String?
+  /// The employer's logo as the job board showed it, captured when the job was
+  /// saved. Without it the dashboard can only guess a domain from the company
+  /// name, which fails for anything that is not name.com.
+  companyLogo      String?
   salary           String?
   description      String?
   status           String            @default("SAVED")

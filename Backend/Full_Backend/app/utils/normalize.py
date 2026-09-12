@@ -38,6 +38,9 @@ def normalize_data(data: dict):
             "startDate": exp.get("startDate", ""),
             "endDate": exp.get("endDate", ""),
             "description": normalize_description(exp.get("description", "")),
+            # One line closing the role. Where a support-shaped history keeps
+            # its figures, so it must survive normalisation.
+            "impact": str(exp.get("impact", "") or "").strip(),
         })
     data["experience"] = normalized_exp
 
@@ -108,15 +111,53 @@ def normalize_data(data: dict):
     return data
 
 def enforce_content_limits(data: dict) -> dict:
-    """Hard-cap content to prevent template overflow."""
-    MAX_SKILLS = 12
-    MAX_EXPERIENCE = 4
-    MAX_EXP_BULLETS = 4
-    MAX_PROJECTS = 3
+    """
+    Ceilings, not targets.
+
+    These used to be flat — four roles, four bullets each, twelve skills —
+    which quietly truncated every resume to the same thin shape no matter how
+    much the candidate had done. A senior engineer's most recent role carries
+    six or seven bullets on a real resume, and a skills section runs to forty
+    terms across labelled groups. The budget now tapers by position instead:
+    the role a recruiter actually reads gets the room, older roles get less.
+    """
+    MAX_SKILLS = 40
+    MAX_SKILLS_PER_GROUP = 14
+    MAX_SKILL_GROUPS = 7
+    MAX_EXPERIENCE = 5
+    # Bullets per role, most recent first; roles past the end of the list get
+    # the last value.
+    EXP_BULLET_BUDGET = [8, 6, 5, 4, 3]
+    MAX_PROJECTS = 4
     MAX_PROJ_BULLETS = 3
-    MAX_EDUCATION = 3
-    MAX_CERTIFICATIONS = 4
-    MAX_LANGUAGES = 4
+    MAX_ACHIEVEMENTS = 6
+
+    groups = data.get("skillGroups")
+    if isinstance(groups, list) and groups:
+        trimmed = []
+        for group in groups[:MAX_SKILL_GROUPS]:
+            if not isinstance(group, dict):
+                continue
+            items = [str(s).strip() for s in (group.get("skills") or []) if str(s).strip()]
+            if not items:
+                continue
+            trimmed.append({
+                "label": str(group.get("label") or "").strip(),
+                "skills": items[:MAX_SKILLS_PER_GROUP],
+            })
+
+        # The flat list and the groups have to agree: templates read one or the
+        # other, and a resume that lists a skill in its grid but not in its
+        # skills line looks like two different documents.
+        kept: list[str] = []
+        for group in trimmed:
+            room = max(0, MAX_SKILLS - len(kept))
+            group["skills"] = group["skills"][:room]
+            kept.extend(group["skills"])
+        data["skillGroups"] = [g for g in trimmed if g["skills"]]
+        if kept:
+            soft = data.get("skills", {}).get("soft", "") if isinstance(data.get("skills"), dict) else ""
+            data["skills"] = {"technical": ", ".join(kept), "soft": soft}
 
     skills = data.get("skills", {})
     if isinstance(skills, dict):
@@ -130,11 +171,16 @@ def enforce_content_limits(data: dict) -> dict:
     exp_list = data.get("experience", [])
     if len(exp_list) > MAX_EXPERIENCE:
         exp_list = exp_list[:MAX_EXPERIENCE]
-    for exp in exp_list:
+    for index, exp in enumerate(exp_list):
+        budget = EXP_BULLET_BUDGET[min(index, len(EXP_BULLET_BUDGET) - 1)]
         desc = exp.get("description", "")
-        if isinstance(desc, list) and len(desc) > MAX_EXP_BULLETS:
-            exp["description"] = desc[:MAX_EXP_BULLETS]
+        if isinstance(desc, list) and len(desc) > budget:
+            exp["description"] = desc[:budget]
     data["experience"] = exp_list
+
+    achievements = data.get("achievements")
+    if isinstance(achievements, list) and len(achievements) > MAX_ACHIEVEMENTS:
+        data["achievements"] = achievements[:MAX_ACHIEVEMENTS]
 
     proj_list = data.get("projects", [])
     if len(proj_list) > MAX_PROJECTS:

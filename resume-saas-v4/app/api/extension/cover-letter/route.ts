@@ -2,12 +2,17 @@ import { NextResponse } from "next/server";
 import { getExtensionUser } from "@/lib/extensionAuth";
 import { db } from "@/lib/db";
 import { withCors, handleCorsOptions } from "@/lib/extensionCors";
-import { findExistingWork, duplicateResponse } from "@/lib/extensionDuplicate";
+import { findJobByUrl } from "@/lib/extensionDuplicate";
 import { checkAiAccess } from "@/lib/extensionPlan";
+import { callBackend } from "@/lib/career-ops";
+import { spendCredit, refundCredit } from "@/lib/credits";
+
+export const maxDuration = 120;
 
 export const OPTIONS = handleCorsOptions;
 
 export async function POST(req: Request) {
+    let reservedFor: string | null = null;
     try {
         const auth = await getExtensionUser(req);
         if (auth.error || !auth.user) {
@@ -26,14 +31,15 @@ export async function POST(req: Request) {
             return withCors(NextResponse.json({ error: "Job description too short" }, { status: 400 }));
         }
 
-        // Already written one for this posting? Ask rather than quietly
-        // replacing it — the extension turns this into a prompt and
-        // retries with force: true.
-        if (!force) {
-            const existing = await findExistingWork(user.id, jobUrl);
-            if (existing) {
-                return withCors(NextResponse.json(duplicateResponse(existing), { status: 409 }));
-            }
+        const existingJob = await findJobByUrl(user.id, jobUrl);
+        if (!force && existingJob?.coverLetter?.trim()) {
+            return withCors(NextResponse.json({
+                success: true,
+                reused: true,
+                jobId: existingJob.id,
+                coverLetter: existingJob.coverLetter,
+                message: "Existing cover letter reused",
+            }));
         }
 
         // Fetch user's primary profile
@@ -48,6 +54,10 @@ export async function POST(req: Request) {
             return withCors(NextResponse.json({ error: "No profile found" }, { status: 404 }));
         }
 
+        const spent = await spendCredit(user.id);
+        if (!spent.ok) return withCors(NextResponse.json({ error: "You're out of credits.", upgradeRequired: true, outOfCredits: true }, { status: 402 }));
+        reservedFor = user.id;
+
         let data = profile.parsed_data as any;
 
         if (typeof data === "string") {
@@ -58,85 +68,25 @@ export async function POST(req: Request) {
             }
         }
 
-        // Build user context
-        const fullName = `${data.first_name || ""} ${data.last_name || ""}`.trim();
-        const currentTitle = data.experience?.[0]?.role || data.experience?.[0]?.title || "";
-        const currentCompany = data.experience?.[0]?.company || "";
-        const skills = Array.isArray(data.skills)
-            ? data.skills.join(", ")
-            : typeof data.skills === "string"
-                ? data.skills
-                : typeof data.skills === "object" && data.skills?.technical
-                    ? (Array.isArray(data.skills.technical) ? data.skills.technical.join(", ") : data.skills.technical)
-                    : "";
-
-        const experience = Array.isArray(data.experience)
-            ? data.experience.slice(0, 3).map((e: any) => `${e.role || e.title || ""} at ${e.company || ""}`).join("; ")
-            : "";
-
-        const education = Array.isArray(data.education)
-            ? data.education.map((e: any) => `${e.degree || ""} from ${e.school || ""}`).join("; ")
-            : "";
-
-        // Generate cover letter using Ollama
-        const OLLAMA_BASE_URL = process.env.OLLAMA_BASE_URL || "http://localhost:11434";
-        const OLLAMA_MODEL = process.env.OLLAMA_MODEL || "llama3.2";
-
-        const prompt = `Write a professional, compelling cover letter for the following job application.
-
-APPLICANT:
-Name: ${fullName}
-Current Role: ${currentTitle} at ${currentCompany}
-Skills: ${skills}
-Experience: ${experience}
-Education: ${education}
-
-JOB:
-Title: ${jobTitle || "the position"}
-Company: ${company || "the company"}
-Description: ${description.substring(0, 3000)}
-
-INSTRUCTIONS:
-- Write a professional cover letter (3-4 paragraphs)
-- Highlight relevant skills and experience that match the job description
-- Show enthusiasm and cultural fit
-- Keep it concise (250-350 words)
-- Do NOT include addresses or date headers
-- Start with "Dear Hiring Manager," or similar
-- End with a professional closing
-- Output ONLY the cover letter text, no extra commentary`;
-
-        const ollamaRes = await fetch(`${OLLAMA_BASE_URL}/api/generate`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                model: OLLAMA_MODEL,
-                prompt,
-                stream: false,
-                options: { temperature: 0.7, num_predict: 800 },
-            }),
+        const result = await callBackend<{ response: string }>("/api/generate-cover-letter", {
+            method: "POST", timeoutMs: 90000, headers: { "X-Client-Id": user.id },
+            body: { jobDescription: `${jobTitle || ""} at ${company || ""}\n\n${description}`, masterProfile: data },
         });
-
-        if (!ollamaRes.ok) {
-            const err = await ollamaRes.text();
-            console.error("[COVER_LETTER] Ollama error:", err);
-            return withCors(NextResponse.json({ error: "AI generation failed" }, { status: 500 }));
+        if (!result.ok) {
+            await refundCredit(user.id, "extension cover letter generation failed");
+            reservedFor = null;
+            return withCors(NextResponse.json({ error: "Cover letter generation failed. Please try again.", creditCharged: false }, { status: 502 }));
         }
-
-        const ollamaData = await ollamaRes.json();
-        const coverLetter = ollamaData.response?.trim() || "";
+        const coverLetter = result.data?.response?.trim() || "";
 
         if (!coverLetter) {
-            return withCors(NextResponse.json({ error: "Empty response from AI" }, { status: 500 }));
+            await refundCredit(user.id, "extension cover letter empty response");
+            reservedFor = null;
+            return withCors(NextResponse.json({ error: "Empty response from AI", creditCharged: false }, { status: 500 }));
         }
 
         // Save or update the job with cover letter
-        let job;
-        if (jobUrl) {
-            job = await db.jobApplication.findFirst({
-                where: { userId: user.id, jobUrl },
-            });
-        }
+        let job = existingJob;
 
         if (job) {
             // Update existing job with cover letter
@@ -165,10 +115,12 @@ INSTRUCTIONS:
             success: true,
             jobId: job.id,
             coverLetter,
+            credits_remaining: spent.remaining,
             message: "Cover letter generated and saved",
         }));
 
     } catch (error) {
+        if (reservedFor) await refundCredit(reservedFor, "extension cover letter failed");
         console.error("[COVER_LETTER]", error);
         return withCors(NextResponse.json({ error: "Internal Error" }, { status: 500 }));
     }

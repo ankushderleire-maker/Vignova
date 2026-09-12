@@ -51,6 +51,8 @@ export async function findJobByUrl(userId: string, jobUrl?: string | null) {
             id: true,
             jobTitle: true,
             company: true,
+            // So a status change can fill in a logo the row is missing.
+            companyLogo: true,
             coverLetter: true,
             draftEmail: true,
             createdAt: true,

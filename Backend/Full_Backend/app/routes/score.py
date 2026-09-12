@@ -104,8 +104,8 @@ async def score_job(request: Request, payload: ScoreRequest):
                 "keyword":             min(int(keyword_score), 100),
                 "match_count":         len(matched_keywords),
                 "total_unique_jd_words": total_jd_skills,
-                "matching_keywords":   list(matched_keywords)[:15],
-                "missing_keywords":    list(missing_keywords)[:15],
+                "matching_keywords":   sorted(matched_keywords),
+                "missing_keywords":    sorted(missing_keywords),
             },
         }
 

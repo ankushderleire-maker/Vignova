@@ -1,5 +1,5 @@
 /**
- * Vignova Agent — Content Script Entry Point (Auto-Apply)
+ * Vignova Agent — Content Script Entry Point (Autofill)
  * 
  * With all_frames: true, this script loads in BOTH the parent page
  * and any iframes. The logic:
@@ -23,17 +23,13 @@
         }
     }
 
-    /**
-     * Does THIS frame contain enough fillable fields to run the agent?
-     * Iframes use a lower threshold (a form iframe often holds only the form),
-     * the top frame a higher one (search bars etc. shouldn't trigger it).
-     */
-    function frameHasFillableFields(min) {
-        const els = document.querySelectorAll(
-            'input:not([type="hidden"]):not([type="submit"]):not([type="button"]):not([type="reset"]):not([type="image"]), textarea, select, [contenteditable="true"], [role="textbox"]'
-        );
-        // Reduce the required minimum to 1 to detect simple forms better
-        return els.length >= 1;
+    function frameHasFillableFields() {
+        const fields = Array.from(document.querySelectorAll('input, textarea, select, [contenteditable="true"], [role="textbox"]')).filter(el => {
+            if (el.disabled || el.readOnly || !el.getClientRects().length || el.closest('[hidden],[aria-hidden="true"],[role="search"],#vignova-dashboard-container')) return false;
+            if (/^(hidden|submit|button|reset|image|search|password)$/i.test(el.type || '')) return false;
+            return !/^(q|query|search|keyword|keywords|where)$/i.test(el.name || el.id || '');
+        });
+        return fields.some(el => /first.?name|last.?name|full.?name|email|phone|resume|cover.?letter|work.?experience/i.test([el.name, el.id, el.autocomplete, el.getAttribute('aria-label'), ...(el.labels || [])].join(' '))) || fields.length >= 4;
     }
 
     // Heartbeat: remove stale dashboard/minimized UI when extension is reloaded/invalidated
@@ -48,28 +44,23 @@
 
     // Listen for cross-frame messages via background script
     chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+        if (message.type === "AUTH_STATE_CHANGED") {
+            stopAgent();
+            return;
+        }
+        if (message.type === "PROBE_APPLICATION_FORMS") {
+            if (frameHasFillableFields()) chrome.runtime.sendMessage({ type: 'APPLICATION_FORM_FOUND', requestId: message.requestId }).catch(() => {});
+            sendResponse({ success: true });
+            return;
+        }
         if (message.type === "START_AGENT") {
-            if (agentStarted) {
-                sendResponse({ success: false, error: "Agent already running" });
+            if (agentStarted || !frameHasFillableFields() || !window.Vignova_AgentLoop) {
+                sendResponse({ success: false, error: agentStarted ? 'Autofill is already running.' : 'Open an application form first, then use Autofill.' });
                 return;
             }
-
-            if (isInIframe) {
-                if (frameHasFillableFields(2)) {
-                    startAgent();
-                    sendResponse({ success: true, context: "iframe" });
-                } else {
-                    sendResponse({ success: false, context: "iframe_no_form" });
-                }
-            } else {
-                if (frameHasFillableFields(4)) {
-                    startAgent();
-                    sendResponse({ success: true, context: "parent" });
-                } else {
-                    sendResponse({ success: true, context: "delegated_to_iframe" });
-                }
-            }
-            return true;
+            startAgent();
+            sendResponse({ success: true, context: isInIframe ? 'iframe' : 'parent' });
+            return;
         }
 
         if (message.type === "STOP_AGENT") {
@@ -93,7 +84,7 @@
                     iframe.contentWindow.postMessage({
                         type: "Vignova_AGENT_STATUS",
                         status: message.event.status,
-                        text: message.event.text,
+                        text: message.event.message || message.event.text,
                         progress: message.event.progress
                     }, "*");
                 }
@@ -157,6 +148,8 @@
 
         const Loop = window.Vignova_AgentLoop;
         if (!Loop) {
+            agentStarted = false;
+            window.vignova_agent_running = false;
             console.error("[Vignova Agent] Modules not loaded.");
             return;
         }
@@ -170,6 +163,10 @@
                 agentStarted = false;
                 window.vignova_agent_running = false;
             }
+        }).catch(() => {
+            agentStarted = false;
+            window.vignova_agent_running = false;
+            sendUIStatus({ status: 'error', text: 'Autofill could not finish. Review the fields and try again.' });
         });
     }
 
@@ -183,7 +180,7 @@
                 iframe.contentWindow.postMessage({
                     type: "Vignova_AGENT_STATUS",
                     status: event.status,
-                    text: event.text,
+                    text: event.message || event.text,
                     progress: event.progress
                 }, "*");
             }
@@ -208,9 +205,9 @@
 
     // Log where we loaded
     if (isInIframe) {
-        console.log("[Vignova] Auto-Apply agent loaded in iframe:", window.location.hostname);
+        console.log("[Vignova] Autofill agent loaded in iframe:", window.location.hostname);
     } else {
-        console.log("[Vignova] Auto-Apply agent loaded in parent page.");
+        console.log("[Vignova] Autofill agent loaded in parent page.");
     }
 
     // Cross-Frame Dashboard Message Logic

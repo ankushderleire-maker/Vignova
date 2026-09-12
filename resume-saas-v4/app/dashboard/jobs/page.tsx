@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo, useRef } from "react";
 import {
+  AlertTriangle,
   Plus,
   Search,
   MapPin,
@@ -41,6 +42,8 @@ type Job = {
   status: string;
   description?: string; // Added description
   jobUrl?: string; // Added jobUrl
+  /** The employer's logo, captured when the job was saved from a job board. */
+  companyLogo?: string | null;
   interviewAt?: string | null;
   deadlineAt?: string | null;
   createdAt: string;
@@ -77,6 +80,8 @@ const STATUSES = {
 export default function JobTrackerPage() {
   const router = useRouter();
   const [jobs, setJobs] = useState<Job[]>([]);
+  // Why the list is empty, when it is empty for a reason other than having no jobs.
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [dialogConfig, setDialogConfig] = useState<{
     isOpen: boolean;
@@ -112,9 +117,14 @@ export default function JobTrackerPage() {
 
   // 1. Fetch Jobs
   const fetchJobs = async () => {
+    setLoadError(null);
     try {
       const res = await fetch("/api/jobs");
-      const json = await res.json();
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setLoadError(json?.error || `The server returned ${res.status}.`);
+        return;
+      }
       if (json.data) {
         // Map legacy/extension statuses to standard dashboard statuses
         const mappedJobs = json.data.map((job: Job) => {
@@ -127,6 +137,7 @@ export default function JobTrackerPage() {
       }
     } catch (err) {
       console.error(err);
+      setLoadError("Could not reach the server.");
     } finally {
       setLoading(false);
     }
@@ -402,6 +413,18 @@ export default function JobTrackerPage() {
           <div className="overflow-y-auto flex-1 custom-scrollbar">
             {loading ? (
               <div className="flex items-center justify-center h-40"><Loader2 className="h-6 w-6 animate-spin text-[var(--primary)]" /></div>
+            ) : loadError ? (
+              <div className="flex flex-col items-center justify-center h-64 text-center px-6">
+                <AlertTriangle className="h-10 w-10 mb-3 text-amber-500" />
+                <p className="font-bold text-[var(--foreground)]">Your jobs could not be loaded</p>
+                <p className="text-sm text-[var(--text-secondary)] mt-1 max-w-sm">{loadError} Your saved jobs are safe — this is a problem reading them, not a problem with them.</p>
+                <button
+                  onClick={() => { setLoading(true); fetchJobs(); }}
+                  className="mt-4 text-sm font-bold text-[var(--primary)] hover:bg-[var(--primary)]/10 px-4 py-2 rounded-lg transition-colors"
+                >
+                  Try again
+                </button>
+              </div>
             ) : filteredJobs.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-64 text-gray-500">
                 <Briefcase className="h-10 w-10 mb-3 opacity-20" />
@@ -413,7 +436,7 @@ export default function JobTrackerPage() {
 
                   {/* Mobile card row */}
                   <div className="flex md:hidden items-center gap-3 p-3">
-                    <CompanyLogo company={job.company} jobUrl={job.jobUrl} size={36} />
+                    <CompanyLogo company={job.company} jobUrl={job.jobUrl} logoUrl={job.companyLogo} size={36} />
                     <div className="flex-1 min-w-0 cursor-pointer" onClick={() => router.push(`/dashboard/jobs/${job.id}`)}>
                       <h3 className="font-bold text-[var(--foreground)] text-sm group-hover:text-[var(--primary)] transition-colors truncate">{job.jobTitle}</h3>
                       <p className="text-xs text-[var(--text-secondary)] truncate">{job.company}</p>
@@ -451,7 +474,7 @@ export default function JobTrackerPage() {
                   <div className="hidden md:grid grid-cols-12 gap-4 p-4 items-center">
                     {/* Column 1: Info */}
                     <div className="col-span-4 cursor-pointer min-w-0 pr-4 flex items-center gap-3" onClick={() => router.push(`/dashboard/jobs/${job.id}`)}>
-                      <CompanyLogo company={job.company} jobUrl={job.jobUrl} size={38} />
+                      <CompanyLogo company={job.company} jobUrl={job.jobUrl} logoUrl={job.companyLogo} size={38} />
                       <div className="min-w-0">
                         <h3 className="font-bold text-[var(--foreground)] text-sm group-hover:text-[var(--primary)] transition-colors truncate" title={job.jobTitle}>{job.jobTitle}</h3>
                         <p className="text-xs text-[var(--text-secondary)] mt-0.5 truncate">{job.company}</p>
@@ -618,7 +641,7 @@ export default function JobTrackerPage() {
                                     <div className="flex justify-between items-start mb-2 pointer-events-none">
                                       {/* Company Icon & Name */}
                                       <div className="flex gap-2.5 overflow-hidden">
-                                        <CompanyLogo company={job.company} jobUrl={job.jobUrl} size={28} rounded="rounded-md" />
+                                        <CompanyLogo company={job.company} jobUrl={job.jobUrl} logoUrl={job.companyLogo} size={28} rounded="rounded-md" />
                                         <div className="overflow-hidden">
                                           <h4 className="font-bold text-[var(--foreground)] text-[13px] leading-snug truncate pr-1 group-hover:text-[var(--primary)]">{job.jobTitle}</h4>
                                           <p className="text-[11px] text-[var(--text-secondary)] truncate">{job.company}</p>

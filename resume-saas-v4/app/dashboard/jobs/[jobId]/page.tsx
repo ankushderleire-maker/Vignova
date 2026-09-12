@@ -15,10 +15,10 @@ import { AIPreparationAnimation } from "@/components/resume-engine/AIPreparation
 
 // --- TYPES ---
 import { ResumeData, type CustomSection } from "@/types/resume";
+import { toResumeData, reconcileSkillGroups } from "@/lib/tailoredResume";
 import SaveDialog from "@/components/resume-engine/SaveDialog";
 
 // --- TEMPLATES ---
-import { AVAILABLE_TEMPLATES, TemplateConfig } from '@/components/resume-engine/templates';
 import { InteractivePreviewPanel } from '@/components/resume-engine/InteractivePreviewPanel';
 import { SidebarTabBar, type SidebarTab } from '@/components/resume-engine/SidebarTabBar';
 import { TemplatesTabContent } from '@/components/resume-engine/TemplatesTabContent';
@@ -388,43 +388,7 @@ function ResumeStudioPageContent() {
             const result = await response.json();
             
             const aiData = result.data;
-            const formattedData = {
-                fullName: aiData.fullName || masterProfile.fullName,
-                jobTitle: aiData.jobTitle || job.jobTitle,
-                contact: {
-                    email: aiData.email || masterProfile.email,
-                    phone: aiData.phone || masterProfile.phone,
-                    location: aiData.location || masterProfile.location || "",
-                    linkedin: aiData.linkedin || masterProfile.linkedin || "",
-                    website: aiData.website || ""
-                },
-                summary: aiData.summary,
-                skills: aiData.skills?.technical ? (Array.isArray(aiData.skills.technical) ? aiData.skills.technical : aiData.skills.technical.split(",").map((s: string) => s.trim())) : [],
-                experience: aiData.experience?.map((exp: any) => ({
-                    id: exp.id || Math.random().toString(),
-                    company: exp.company,
-                    role: exp.role,
-                    startDate: exp.startDate,
-                    endDate: exp.endDate,
-                    description: Array.isArray(exp.description) ? exp.description : [exp.description],
-                    location: exp.location || ""
-                })) || [],
-                projects: aiData.projects ? aiData.projects.map((proj: any) => ({
-                    id: proj.id || Math.random().toString(),
-                    name: proj.name,
-                    techStack: proj.techStack,
-                    description: Array.isArray(proj.description) ? proj.description : [proj.description],
-                    link: proj.link || ""
-                })) : [],
-                education: aiData.education?.map((edu: any) => ({
-                    id: edu.id || Math.random().toString(),
-                    school: edu.school,
-                    degree: edu.degree,
-                    field: edu.field,
-                    startDate: edu.startDate || "",
-                    endDate: edu.endDate || ""
-                })) || []
-            };
+            const formattedData = toResumeData(aiData, masterProfile, job.jobTitle);
             setResumeData(formattedData);
             setHasGenerated(true);
             setActiveDocument("resume");
@@ -474,47 +438,7 @@ function ResumeStudioPageContent() {
             if (result.draftEmail) setDraftEmail(result.draftEmail);
 
             // 3. Format Data
-            const formattedData: ResumeData = {
-                fullName: aiData.fullName || currentProfile.fullName,
-                jobTitle: aiData.jobTitle || currentJob.jobTitle,
-                contact: {
-                    email: aiData.email || currentProfile.email,
-                    phone: aiData.phone || currentProfile.phone,
-                    location: aiData.location || currentProfile.location || "",
-                    linkedin: aiData.linkedin || currentProfile.linkedin || "",
-                    website: aiData.website || ""
-                },
-                summary: aiData.summary,
-                skills: aiData.skills?.technical
-                    ? (Array.isArray(aiData.skills.technical)
-                        ? aiData.skills.technical
-                        : aiData.skills.technical.split(",").map((s: string) => s.trim()))
-                    : [],
-                experience: aiData.experience?.map((exp: any) => ({
-                    id: exp.id || Math.random().toString(),
-                    company: exp.company,
-                    role: exp.role,
-                    startDate: exp.startDate,
-                    endDate: exp.endDate,
-                    description: Array.isArray(exp.description) ? exp.description : [exp.description],
-                    location: exp.location || ""
-                })) || [],
-                projects: aiData.projects ? aiData.projects.map((proj: any) => ({
-                    id: proj.id || Math.random().toString(),
-                    name: proj.name,
-                    techStack: proj.techStack,
-                    description: Array.isArray(proj.description) ? proj.description : [proj.description],
-                    link: proj.link || ""
-                })) : [],
-                education: aiData.education?.map((edu: any) => ({
-                    id: edu.id || Math.random().toString(),
-                    school: edu.school,
-                    degree: edu.degree,
-                    field: edu.field,
-                    startDate: edu.startDate || "",
-                    endDate: edu.endDate || ""
-                })) || []
-            };
+            const formattedData: ResumeData = toResumeData(aiData, currentProfile, currentJob.jobTitle);
 
             setResumeData(formattedData);
             setHasGenerated(true);
@@ -667,7 +591,15 @@ function ResumeStudioPageContent() {
     };
 
     const setSkills = (next: string[]) => {
-        if (resumeData) setResumeData({ ...resumeData, skills: next });
+        if (!resumeData) return;
+        // Templates that lay skills out under headings read skillGroups, so the
+        // groups have to follow an edit made to the flat list.
+        const groups = reconcileSkillGroups(resumeData.skillGroups || [], next);
+        setResumeData({
+            ...resumeData,
+            skills: next,
+            ...(groups.length ? { skillGroups: groups } : { skillGroups: undefined }),
+        });
     };
 
     const experienceLines = (): string[] =>

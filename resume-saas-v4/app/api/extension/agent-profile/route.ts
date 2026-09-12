@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { cleanSkills } from "@/lib/linkedin-skills";
 import { getExtensionUser } from "@/lib/extensionAuth";
 import { withCors, handleCorsOptions } from "@/lib/extensionCors";
 
@@ -61,14 +62,16 @@ export async function GET(req: Request) {
             }
         }
 
-        // Split fullName into first/last
-        const fullName = data?.fullName || data?.full_name || "";
-        const nameParts = fullName.trim().split(/\s+/);
-        const firstName = nameParts[0] || "";
-        const lastName = nameParts.slice(1).join(" ") || "";
-
         // Extract personal details section if it exists
         const personalDetails = data.personalDetails || data.personal_details || {};
+        const pick = (...values: unknown[]) =>
+            values.find((value) => typeof value === "string" && value.trim()) as string | undefined;
+        const fullName = pick(data?.fullName, data?.full_name, data?.name, personalDetails.fullName, personalDetails.full_name) || "";
+        const nameParts = fullName.trim().split(/\s+/).filter(Boolean);
+        const firstName = pick(data.firstName, data.first_name, personalDetails.firstName, personalDetails.first_name) ||
+            (nameParts.length > 1 ? nameParts[0] : "");
+        const lastName = pick(data.lastName, data.last_name, data.surname, personalDetails.lastName, personalDetails.last_name, personalDetails.surname) ||
+            (nameParts.length > 1 ? nameParts.slice(1).join(" ") : nameParts[0] || "");
 
         // Map Education
         const parsedEducation = Array.isArray(data.education) ? data.education.map((edu: any) => ({
@@ -114,8 +117,8 @@ export async function GET(req: Request) {
 
         // Build the agent profile from Master Profile data
         const agentProfile = {
-            first_name: firstName || personalDetails.firstName || personalDetails.first_name || "",
-            last_name: lastName || personalDetails.lastName || personalDetails.last_name || "",
+            first_name: firstName || "",
+            last_name: lastName || "",
             email: data.email || personalDetails.email || user!.email || "",
             phone: data.phone || personalDetails.phone || personalDetails.mobile || "",
             linkedin: data.linkedin || personalDetails.linkedin || data.socialLinks?.linkedin || "",
@@ -124,12 +127,14 @@ export async function GET(req: Request) {
             city: data.location || personalDetails.city || personalDetails.location || "",
             state: personalDetails.state || "",
             country: personalDetails.country || "",
-            current_title: data.jobTitle || data.currentTitle || "",
-            current_company: data.currentCompany || "",
-            years_experience: data.yearsExperience || personalDetails.yearsExperience || "",
-            work_authorized: personalDetails.workAuthorized || "Yes",
-            visa_status: data.visaStatus || data.visa_status || personalDetails.visaStatus || personalDetails.visa_status || "",
-            needs_sponsorship: personalDetails.needsSponsorship || "No",
+            current_title: data.jobTitle || data.currentTitle || parsedExperience[0]?.title || "",
+            current_company: data.currentCompany || parsedExperience[0]?.company || "",
+            years_experience: data.yearsExperience ?? personalDetails.yearsExperience ?? "",
+            work_authorized: personalDetails.workAuthorized ?? "",
+            // workAuthorization is what the profile form now collects ("Stamp 1G",
+            // "EU Citizen"); the older spellings stay for profiles saved before it.
+            visa_status: data.workAuthorization || data.visaStatus || data.visa_status || personalDetails.workAuthorization || personalDetails.visaStatus || personalDetails.visa_status || "",
+            needs_sponsorship: personalDetails.needsSponsorship ?? "",
             address: personalDetails.address || "",
             zip_code: personalDetails.zipCode || personalDetails.zip_code || "",
             summary: data.summary || data.professionalSummary || data.about || "",
@@ -138,9 +143,7 @@ export async function GET(req: Request) {
             projects: parsedProjects,
             certifications: parsedCertifications,
             languages: parsedLanguages,
-            skills: Array.isArray(data.skills)
-                ? data.skills
-                : (typeof data.skills === 'string' ? data.skills.split(",") : []),
+            skills: cleanSkills(data.skills),
         };
 
         return withCors(NextResponse.json({

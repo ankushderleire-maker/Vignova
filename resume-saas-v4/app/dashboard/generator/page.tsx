@@ -472,7 +472,7 @@ export default function GeneratorPage() {
                     className="group bg-[var(--background)] border border-[var(--border-color)] rounded-xl p-4 shadow-sm hover:border-[var(--primary)]/40 hover:shadow-md transition"
                   >
                     <div className="flex gap-3">
-                      <CompanyLogo company={job.company} jobUrl={job.jobUrl} />
+                      <CompanyLogo company={job.company} jobUrl={job.jobUrl} logoUrl={(job as any).companyLogo} />
 
                       <div className="min-w-0 flex-1">
                         <div className="flex items-start justify-between gap-3">

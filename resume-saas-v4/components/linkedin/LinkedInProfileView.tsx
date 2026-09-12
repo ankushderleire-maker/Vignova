@@ -1,6 +1,7 @@
 "use client";
 
 import { useId, useState } from "react";
+import { cleanSkills, cleanSkillDetails, sanitizeLinkedInProfile, type LinkedInSkill } from "@/lib/linkedin-skills";
 import {
     Award,
     BarChart3,
@@ -244,24 +245,28 @@ function CopyBtn({
     text,
     copied,
     onCopy,
+    label = "Copy section",
 }: {
     text: string;
     copied: string;
     onCopy: (t: string) => void;
+    label?: string;
 }) {
     return (
         <button
+            type="button"
+            aria-label={label}
             onClick={() => onCopy(text)}
             className="shrink-0 inline-flex items-center gap-1 text-[11px] text-green-700 dark:text-green-400 hover:text-green-800 dark:hover:text-green-300 transition font-semibold bg-green-500/10 border border-green-500/20 px-2 py-1 rounded shadow-sm"
         >
-            {copied === text ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />} Copy
+            {copied === text ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />} {copied === text ? "Copied" : "Copy"}
         </button>
     );
 }
 
 // ── the profile ─────────────────────────────────────────────────────────
 
-type Skill = { name: string; endorsements?: string; positions?: string[] };
+type Skill = LinkedInSkill;
 
 export type LinkedInProfileViewProps = {
     profile: any;
@@ -276,7 +281,7 @@ export type LinkedInProfileViewProps = {
 /** Counts used by the caller's "fetched from LinkedIn" summary. */
 export function summarizeProfile(profile: any) {
     const len = (v: any) => (Array.isArray(v) ? v.length : 0);
-    const skills = len(profile?.skillDetails) || len(profile?.skills);
+    const skills = cleanSkillDetails(profile?.skillDetails).length || cleanSkills(profile?.skills).length;
     return [
         { label: "Roles", value: len(profile?.experience) },
         { label: "Schools", value: len(profile?.education) },
@@ -288,12 +293,13 @@ export function summarizeProfile(profile: any) {
 }
 
 export default function LinkedInProfileView({
-    profile: p,
+    profile,
     viewMode,
     optimizedSkills,
     copiedText,
     onCopy,
 }: LinkedInProfileViewProps) {
+    const p = sanitizeLinkedInProfile(profile) || {};
     const arr = (v: any): any[] => (Array.isArray(v) ? v : []);
 
     const experience = arr(p.experience);
@@ -307,7 +313,7 @@ export default function LinkedInProfileView({
     const patents = arr(p.patents);
     const organizations = arr(p.organizations);
     const interests = arr(p.interests);
-    const topSkills: string[] = arr(p.topSkills);
+    const topSkills = cleanSkills(p.topSkills);
 
     const languages = arr(p.languages)
         .map((l: any) => (typeof l === "string" ? { name: l, proficiency: "" } : l))
@@ -319,10 +325,10 @@ export default function LinkedInProfileView({
     // carrying endorsement counts. Render either shape.
     const skills: Skill[] =
         viewMode === "optimized" && optimizedSkills
-            ? optimizedSkills.map((s) => ({ name: s }))
-            : arr(p.skillDetails).length
-              ? arr(p.skillDetails)
-              : arr(p.skills).map((s: any) => (typeof s === "string" ? { name: s } : s));
+            ? cleanSkillDetails(optimizedSkills)
+            : cleanSkillDetails(p.skillDetails).length
+              ? cleanSkillDetails(p.skillDetails)
+              : cleanSkillDetails(p.skills);
     const canCopy = viewMode === "optimized";
     const experienceCopyText = experience
         .map((exp: any) => [exp.title, exp.company, exp.dateRange, exp.location, exp.description, exp.associatedSkills].filter(Boolean).join("\n"))
@@ -694,7 +700,17 @@ export default function LinkedInProfileView({
                             key={i}
                             logo={<LogoBox alt={pr.title} fallback={<FolderKanban className="w-5 h-5 text-[var(--text-secondary)]" />} />}
                         >
-                            <h4 className="text-sm font-semibold text-[var(--foreground)]">{pr.title}</h4>
+                            <div className="flex items-start justify-between gap-2">
+                                <h4 className="min-w-0 text-sm font-semibold text-[var(--foreground)]">{pr.title}</h4>
+                                {canCopy && pr.description ? (
+                                    <CopyBtn
+                                        text={pr.description}
+                                        copied={copiedText}
+                                        onCopy={onCopy}
+                                        label={`Copy ${pr.title || `project ${i + 1}`} description`}
+                                    />
+                                ) : null}
+                            </div>
                             {pr.dateRange && <p className="text-xs text-[var(--text-secondary)] mt-0.5">{pr.dateRange}</p>}
                             {pr.associatedWith && (
                                 <p className="text-xs text-[var(--text-secondary)]">Associated with {pr.associatedWith}</p>

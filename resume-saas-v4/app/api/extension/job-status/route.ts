@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getExtensionUser } from "@/lib/extensionAuth";
 import { db } from "@/lib/db";
+import { safeCompanyLogo } from "@/lib/companyLogo";
 import { withCors, handleCorsOptions } from "@/lib/extensionCors";
 import { findJobByUrl } from "@/lib/extensionDuplicate";
 
@@ -33,7 +34,8 @@ export async function POST(req: Request) {
             );
         }
 
-        const { jobUrl, status, jobTitle, company, location, description } = await req.json();
+        const { jobUrl, status, jobTitle, company, location, description, companyLogo } = await req.json();
+        const logo = safeCompanyLogo(companyLogo);
 
         if (!jobUrl || typeof jobUrl !== "string") {
             return withCors(NextResponse.json({ error: "A job URL is required." }, { status: 400 }));
@@ -54,6 +56,7 @@ export async function POST(req: Request) {
                     // opens it again with the scraper running.
                     ...(jobTitle && !existing.jobTitle ? { jobTitle } : {}),
                     ...(company && !existing.company ? { company } : {}),
+                    ...(logo && !existing.companyLogo ? { companyLogo: logo } : {}),
                 },
                 select: { id: true, status: true },
             });
@@ -81,6 +84,7 @@ export async function POST(req: Request) {
                 location: typeof location === "string" ? location.slice(0, 300) : "",
                 jobUrl,
                 sourceUrl: jobUrl,
+                companyLogo: logo || null,
                 source: "extension",
                 status,
             },

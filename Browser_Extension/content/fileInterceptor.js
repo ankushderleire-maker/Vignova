@@ -18,6 +18,13 @@
     }
 
     let documentsCache = null;
+    let accountVersion = 0;
+    chrome.runtime.onMessage.addListener(message => {
+        if (message.type !== "AUTH_STATE_CHANGED") return;
+        ++accountVersion;
+        documentsCache = null;
+        document.querySelectorAll(".vignova-doc-modal-overlay").forEach(el => el.classList.remove("vignova-visible"));
+    });
 
     // Inject CSS for the UI
     const style = document.createElement("style");
@@ -282,6 +289,7 @@
      * Handle document selection
      */
     async function handleDocumentSelect(docId, docType) {
+        const version = accountVersion;
         const listContainer = document.getElementById("vignova-doc-list");
 
         const downloadOverlay = document.createElement('div');
@@ -301,6 +309,7 @@
                 }, resolve);
             });
 
+            if (version !== accountVersion) { downloadOverlay.remove(); return; }
             if (result && result.success && result.pdfBase64) {
                 const blob = base64ToBlob(result.pdfBase64, result.mimeType || 'application/pdf');
                 attachBlobToInput(activeFileInput, blob, result.filename);
@@ -363,6 +372,7 @@
      * Load documents from API and show modal
      */
     function openDocumentModal(inputElement) {
+        const version = accountVersion;
         activeFileInput = inputElement;
         modalOverlay.classList.add('vignova-visible');
 
@@ -381,6 +391,7 @@
         `;
 
         chrome.runtime.sendMessage({ type: "API_GET_DOCUMENTS" }, (result) => {
+            if (version !== accountVersion) return;
             if (result && result.success) {
                 documentsCache = { data: result.documents, timestamp: Date.now() };
                 renderDocuments(result.documents);

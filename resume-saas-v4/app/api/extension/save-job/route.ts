@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getExtensionUser } from "@/lib/extensionAuth";
 import { db } from "@/lib/db";
+import { safeCompanyLogo } from "@/lib/companyLogo";
 import { withCors, handleCorsOptions } from "@/lib/extensionCors";
 import { queueJdFormat } from "@/lib/jdFormatQueue";
 
@@ -22,6 +23,7 @@ export async function POST(req: Request) {
             jobUrl,
             salary,
             description,
+            companyLogo,
             source = "extension"
         } = body;
 
@@ -31,12 +33,14 @@ export async function POST(req: Request) {
 
         // Check if job already exists for this user (by URL) to avoid duplicates
         // If it exists, we return the existing one.
-        const existingJob = await db.jobApplication.findFirst({
+        const existingJob = jobUrl ? await db.jobApplication.findFirst({
             where: {
                 userId: user.id,
                 jobUrl: jobUrl,
             },
-        });
+        }) : null;
+
+        const logo = safeCompanyLogo(companyLogo);
 
         if (existingJob) {
             // Update the existing job with the latest scraped data just in case it was a bad scrape previously
@@ -48,6 +52,7 @@ export async function POST(req: Request) {
                     location,
                     description,
                     salary,
+                    ...(logo ? { companyLogo: logo } : {}),
                 }
             });
 
@@ -71,6 +76,7 @@ export async function POST(req: Request) {
                 jobUrl,
                 salary,
                 description,
+                companyLogo: logo || null,
                 source,
                 sourceUrl: jobUrl,
                 status: "SAVED",

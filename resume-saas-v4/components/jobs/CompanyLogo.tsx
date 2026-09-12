@@ -81,6 +81,7 @@ export function companyDomain(company?: string | null, jobUrl?: string | null): 
 export function CompanyLogo({
     company,
     jobUrl,
+    logoUrl,
     size = 40,
     rounded = "rounded-lg",
     logos = true,
@@ -88,6 +89,8 @@ export function CompanyLogo({
 }: {
     company?: string | null;
     jobUrl?: string | null;
+    /** The employer's own logo, captured from the posting when it was saved. */
+    logoUrl?: string | null;
     size?: number;
     rounded?: string;
     /** Set false to keep this surface entirely local. */
@@ -99,6 +102,15 @@ export function CompanyLogo({
     const name = (company || "?").trim();
     const domain = useMemo(() => (logos ? companyDomain(company, jobUrl) : null), [company, jobUrl, logos]);
 
+    // A logo saved with the job is the employer's actual mark; the domain guess
+    // is only ever a guess. Both go through the proxy.
+    const src = useMemo(() => {
+        if (!logos) return null;
+        const stored = (logoUrl || "").trim();
+        if (stored.startsWith("https://")) return `/api/company-logo?src=${encodeURIComponent(stored)}`;
+        return domain ? `/api/company-logo?domain=${encodeURIComponent(domain)}` : null;
+    }, [logoUrl, domain, logos]);
+
     const tint = useMemo(() => {
         let hash = 0;
         for (let i = 0; i < name.length; i++) hash = (hash * 31 + name.charCodeAt(i)) >>> 0;
@@ -107,10 +119,10 @@ export function CompanyLogo({
 
     const box = { width: size, height: size };
 
-    if (domain && !failed) {
+    if (src && !failed) {
         return (
             <img
-                src={`/api/company-logo?domain=${encodeURIComponent(domain)}`}
+                src={src}
                 alt=""
                 width={size}
                 height={size}

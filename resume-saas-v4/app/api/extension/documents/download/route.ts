@@ -42,7 +42,7 @@ export async function GET(req: Request) {
 
             const data = typeof resume.content === "string" ? JSON.parse(resume.content) : resume.content;
 
-            let templateId = "classic";
+            let templateId = "signature";
             const settings = (auth.user as any).extensionSettings;
             if (settings && settings.mode === "specific" && settings.templateId) {
                 templateId = settings.templateId;

@@ -4,6 +4,14 @@ Resume Routes
 POST /api/parse-resume            — PDF → structured JSON via Gemini
 POST /api/generate-tailored-resume — master profile + JD → tailored resume + ATS report
 
+How the tailored resume is written:
+  - app.services.resume_writer holds the house style and the output schema.
+    First choice is gpt-5-nano with Structured Outputs, so the JSON shape is
+    guaranteed by the decoder instead of asked for in the prompt.
+  - Gemini is the fallback, driven by the same style guide plus a written-out
+    JSON shape. It runs when OpenAI is not configured or is having a bad
+    minute, so a generation attempt does not fail outright.
+
 Production fixes applied:
   - All synchronous LLM calls (Gemini / Sarvam) run in run_in_executor so
     the event loop is never blocked (each call can take 3–15 seconds).
@@ -34,7 +42,9 @@ from app.services.ats_helpers import (
     detect_experience_level,
 )
 from app.services.content_analysis import calculate_content_analysis
+from app.services.openai_client import OpenAiError
 from app.services.resume_text import resume_data_to_text
+from app.services import resume_writer
 from app.utils.json_utils import extract_json_from_response
 from app.utils.normalize import enforce_content_limits, normalize_data
 from app.utils.pdf import extract_text_from_pdf
@@ -94,109 +104,14 @@ def merge_skills(master_profile: dict, resume_data: dict) -> dict:
     return resume_data
 
 
-_JD_MAX_CHARS     = 8_000   # ~2k tokens — enough for full JD context
-_PROFILE_MAX_CHARS = 12_000  # ~3k tokens — covers all sections
+# The style guide, the prompt and the schema all live in resume_writer so the
+# two model paths cannot drift apart.
+build_tailoring_prompt = resume_writer.build_gemini_prompt
 
-
-def _trim(text: str, max_chars: int) -> str:
-    return text[:max_chars] + "\n[truncated]" if len(text) > max_chars else text
-
-
-def build_tailoring_prompt(master_profile: dict, job_description: str, ats_report=None) -> str:
-    master_profile_str = _trim(json.dumps(master_profile, indent=2), _PROFILE_MAX_CHARS)
-
-    ats_context = ""
-    if ats_report:
-        # Only send the actionable parts of the report, not the full blob
-        slim_report = {
-            "overall_ats_score": ats_report.get("overall_ats_score"),
-            "keyword_score": ats_report.get("keyword_score"),
-            "missing_keywords": ats_report.get("missing_keywords", [])[:10],
-            "improvements": ats_report.get("improvements", [])[:5],
-        }
-        ats_context = (
-            "\n\n=== REFINING PREVIOUS ATS SCORE ===\n"
-            "The candidate previously scored poorly in ATS. Key issues to fix:\n"
-            f"{json.dumps(slim_report, indent=2)}\n"
-            "Fix these exact issues — focus on missing keywords and improvements.\n"
-        )
-
-    return f"""You are an Expert Resume Writer and ATS Optimization Specialist.
-Your goal is to tailor the candidate's MASTER PROFILE to the provided JOB DESCRIPTION, resulting in a professional, natural-sounding resume that passes ATS systems without looking artificially keyword-stuffed.
-
-=== TASK ===
-Output STRICT JSON only - no markdown, no explanation, no wrapping.
-DO NOT use markdown formatting like **bold** in any of your text output. Keep it plain text.
-CRITICAL JSON RULE: NEVER place double-quote characters inside JSON string values. If you need to quote a term, use single quotes or just write it without quotes.
-
-=== SECTION GUIDELINES ===
-1. CONTACT INFO
-   - Preserve all existing contact information from the master profile.
-2. SUMMARY
-   - Write a professional summary of about 40-60 words.
-   - Clearly state the candidate's years of experience, core expertise, and value proposition.
-   - Weave in 4-6 highly relevant keywords from the JD naturally.
-   - Mention the company name from the JD and the exact job title.
-3. SKILLS
-   - technical: comprehensive comma-separated list of technologies, tools, and languages mentioned in the JD that the candidate has.
-   - soft: comma-separated list of relevant soft skills.
-4. EXPERIENCE
-   - Preserve actual companies, roles, and dates.
-   - Preserve the user's factual background. Rewrite phrasing for relevance, but do not replace the underlying experience with new responsibilities they never had.
-   - Write 4-5 bullet points per role, concise and specific.
-   - Start bullets with strong action verbs.
-   - Integrate keywords from the JD naturally into bullet points.
-   - Include quantified achievements only where they genuinely fit.
-   - NEVER use passive voice like Responsible for or Involved in.
-5. PROJECTS
-   - Rewrite project descriptions to emphasize alignment with the JD.
-   - Mention the tech stack explicitly using exact JD terminology.
-   - 2-3 bullets per project.
-6. EDUCATION, CERTIFICATIONS, LANGUAGES
-   - Copy exactly from the master profile. Never fabricate.
-
-=== KEYWORD INJECTION RULE ===
-1. Extract the top 20 most important technical keywords, tools, and methodologies from the JD.
-2. Confirm which ones are already in the Master Profile.
-3. For any keyword not in the Master Profile, if it is reasonable for the candidate's background, insert it verbatim into:
-   - skills.technical
-   - the techStack of the most relevant project when appropriate
-   - one bullet in experience or projects
-4. Every keyword extracted in step 1 must appear verbatim at least once in the final resume text.
-
-=== CRITICAL RULES ===
-- NEVER fabricate companies, roles, degrees, or certifications.
-- Treat the master profile as the source of truth. Keep all factual profile data intact and only tailor wording, emphasis, keyword placement, and ordering.
-- Preserve the user's original skill inventory, then add only JD-aligned keywords that are genuinely supported by their background.
-- Prefer adapting existing experience and projects to sound closer to the JD instead of inventing new tools, ownership, or achievements.
-- DO NOT use markdown inside JSON values.
-- Ensure all top JD keywords appear verbatim in the output, prioritising skills.technical.
-- Keep ATS-friendly section names clearly represented: Summary, Skills, Experience, Education, Projects when content exists.{ats_context}
-
-JOB DESCRIPTION:
-{_trim(job_description, _JD_MAX_CHARS)}
-
-MASTER PROFILE:
-{master_profile_str}
-
-JSON STRUCTURE:
-{{
-  "fullName": "exact from profile",
-  "jobTitle": "exact JD job title",
-  "email": "exact from profile",
-  "phone": "exact from profile",
-  "linkedin": "exact from profile",
-  "location": "from profile",
-  "website": "from profile",
-  "github": "from profile",
-  "summary": "Professional summary paragraph",
-  "skills": {{ "technical": "Python, SQL, TensorFlow", "soft": "Agile, Communication" }},
-  "experience": [{{ "company": "...", "role": "...", "startDate": "...", "endDate": "...", "location": "...", "description": ["Led...", "Built..."] }}],
-  "projects": [{{ "name": "...", "techStack": "...", "link": "...", "description": ["Developed...", "Implemented..."] }}],
-  "education": [{{ "school": "...", "degree": "...", "field": "...", "startDate": "...", "endDate": "...", "grade": "..." }}],
-  "certifications": [{{ "name": "...", "issuer": "...", "date": "...", "url": "..." }}],
-  "languages": [{{ "name": "...", "proficiency": "..." }}]
-}}"""
+# The cover letter and the draft email still build their own prompts here;
+# they trim the job description to the same budget the resume does.
+_trim = resume_writer.trim
+_JD_MAX_CHARS = resume_writer.JD_MAX_CHARS
 
 
 # ── Sync LLM + ATS workers (run via run_in_executor) ──────────────────
@@ -317,10 +232,31 @@ def _build_ats_report_sync(job_description: str, resume_data: dict) -> dict:
 
 
 def apply_profile_fallbacks(resume_data: dict, master_profile: dict) -> dict:
-    resume_data = merge_skills(master_profile, resume_data)
+    # Grouped skills are a deliberate selection for this posting, so the flat
+    # master list is not folded back in — that would undo the tailoring and
+    # spill the groups' own ordering. Ungrouped output still gets the merge,
+    # which is what stops a thin generation from losing the user's skills.
+    if resume_data.get("skillGroups"):
+        groups = resume_writer.normalize_skill_groups(resume_data["skillGroups"])
+        resume_data["skillGroups"] = groups
+        flat = [skill for group in groups for skill in group["skills"]]
+        skills = resume_data.get("skills")
+        soft = skills.get("soft", "") if isinstance(skills, dict) else ""
+        resume_data["skills"] = {"technical": ", ".join(flat), "soft": soft}
+    else:
+        resume_data = merge_skills(master_profile, resume_data)
+
     for key in ("experience", "projects", "education", "certifications", "languages"):
         if not resume_data.get(key) and master_profile.get(key):
             resume_data[key] = master_profile[key]
+
+    # Awards, the references note and the right-to-work line are facts, not
+    # writing. They are copied across as the profile holds them so that no
+    # model has the chance to reword an award into one nobody gave.
+    for key in ("achievements", "references", "workAuthorization"):
+        if master_profile.get(key):
+            resume_data[key] = master_profile[key]
+
     return enforce_content_limits(resume_data)
 
 
@@ -398,11 +334,32 @@ async def generate_tailored_resume(request: Request, payload: TailorRequest):
         try:
             loop = asyncio.get_event_loop()
 
-            # ── First generation (in thread) ──
-            prompt     = build_tailoring_prompt(payload.masterProfile, job_description, payload.atsReport)
-            raw_resume = await loop.run_in_executor(
-                None, partial(_generate_resume_content_sync, prompt)
-            )
+            async def write(ats_context) -> dict:
+                """
+                One draft. Structured Outputs first, Gemini if that path is
+                unavailable — a resume beats an error message, and the user is
+                only charged for a request that produced one.
+                """
+                if resume_writer.available():
+                    try:
+                        raw = await resume_writer.write_resume(
+                            payload.masterProfile, job_description, ats_context
+                        )
+                        return enforce_content_limits(normalize_data(raw))
+                    except OpenAiError as exc:
+                        logger.warning("Structured writer unavailable (%s); using Gemini", exc)
+                    except Exception as exc:  # schema validation, unexpected shape
+                        logger.warning("Structured writer failed (%s); using Gemini", exc)
+
+                prompt = resume_writer.build_gemini_prompt(
+                    payload.masterProfile, job_description, ats_context
+                )
+                return await loop.run_in_executor(
+                    None, partial(_generate_resume_content_sync, prompt)
+                )
+
+            # ── First generation ──
+            raw_resume = await write(payload.atsReport)
             normalized = apply_profile_fallbacks(raw_resume, payload.masterProfile)
 
             # ── First ATS report (in thread) ──
@@ -427,10 +384,7 @@ async def generate_tailored_resume(request: Request, payload: TailorRequest):
                     ats_report["keyword_score"],
                     len(ats_report["missing_keywords"]),
                 )
-                retry_prompt  = build_tailoring_prompt(payload.masterProfile, job_description, ats_report)
-                raw_retry     = await loop.run_in_executor(
-                    None, partial(_generate_resume_content_sync, retry_prompt)
-                )
+                raw_retry     = await write(ats_report)
                 retry_resume  = apply_profile_fallbacks(raw_retry, payload.masterProfile)
                 retry_report  = await loop.run_in_executor(
                     None, partial(_build_ats_report_sync, job_description, retry_resume)
