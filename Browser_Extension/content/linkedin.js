@@ -238,9 +238,19 @@
 
     // ─── Render Extension UI (Auth Aware) ───
     let isRenderingUI = false;
+    let authRenderVersion = 0;
+    let authRefreshPending = false;
+    function finishAuthRender() {
+        isRenderingUI = false;
+        if (authRefreshPending) {
+            authRefreshPending = false;
+            queueMicrotask(renderExtensionUI);
+        }
+    }
 
     async function renderExtensionUI() {
-        if (isRenderingUI) return;
+        if (isRenderingUI) { authRefreshPending = true; return; }
+        const renderVersion = authRenderVersion;
         if (!hasValidExtensionContext()) return;
         isRenderingUI = true;
 
@@ -251,7 +261,7 @@
             .catch(() => null);
         if (updateState && updateState.blocked) {
             renderUpdateRequired();
-            isRenderingUI = false;
+            finishAuthRender();
             return;
         }
 
@@ -260,9 +270,11 @@
             chrome.runtime.sendMessage({ type: "GET_AUTH_STATUS" }, resolve);
         });
 
+        if (renderVersion !== authRenderVersion) { finishAuthRender(); return; }
+
         const container = document.getElementById(CONTAINER_ID);
         if (!container) {
-            isRenderingUI = false;
+            finishAuthRender();
             return;
         }
 
@@ -284,7 +296,7 @@
             renderActionButtons(container, Vignova_Plan.isPaid(authStatus.user));
         }
 
-        isRenderingUI = false;
+        finishAuthRender();
     }
 
     /**
@@ -404,7 +416,7 @@
         const spinner = document.createElement("div");
         spinner.className = "vignova-score-loading";
         scoreBadge.appendChild(spinner); // Loading spinner
-        scoreBadge.title = "Calculating Match Score...";
+        scoreBadge.title = "Calculating Keyword Score...";
 
         container.appendChild(scoreBadge);
 
@@ -441,6 +453,7 @@
                         company: job.company,
                         location: job.location,
                         description: job.jobDescription,
+                        companyLogo: job.companyLogo,
                     },
                 });
                 if (res?.success) {
@@ -467,6 +480,38 @@
 
         // Fetch Score
         fetchAndDisplayScore(scoreBadge);
+    }
+
+    /**
+     * The employer's logo on this posting, as a CDN URL.
+     *
+     * LinkedIn serves company logos and people's profile photos from the same
+     * host, and the hiring-manager card sits inside the same top card, so the
+     * URL itself is the discriminator: company marks carry "company-logo" in
+     * the path, faces carry "profile-displayphoto".
+     */
+    function scrapeCompanyLogo() {
+        const scope =
+            document.querySelector(".job-details-jobs-unified-top-card__container--two-pane") ||
+            document.querySelector(".jobs-unified-top-card") ||
+            document.querySelector(".job-details-jobs-unified-top-card") ||
+            document;
+
+        const images = Array.from(
+            scope.querySelectorAll(
+                'a[href*="/company/"] img, .jobs-unified-top-card__company-logo img, img.ivm-view-attr__img--centered, img'
+            )
+        );
+
+        for (const img of images) {
+            const src = img.currentSrc || img.src || "";
+            if (!/^https:\/\/(media|static)[\w-]*\.licdn\.com\//.test(src)) continue;
+            // Only an image LinkedIn itself labels as a company logo. Taking
+            // the next licdn image along would sooner or later put someone's
+            // post picture on the card, and a wrong logo is worse than none.
+            if (/company-logo/.test(src)) return src;
+        }
+        return "";
     }
 
     // ─── Extract salary / deadline from JD text ───
@@ -516,7 +561,10 @@
             const jobMeta = extractJobMeta(jobData.jobDescription);
 
             if (response && response.success) {
-                const score = response.score;
+                const matched = response.breakdown.matching_keywords || [];
+                const missing = response.breakdown.missing_keywords || [];
+                const total = matched.length + missing.length;
+                const score = total ? Math.round(100 * matched.length / total) : 0;
 
                 // Categorical Mapping — realistic thresholds
                 let categoryText = "";
@@ -539,74 +587,34 @@
                     badge.classList.add("very-low");
                 }
 
-                badge.textContent = categoryText;
+                badge.textContent = total ? `${score}% keywords` : "No keywords";
 
-                // Add Matched Keywords
-                let matchedKeywordsHtml = "";
-                const matchedKws = response.breakdown.matching_keywords || [];
-                if (matchedKws.length > 0) {
-                    const kwPills = matchedKws.slice(0, 25).map(k => `<span class="vignova-kw-pill">${k}</span>`).join("");
-                    matchedKeywordsHtml = `
-                        <div class="vignova-tt-row" style="margin-top:12px; border-top:1px solid #3f3f46; padding-top:12px; display:block;">
-                            <span class="vignova-tt-label" style="display:block; margin-bottom:6px;">Keyword Matches (${matchedKws.length})</span>
-                            <div style="display:flex; flex-wrap:wrap; gap:6px;">${kwPills}</div>
-                        </div>
-                    `;
-                }
+                // The badge opens the Keyword Score panel on hover. Everything
+                // it shows comes from the local scorer that already ran.
+                VignovaMatchPanel.attach(
+                    badge,
+                    {
+                        score,
+                        matched,
+                        missing,
+                        salary: jobMeta.salary || "",
+                        deadline: jobMeta.deadline || "",
+                    },
+                    {
+                        onImprove: () => {
+                            const tailor = document.getElementById(BUTTON_ID) ||
+                                document.querySelector(".vignova-tailor-btn");
+                            if (tailor) tailor.click();
+                        },
+                        onSettings: () => {
+                            chrome.runtime.sendMessage({
+                                type: "OPEN_TAB",
+                                url: "https://app.vignova.io/dashboard/extension",
+                            });
+                        },
+                    }
+                );
 
-                // Add Missing Keywords
-                let missingKeywordsHtml = "";
-                const missingKws = response.breakdown.missing_keywords || [];
-                if (missingKws.length > 0) {
-                    const missingPills = missingKws.slice(0, 25).map(k => `<span class="vignova-kw-pill vignova-kw-missing">${k}</span>`).join("");
-                    missingKeywordsHtml = `
-                        <div class="vignova-tt-row" style="margin-top:12px; border-top:1px solid #3f3f46; padding-top:12px; display:block;">
-                            <span class="vignova-tt-label" style="display:block; margin-bottom:6px;">What's Missing (${missingKws.length})</span>
-                            <div style="display:flex; flex-wrap:wrap; gap:6px;">${missingPills}</div>
-                        </div>
-                    `;
-                }
-
-                // Create Advanced HTML Tooltip String
-                const sem = response.breakdown.semantic;
-                const kw = response.breakdown.keyword;
-                const domainRel = response.breakdown.domain_relevance || 100;
-                const metaHtml = (jobMeta.salary || jobMeta.deadline) ? `
-                    <div class="vignova-tt-row" style="margin-top:10px; border-top:1px solid #3f3f46; padding-top:10px; gap:8px; flex-wrap:wrap;">
-                        ${jobMeta.salary ? `<span style="background:rgba(16,185,129,0.15);border:1px solid rgba(16,185,129,0.3);color:#6ee7b7;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:600;">💰 ${jobMeta.salary}</span>` : ""}
-                        ${jobMeta.deadline ? `<span style="background:rgba(251,191,36,0.15);border:1px solid rgba(251,191,36,0.3);color:#fde68a;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:600;">📅 Apply by ${jobMeta.deadline}</span>` : ""}
-                    </div>` : "";
-
-                const tooltipHTML = `
-                    <div class="vignova-tt-header">Match Breakdown (${score}/100)</div>
-                    ${metaHtml}
-                    <div class="vignova-tt-row">
-                        <span class="vignova-tt-label">Vibe & Theory</span>
-                        <div class="vignova-tt-bar-bg"><div class="vignova-tt-bar-fill" style="width: ${sem}%; background: #3b82f6;"></div></div>
-                        <span class="vignova-tt-val">${sem}%</span>
-                    </div>
-                    <div class="vignova-tt-row">
-                        <span class="vignova-tt-label">Keywords</span>
-                        <div class="vignova-tt-bar-bg"><div class="vignova-tt-bar-fill" style="width: ${kw}%; background: #8b5cf6;"></div></div>
-                        <span class="vignova-tt-val">${kw}%</span>
-                    </div>
-                    <div class="vignova-tt-row">
-                        <span class="vignova-tt-label">Domain Fit</span>
-                        <div class="vignova-tt-bar-bg"><div class="vignova-tt-bar-fill" style="width: ${domainRel}%; background: ${domainRel >= 80 ? '#8b5cf6' : domainRel >= 50 ? '#f59e0b' : '#ef4444'};"></div></div>
-                        <span class="vignova-tt-val">${domainRel}%</span>
-                    </div>
-                    ${matchedKeywordsHtml}
-                    ${missingKeywordsHtml}
-                `;
-
-                // Store the HTML data
-                badge.setAttribute("data-tooltip-html", tooltipHTML);
-                badge.removeAttribute("data-tooltip");
-                badge.title = "";
-
-                // Add Hover Listeners for Global Tooltip
-                badge.addEventListener("mouseenter", showGlobalTooltip);
-                badge.addEventListener("mouseleave", hideGlobalTooltip);
 
             } else {
                 badge.textContent = "!";
@@ -615,54 +623,6 @@
         } catch (e) {
             console.error(e);
             badge.textContent = "!";
-        }
-    }
-
-    // ─── Global Tooltip Logic ───
-    let globalTooltipEl = null;
-
-    function showGlobalTooltip(e) {
-        const badge = e.currentTarget;
-        const html = badge.getAttribute("data-tooltip-html");
-        if (!html) return;
-
-        if (!globalTooltipEl) {
-            globalTooltipEl = document.createElement("div");
-            globalTooltipEl.className = "vignova-tooltip-content global-tooltip";
-            document.body.appendChild(globalTooltipEl);
-        }
-
-        const doc = new DOMParser().parseFromString(html, "text/html");
-        globalTooltipEl.textContent = "";
-        while (doc.body.firstChild) {
-            globalTooltipEl.appendChild(doc.body.firstChild);
-        }
-
-        // Show slightly to calculate dimensions
-        globalTooltipEl.style.visibility = "hidden";
-        globalTooltipEl.style.opacity = "0";
-        globalTooltipEl.classList.add("show");
-
-        // Calculate position
-        const rect = badge.getBoundingClientRect();
-
-        // Position to the right of the badge
-        const top = rect.top + (rect.height / 2) - (globalTooltipEl.offsetHeight / 2);
-        const left = rect.right + 12; // 12px gap
-
-        globalTooltipEl.style.top = `${top}px`;
-        globalTooltipEl.style.left = `${left}px`;
-
-        // Render
-        globalTooltipEl.style.visibility = "visible";
-        globalTooltipEl.style.opacity = "1";
-    }
-
-    function hideGlobalTooltip() {
-        if (globalTooltipEl) {
-            globalTooltipEl.classList.remove("show");
-            globalTooltipEl.style.opacity = "0";
-            globalTooltipEl.style.visibility = "hidden";
         }
     }
 
@@ -927,7 +887,7 @@
             jobDescription = jobDescription.replace(/\n{3,}/g, '\n\n');
         }
 
-        return { jobTitle, company, jobDescription, location, descriptionEl };
+        return { jobTitle, company, jobDescription, location, companyLogo: scrapeCompanyLogo(), descriptionEl };
     }
 
     // ─── Reset Button State ───
@@ -941,11 +901,21 @@
         }
     }
 
-    // ─── Listen for Auth Changes ───
-    chrome.runtime.onMessage.addListener((message) => {
-        if (message.type === "AUTH_STATE_CHANGED") {
-            // Re-render UI on auth change
-            renderExtensionUI();
-        }
+    // Clear visible account data before redrawing from the verified session.
+    function refreshAccountUI() {
+        ++authRenderVersion;
+        isProcessing = false;
+        document.getElementById("vignova-linkedin-container")?.replaceChildren();
+        Vignova_Overlay.remove();
+        window.VignovaMatchPanel?.hide();
+        document.querySelectorAll(".vignova-card-badge").forEach(el => el.remove());
+        document.querySelectorAll("[data-vignova-badge]").forEach(el => el.removeAttribute("data-vignova-badge"));
+        renderExtensionUI();
+    }
+    chrome.runtime.onMessage.addListener(message => {
+        if (message.type === "AUTH_STATE_CHANGED") refreshAccountUI();
+    });
+    chrome.storage.onChanged.addListener((changes, area) => {
+        if (area === "local" && (changes.vignova_token || changes.vignova_user || changes.vignova_agent_profile)) refreshAccountUI();
     });
 })();

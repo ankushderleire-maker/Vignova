@@ -6,6 +6,17 @@ class Skills(BaseModel):
     technical: str = ""
     soft: str = ""
 
+class SkillGroup(BaseModel):
+    """
+    Skills as a labelled block — "Cloud & DevOps: Docker, AWS, Nginx".
+
+    `Skills.technical` stays the flat, comma-separated truth that every
+    template and the ATS scorer read; this is the same content arranged the
+    way a strong resume presents it, for templates that can lay it out.
+    """
+    label: str = ""
+    skills: List[str] = []
+
 class Experience(BaseModel):
     id: str = ""
     company: str = ""
@@ -14,6 +25,7 @@ class Experience(BaseModel):
     startDate: str = ""
     endDate: str = ""
     description: Any = "" # Changed to Any to handle string or list during parsing
+    impact: str = ""
 
 class Education(BaseModel):
     id: str = ""
@@ -54,6 +66,7 @@ class ResumeSchema(BaseModel):
     github: str = ""
     summary: str = ""
     skills: Skills = Skills()
+    skillGroups: List[SkillGroup] = []
     experience: List[Experience] = []
     education: List[Education] = []
     projects: List[Project] = []

@@ -6,106 +6,35 @@
 
 const Vignova_API_BASE = "https://app.vignova.io";
 
-async function warmExtensionCache(token) {
+importScripts("auth.js", "dashboard.js");
+
+async function warmExtensionCache(token, epoch = authEpoch) {
+    const profileVersion = profileCacheVersion;
+    if (epoch !== authEpoch) return;
     const headers = { "Authorization": `Bearer ${token}` };
 
     try {
         const profileResponse = await fetch(`${Vignova_API_BASE}/api/extension/agent-profile`, { headers });
         const profileData = await profileResponse.json();
         if (profileResponse.ok && profileData.profile) {
-            await chrome.storage.local.set({ vignova_agent_profile: profileData.profile });
+            await writeUserCache({ vignova_agent_profile: profileData.profile }, token, epoch, profileVersion);
         }
     } catch (err) {
         // Best effort only
     }
 
+    if (epoch !== authEpoch) return;
     try {
         const jobsResponse = await fetch(`${Vignova_API_BASE}/api/extension/recent-jobs`, { headers });
         const jobsData = await jobsResponse.json();
         if (jobsResponse.ok && Array.isArray(jobsData.jobs)) {
-            await chrome.storage.local.set({ vignova_recent_jobs: jobsData.jobs });
+            await writeUserCache({ vignova_recent_jobs: jobsData.jobs }, token, epoch);
         }
     } catch (err) {
         // Best effort only
     }
 
-    try {
-        const configResponse = await fetch(`${Vignova_API_BASE}/api/extension/config`, { headers });
-        const configData = await configResponse.json();
-        if (configResponse.ok && configData.config) {
-            await chrome.storage.local.set({ vignova_config: configData.config });
-        }
-    } catch (err) {
-        // Best effort only
-    }
-}
 
-// ═══════════════════════════════════════════
-//  AUTH CORE — single source of truth
-//  Every sign-in/sign-out path goes through these helpers so cached data
-//  from a previous account can never leak into the next one.
-// ═══════════════════════════════════════════
-
-const USER_DATA_KEYS = [
-    "vignova_token",
-    "vignova_user",
-    "vignova_agent_profile",
-    "vignova_recent_jobs",
-    "vignova_config",
-];
-
-function broadcastAuthChange() {
-    chrome.tabs.query({}, (tabs) => {
-        tabs.forEach((tab) => {
-            if (tab.id) {
-                chrome.tabs.sendMessage(tab.id, { type: "AUTH_STATE_CHANGED" }).catch(() => { });
-            }
-        });
-    });
-}
-
-async function signInWithToken(token, user) {
-    // Wipe the previous account's data first so nothing stale survives a switch
-    await chrome.storage.local.remove([...USER_DATA_KEYS, "vignova_signed_out"]);
-    await chrome.storage.local.set({ vignova_token: token, vignova_user: user });
-    await warmExtensionCache(token);
-    broadcastAuthChange();
-}
-
-async function signOut() {
-    await chrome.storage.local.remove(USER_DATA_KEYS);
-    // Remember the explicit sign-out so we don't silently log back in
-    // from the website session on the next popup open
-    await chrome.storage.local.set({ vignova_signed_out: true });
-    broadcastAuthChange();
-}
-
-/**
- * Look up the website session (no side effects). This must run in the
- * service worker: fetches from the (possibly iframed) popup never carry the
- * SameSite=Lax NextAuth cookie, so the API would always answer 401 there.
- * The cookie is checked first so no request is fired at all when the user
- * is logged out of the website (no 401 console noise).
- */
-async function probeWebSession() {
-    const cookieNames = ["__Secure-next-auth.session-token", "next-auth.session-token"];
-    let hasSession = false;
-    for (const name of cookieNames) {
-        const cookie = await chrome.cookies.get({ url: Vignova_API_BASE, name }).catch(() => null);
-        if (cookie) { hasSession = true; break; }
-    }
-    if (!hasSession) return { loggedIn: false };
-
-    try {
-        const res = await fetch(`${Vignova_API_BASE}/api/extension/session-token`, { credentials: "include" });
-        const data = await res.json();
-        if (res.ok && data.token) {
-            return { loggedIn: true, token: data.token, user: data.user };
-        }
-        return { loggedIn: false };
-    } catch (err) {
-        return { loggedIn: false, error: "Cannot connect to Vignova server." };
-    }
 }
 
 // ─── Message Router ───
@@ -201,7 +130,53 @@ function apiFailure(data, fallback) {
     return { success: false, error: (data && data.error) || fallback };
 }
 
+// Discover eligible application frames through content scripts, without requesting more host permissions.
+const applicationProbes = new Map();
+async function findApplicationFrame(tabId) {
+    const requestId = crypto.randomUUID();
+    const frames = new Set();
+    applicationProbes.set(requestId, { tabId, frames });
+    try {
+        await chrome.tabs.sendMessage(tabId, { type: 'PROBE_APPLICATION_FORMS', requestId });
+        await new Promise(resolve => setTimeout(resolve, 400));
+        return frames.has(0) ? 0 : [...frames].sort((a, b) => a - b)[0];
+    } finally { applicationProbes.delete(requestId); }
+}
+
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    const needsAuth = (message.type?.startsWith("API_") && message.type !== "API_LOGIN") ||
+        ["GET_AUTH_STATUS", "START_AGENT_ON_TAB", "CHECK_AUTOFILL_ACCESS", "CHECK_PAID_ACCESS", "SYNC_AUTH"].includes(message.type);
+    if (!needsAuth) return routeMessage(message, sender, sendResponse, authEpoch);
+    (async () => {
+        try {
+            const epoch = await syncWebSession({ refreshStatus: message.type !== "API_GET_STATUS",
+                statusMaxAge: ["CHECK_AUTOFILL_ACCESS", "CHECK_PAID_ACCESS"].includes(message.type) ? 0 : 60000 });
+            if (epoch !== authEpoch) throw new Error("Your Vignova account changed. Please try again.");
+            const reply = data => sendResponse(epoch === authEpoch ? data : {
+                success: false, authenticated: false, isLoggedIn: false, authChanged: true,
+                error: "Your Vignova account changed. Please try again.",
+            });
+            if (message.type === "SYNC_AUTH") {
+                const stored = await chrome.storage.local.get("vignova_token");
+                reply({ isLoggedIn: !!stored.vignova_token });
+                return;
+            }
+            routeMessage(message, sender, reply, epoch);
+        } catch (error) {
+            sendResponse({ success: false, authenticated: false, isLoggedIn: false, error: error.message });
+        }
+    })();
+    return true;
+});
+
+function routeMessage(message, sender, sendResponse, requestEpoch) {
+    if (message.type === 'APPLICATION_FORM_FOUND') {
+        const probe = applicationProbes.get(message.requestId);
+        if (probe && sender.tab?.id === probe.tabId && Number.isInteger(sender.frameId)) probe.frames.add(sender.frameId);
+        sendResponse({ success: true });
+        return;
+    }
+    if (routeDashboardMessage(message, sender, sendResponse, requestEpoch)) return true;
 
     // Website-session lookup, read-only (login view uses this for "Continue as…")
     if (message.type === "WEB_SESSION_PROBE") {
@@ -212,23 +187,19 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     // Sign the extension in from the active website session
     if (message.type === "WEB_SESSION_ADOPT") {
         (async () => {
-            const session = await probeWebSession();
-            if (session.token) {
-                await signInWithToken(session.token, session.user);
-                sendResponse({ success: true, user: session.user });
-            } else {
-                sendResponse({ success: false, ...session });
-            }
-        })();
+            await syncWebSession({ adopt: true });
+            const stored = await chrome.storage.local.get(["vignova_token", "vignova_user"]);
+            sendResponse({ success: !!stored.vignova_token, user: stored.vignova_user });
+        })().catch(error => sendResponse({ success: false, error: error.message }));
         return true;
     }
 
     // Sign in with a token the popup obtained itself (OAuth tab-injection fallback)
     if (message.type === "ADOPT_TOKEN") {
         (async () => {
-            await signInWithToken(message.data.token, message.data.user);
-            sendResponse({ success: true });
-        })();
+            const success = await signInWithToken(message.data.token, message.data.user, "website", requestEpoch);
+            sendResponse({ success });
+        })().catch(error => sendResponse({ success: false, error: error.message }));
         return true;
     }
 
@@ -241,6 +212,20 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     // Auth status check (from content scripts)
     if (message.type === "GET_UPDATE_STATE") {
         getUpdateState({ force: !!message.force }).then(sendResponse);
+        return true;
+    }
+
+    // The match panel's "View full analysis" and settings links. Content
+    // scripts cannot open tabs themselves, and the URL is checked here rather
+    // than trusted: a page-injected script is the one asking.
+    if (message.type === "OPEN_TAB") {
+        const url = String(message.url || "");
+        if (/^https:\/\/app\.vignova\.io\//.test(url)) {
+            chrome.tabs.create({ url });
+            sendResponse({ success: true });
+        } else {
+            sendResponse({ success: false, error: "Refused to open that URL." });
+        }
         return true;
     }
 
@@ -286,6 +271,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     // ─── API Proxy: Generate Resume ───
     if (message.type === "API_GENERATE_RESUME") {
         chrome.storage.local.get(["vignova_token"], async (result) => {
+            if (requestEpoch !== authEpoch || !result.vignova_token) {
+                sendResponse({ success: false, authenticated: false, error: "Please sign in to Vignova." });
+                return;
+            }
             try {
                 const response = await fetch(`${Vignova_API_BASE}/api/extension/generate`, {
                     method: "POST",
@@ -303,7 +292,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                     chrome.storage.local.get(["vignova_user"], (stored) => {
                         if (stored.vignova_user) {
                             stored.vignova_user.credits_remaining = data.credits_remaining;
-                            chrome.storage.local.set({ vignova_user: stored.vignova_user });
+                            void writeUserCache({ vignova_user: stored.vignova_user }, result.vignova_token, requestEpoch);
                         }
                     });
                     sendResponse({ success: true, ...data });
@@ -320,6 +309,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     // ─── API Proxy: Generate All (Resume + Cover Letter + Email) ───
     if (message.type === "API_GENERATE_ALL") {
         chrome.storage.local.get(["vignova_token"], async (result) => {
+            if (requestEpoch !== authEpoch || !result.vignova_token) {
+                sendResponse({ success: false, authenticated: false, error: "Please sign in to Vignova." });
+                return;
+            }
             try {
                 const response = await fetch(`${Vignova_API_BASE}/api/extension/generate-all`, {
                     method: "POST",
@@ -337,7 +330,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                     chrome.storage.local.get(["vignova_user"], (stored) => {
                         if (stored.vignova_user) {
                             stored.vignova_user.credits_remaining = data.credits_remaining;
-                            chrome.storage.local.set({ vignova_user: stored.vignova_user });
+                            void writeUserCache({ vignova_user: stored.vignova_user }, result.vignova_token, requestEpoch);
                         }
                     });
                     sendResponse({ success: true, ...data });
@@ -354,6 +347,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     // ─── API Proxy: Save Job ───
     if (message.type === "API_SAVE_JOB") {
         chrome.storage.local.get(["vignova_token"], async (result) => {
+            if (requestEpoch !== authEpoch || !result.vignova_token) {
+                sendResponse({ success: false, authenticated: false, error: "Please sign in to Vignova." });
+                return;
+            }
             try {
                 const response = await fetch(`${Vignova_API_BASE}/api/extension/save-job`, {
                     method: "POST",
@@ -383,6 +380,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     // extension only says which job it is looking at.
     if (message.type === "API_OUTREACH") {
         chrome.storage.local.get(["vignova_token"], async (result) => {
+            if (requestEpoch !== authEpoch || !result.vignova_token) {
+                sendResponse({ success: false, authenticated: false, error: "Please sign in to Vignova." });
+                return;
+            }
             try {
                 const response = await fetch(`${Vignova_API_BASE}/api/extension/outreach`, {
                     method: "POST",
@@ -409,6 +410,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     // ─── API Proxy: Set application status ───
     if (message.type === "API_SET_STATUS") {
         chrome.storage.local.get(["vignova_token"], async (result) => {
+            if (requestEpoch !== authEpoch || !result.vignova_token) {
+                sendResponse({ success: false, authenticated: false, error: "Please sign in to Vignova." });
+                return;
+            }
             try {
                 const response = await fetch(`${Vignova_API_BASE}/api/extension/job-status`, {
                     method: "POST",
@@ -433,6 +438,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     // ─── API Proxy: List Profiles ───
     if (message.type === "API_GET_PROFILES") {
         chrome.storage.local.get(["vignova_token"], async (result) => {
+            if (requestEpoch !== authEpoch || !result.vignova_token) {
+                sendResponse({ success: false, authenticated: false, error: "Please sign in to Vignova." });
+                return;
+            }
             try {
                 const response = await fetch(`${Vignova_API_BASE}/api/extension/profiles`, {
                     headers: { "Authorization": `Bearer ${result.vignova_token}` },
@@ -454,7 +463,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
     // ─── API Proxy: Set Profile ───
     if (message.type === "API_SET_PROFILE") {
+        ++profileCacheVersion;
         chrome.storage.local.get(["vignova_token"], async (result) => {
+            if (requestEpoch !== authEpoch || !result.vignova_token) {
+                sendResponse({ success: false, authenticated: false, error: "Please sign in to Vignova." });
+                return;
+            }
             try {
                 const response = await fetch(`${Vignova_API_BASE}/api/extension/set-profile`, {
                     method: "POST",
@@ -468,6 +482,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                 const data = await response.json();
 
                 if (response.ok) {
+                    await warmExtensionCache(result.vignova_token, requestEpoch);
                     sendResponse({ success: true, ...data });
                 } else {
                     sendResponse(apiFailure(data, "Failed to set profile"));
@@ -492,8 +507,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                 const data = await response.json();
 
                 if (response.ok && data.token) {
-                    await signInWithToken(data.token, data.user);
-                    sendResponse({ success: true, user: data.user });
+                    const success = await signInWithToken(data.token, data.user, "password", requestEpoch);
+                    sendResponse({ success, user: success ? data.user : null });
                 } else {
                     sendResponse({
                         success: false,
@@ -511,8 +526,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     // ─── API Proxy: Get Status ───
     if (message.type === "API_GET_STATUS") {
         chrome.storage.local.get(["vignova_token"], async (result) => {
-            if (!result.vignova_token) {
-                sendResponse({ authenticated: false });
+            if (requestEpoch !== authEpoch || !result.vignova_token) {
+                sendResponse({ success: false, authenticated: false, error: "Please sign in to Vignova." });
                 return;
             }
             try {
@@ -521,7 +536,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                 });
 
                 if (response.status === 401) {
-                    await chrome.storage.local.remove(USER_DATA_KEYS);
+                    if (requestEpoch === authEpoch) await signOut();
                     sendResponse({ authenticated: false, expired: true });
                     return;
                 }
@@ -531,11 +546,17 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                     return;
                 }
 
+                if (!response.ok) throw new Error("Account status unavailable");
                 const data = await response.json();
+                if (!await writeUserCache({ vignova_user: statusUser(data) }, result.vignova_token, requestEpoch)) {
+                    sendResponse({ authenticated: false, authChanged: true });
+                    return;
+                }
+                lastStatusCheck = Date.now();
                 const cached = await chrome.storage.local.get(["vignova_agent_profile", "vignova_recent_jobs"]);
 
                 if (!cached.vignova_agent_profile || !Array.isArray(cached.vignova_recent_jobs)) {
-                    await warmExtensionCache(result.vignova_token);
+                    await warmExtensionCache(result.vignova_token, requestEpoch);
                 }
 
                 const refreshedCache = await chrome.storage.local.get(["vignova_agent_profile", "vignova_recent_jobs"]);
@@ -554,9 +575,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
     // ─── API Proxy: Get Profile ───
     if (message.type === "API_AGENT_GET_PROFILE") {
+        const profileVersion = profileCacheVersion;
         chrome.storage.local.get(["vignova_token"], async (result) => {
-            if (!result.vignova_token) {
-                sendResponse({ success: false, error: "Not authenticated" });
+            if (requestEpoch !== authEpoch || !result.vignova_token) {
+                sendResponse({ success: false, authenticated: false, error: "Please sign in to Vignova." });
                 return;
             }
             try {
@@ -565,7 +587,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                 });
                 const data = await response.json();
                 if (response.ok && data.profile) {
-                    await chrome.storage.local.set({ vignova_agent_profile: data.profile });
+                    if (!await writeUserCache({ vignova_agent_profile: data.profile }, result.vignova_token, requestEpoch, profileVersion)) {
+                        sendResponse({ success: false, error: "Your profile changed. Please try again." }); return;
+                    }
                     sendResponse({ success: true, profile: data.profile, profileName: data.profileName });
                 } else {
                     sendResponse(apiFailure(data, "Failed to fetch profile"));
@@ -580,6 +604,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     // ─── API Proxy: Get Match Score ───
     if (message.type === "API_GET_SCORE") {
         chrome.storage.local.get(["vignova_token"], async (result) => {
+            if (requestEpoch !== authEpoch || !result.vignova_token) {
+                sendResponse({ success: false, authenticated: false, error: "Please sign in to Vignova." });
+                return;
+            }
             try {
                 const response = await fetch(`${Vignova_API_BASE}/api/extension/score`, {
                     method: "POST",
@@ -593,6 +621,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                 const data = await response.json();
 
                 if (response.ok) {
+                    if (Number.isFinite(data.credits_remaining)) {
+                        chrome.storage.local.get(["vignova_user"], (stored) => {
+                            if (stored.vignova_user) {
+                                stored.vignova_user.credits_remaining = data.credits_remaining;
+                                void writeUserCache({ vignova_user: stored.vignova_user }, result.vignova_token, requestEpoch);
+                            }
+                        });
+                    }
                     sendResponse({ success: true, ...data });
                 } else {
                     sendResponse(apiFailure(data, "Failed to calculate score"));
@@ -607,8 +643,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     // ─── API Proxy: Agent Plan (Single Action) ───
     if (message.type === "API_AGENT_PLAN") {
         chrome.storage.local.get(["vignova_token"], async (result) => {
-            if (!result.vignova_token) {
-                sendResponse({ success: false, error: "Not authenticated" });
+            if (requestEpoch !== authEpoch || !result.vignova_token) {
+                sendResponse({ success: false, authenticated: false, error: "Please sign in to Vignova." });
                 return;
             }
             try {
@@ -629,8 +665,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     // ─── API Proxy: Agent Plan Batch (Multiple Actions) ───
     if (message.type === "API_AGENT_PLAN_BATCH") {
         chrome.storage.local.get(["vignova_token"], async (result) => {
-            if (!result.vignova_token) {
-                sendResponse({ success: false, error: "Not authenticated" });
+            if (requestEpoch !== authEpoch || !result.vignova_token) {
+                sendResponse({ success: false, authenticated: false, error: "Please sign in to Vignova." });
                 return;
             }
             try {
@@ -651,8 +687,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     // ─── API Proxy: Get Recent Jobs ───
     if (message.type === "API_GET_RECENT_JOBS") {
         chrome.storage.local.get(["vignova_token"], async (result) => {
-            if (!result.vignova_token) {
-                sendResponse({ success: false, error: "Not authenticated" });
+            if (requestEpoch !== authEpoch || !result.vignova_token) {
+                sendResponse({ success: false, authenticated: false, error: "Please sign in to Vignova." });
                 return;
             }
             try {
@@ -675,8 +711,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     // ─── API Proxy: Get Documents ───
     if (message.type === "API_GET_DOCUMENTS") {
         chrome.storage.local.get(["vignova_token"], async (result) => {
-            if (!result.vignova_token) {
-                sendResponse({ success: false, error: "Not authenticated" });
+            if (requestEpoch !== authEpoch || !result.vignova_token) {
+                sendResponse({ success: false, authenticated: false, error: "Please sign in to Vignova." });
                 return;
             }
             try {
@@ -699,13 +735,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     // ─── API Proxy: Download Document PDF ───
     if (message.type === "API_DOWNLOAD_DOCUMENT") {
         chrome.storage.local.get(["vignova_token"], async (result) => {
-            if (!result.vignova_token) {
-                sendResponse({ success: false, error: "Not authenticated" });
+            if (requestEpoch !== authEpoch || !result.vignova_token) {
+                sendResponse({ success: false, authenticated: false, error: "Please sign in to Vignova." });
                 return;
             }
             try {
                 const { documentId, docType } = message.data;
-                const response = await fetch(`${Vignova_API_BASE}/api/extension/documents/download?id=${documentId}&type=${docType}`, {
+                const response = await fetch(`${Vignova_API_BASE}/api/extension/documents/download?id=${encodeURIComponent(documentId)}&type=${encodeURIComponent(docType)}`, {
                     headers: { "Authorization": `Bearer ${result.vignova_token}` },
                 });
                 const data = await response.json();
@@ -721,29 +757,38 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         return true;
     }
 
-    // ─── Agent: Start on Active Tab ───
-    if (message.type === "START_AGENT_ON_TAB") {
-        chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-            if (tabs[0]?.id) {
-                chrome.tabs.sendMessage(tabs[0].id, { type: "START_AGENT" }, (response) => {
-                    sendResponse(response || { success: false, error: "Could not start agent" });
-                });
-            } else {
-                sendResponse({ success: false, error: "No active tab" });
-            }
+    // Local autofill also requires a verified paid account; it may never call the AI routes.
+    if (message.type === "CHECK_AUTOFILL_ACCESS" || message.type === "CHECK_PAID_ACCESS") {
+        chrome.storage.local.get(["vignova_token", "vignova_user"], stored => {
+            const user = stored.vignova_user;
+            const allowed = !!stored.vignova_token && ["PRO", "PREMIUM"].includes(user?.plan) &&
+                (user?.credits_remaining ?? 0) > 0;
+            sendResponse({ success: allowed, upgradeRequired: !allowed, error: allowed ? null : "This feature requires a paid plan with available credits." });
         });
         return true;
     }
 
-    // ─── Agent: Stop on Active Tab ───
-    if (message.type === "STOP_AGENT_ON_TAB") {
-        chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-            if (tabs[0]?.id) {
-                chrome.tabs.sendMessage(tabs[0].id, { type: "STOP_AGENT" }, (response) => {
-                    sendResponse(response || { success: false });
-                });
-            }
-        });
+    if (["START_AGENT_ON_TAB", "STOP_AGENT_ON_TAB"].includes(message.type)) {
+        (async () => {
+            const tab = sender.tab || (await chrome.tabs.query({ active: true, currentWindow: true }))[0];
+            if (!tab?.id) throw new Error("Open an application page first.");
+            let response;
+            if (message.type === 'START_AGENT_ON_TAB') {
+                const { vignova_user: user, vignova_token: token } = await chrome.storage.local.get(['vignova_user', 'vignova_token']);
+                if (!token || !['PRO', 'PREMIUM'].includes(user?.plan) || !(user?.credits_remaining > 0)) {
+                    sendResponse({ success: false, upgradeRequired: true, error: 'Autofill requires a paid plan with available credits.' });
+                    return;
+                }
+                const frameId = await findApplicationFrame(tab.id);
+                if (requestEpoch !== authEpoch) throw new Error('Your account changed. Try again.');
+                if (frameId === undefined) {
+                    sendResponse({ success: false, error: 'Open an application form first, then use Autofill.' });
+                    return;
+                }
+                response = await chrome.tabs.sendMessage(tab.id, { type: 'START_AGENT' }, { frameId });
+            } else response = await chrome.tabs.sendMessage(tab.id, { type: 'STOP_AGENT' });
+            sendResponse(response || { success: false, error: "No application form was found on this page." });
+        })().catch(() => sendResponse({ success: false, error: "Could not reach the application form. Open it and try again." }));
         return true;
     }
 
@@ -760,6 +805,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     // ─── API Proxy: Generate Cover Letter ───
     if (message.type === "API_GENERATE_COVER_LETTER") {
         chrome.storage.local.get(["vignova_token"], async (result) => {
+            if (requestEpoch !== authEpoch || !result.vignova_token) {
+                sendResponse({ success: false, authenticated: false, error: "Please sign in to Vignova." });
+                return;
+            }
             try {
                 const response = await fetch(`${Vignova_API_BASE}/api/extension/cover-letter`, {
                     method: "POST",
@@ -773,34 +822,17 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                 const data = await response.json();
 
                 if (response.ok) {
+                    if (Number.isFinite(data.credits_remaining)) {
+                        chrome.storage.local.get(["vignova_user"], (stored) => {
+                            if (stored.vignova_user) {
+                                stored.vignova_user.credits_remaining = data.credits_remaining;
+                                void writeUserCache({ vignova_user: stored.vignova_user }, result.vignova_token, requestEpoch);
+                            }
+                        });
+                    }
                     sendResponse({ success: true, ...data });
                 } else {
                     sendResponse(apiFailure(data, "Failed to generate cover letter"));
-                }
-            } catch (err) {
-                sendResponse({ success: false, error: "Cannot connect to server." });
-            }
-        });
-        return true;
-    }
-
-    // ─── API Proxy: Interview Prep ───
-    if (message.type === "API_INTERVIEW_PREP") {
-        chrome.storage.local.get(["vignova_token"], async (result) => {
-            try {
-                const response = await fetch(`${Vignova_API_BASE}/api/extension/interview-prep`, {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                        "Authorization": `Bearer ${result.vignova_token}`,
-                    },
-                    body: JSON.stringify(message.data),
-                });
-                const data = await response.json();
-                if (response.ok) {
-                    sendResponse({ success: true, questions: data.questions || [] });
-                } else {
-                    sendResponse(apiFailure(data, "Failed to generate interview questions"));
                 }
             } catch (err) {
                 sendResponse({ success: false, error: "Cannot connect to server." });
@@ -819,7 +851,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         return true;
     }
 
-});
+}
 
 // Extension install handler
 chrome.runtime.onInstalled.addListener((details) => {
@@ -853,7 +885,9 @@ chrome.action.onClicked.addListener((tab) => {
         chrome.scripting.executeScript({
             target: { tabId: tab.id },
             files: [
+                "content/jobExtractor.js",
                 "agent/observer.js",
+                "agent/atsProfiles.js",
                 "agent/ruleEngine.js",
                 "agent/atsDetector.js",
                 "agent/planner.js",

@@ -38,6 +38,7 @@ from app.services.ats_helpers import (
     calculate_semantic_score,
 )
 from app.utils.json_utils import extract_json_from_response
+from app.utils.linkedin_skills import coerce_skill_list, collect_master_skills, clean_skill_details
 
 router = APIRouter()
 logger = logging.getLogger("linkedin")
@@ -420,25 +421,7 @@ def _as_clean_text(value) -> str:
     return str(value).replace("\x00", "").strip()
 
 def _coerce_skill_list(value) -> list[str]:
-    items = value if isinstance(value, list) else []
-    if isinstance(value, str):
-        items = [part.strip() for part in value.replace("\n", ",").split(",")]
-
-    skills = []
-    seen = set()
-    for item in items:
-        if isinstance(item, dict):
-            skill = _as_clean_text(item.get("name") or item.get("title") or item.get("skill"))
-        else:
-            skill = _as_clean_text(item)
-        if not skill:
-            continue
-        key = skill.lower()
-        if key in seen:
-            continue
-        seen.add(key)
-        skills.append(skill[:80])
-    return skills[:80]
+    return coerce_skill_list(value)
 
 def _normalize_linkedin_profile(raw_profile_data: dict) -> dict:
     raw_data = _remove_null_bytes(raw_profile_data or {})
@@ -459,9 +442,7 @@ def _normalize_linkedin_profile(raw_profile_data: dict) -> dict:
                 "dateRange": _as_clean_text(item.get("dateRange") or item.get("dates") or item.get("duration")),
                 "location": _as_clean_text(item.get("location")),
                 "description": _as_clean_text(item.get("description") or item.get("summary")),
-                "associatedSkills": ", ".join(_coerce_skill_list(associated_skills))
-                if isinstance(associated_skills, list)
-                else _as_clean_text(associated_skills),
+                "associatedSkills": ", ".join(_coerce_skill_list(associated_skills)),
             })
 
     education = raw_data.get("education")
@@ -475,6 +456,7 @@ def _normalize_linkedin_profile(raw_profile_data: dict) -> dict:
                 "school": _as_clean_text(item.get("school") or item.get("schoolName") or item.get("name")),
                 "degree": _as_clean_text(item.get("degree") or item.get("fieldOfStudy")),
                 "dateRange": _as_clean_text(item.get("dateRange") or item.get("dates")),
+                "associatedSkills": ", ".join(_coerce_skill_list(item.get("associatedSkills"))),
             })
 
     projects = raw_data.get("projects")
@@ -501,6 +483,8 @@ def _normalize_linkedin_profile(raw_profile_data: dict) -> dict:
         "education": normalized_education,
         "projects": normalized_projects,
         "skills": _coerce_skill_list(raw_data.get("skills")),
+        "skillDetails": clean_skill_details(raw_data.get("skillDetails")),
+        "topSkills": _coerce_skill_list(raw_data.get("topSkills")),
     }
 
 def _build_linkedin_profile_text(raw_data: dict) -> str:
@@ -538,59 +522,10 @@ def _build_linkedin_profile_text(raw_data: dict) -> str:
     ]).strip()
 
 def _collect_master_keywords(master_data, limit: int = 35) -> list[str]:
-    text_items = []
-    skills = []
-
-    def walk(value, parent_key: str = ""):
-        if isinstance(value, dict):
-            for key, child in value.items():
-                walk(child, str(key).lower())
-        elif isinstance(value, list):
-            for child in value:
-                walk(child, parent_key)
-        elif value is not None:
-            text = _as_clean_text(value)
-            if not text:
-                return
-            text_items.append(text)
-            if "skill" in parent_key or "technolog" in parent_key or "tool" in parent_key:
-                skills.append(text)
-
-    walk(master_data)
-    candidates = skills + text_items
-    seen = set()
-    keywords = []
-    for item in candidates:
-        for part in item.replace("/", ",").replace("|", ",").replace("\n", ",").split(","):
-            keyword = part.strip(" -*•\t")
-            if not keyword or len(keyword) < 2 or len(keyword) > 60:
-                continue
-            if len(keyword.split()) > 5:
-                continue
-            key = keyword.lower()
-            if key in seen:
-                continue
-            seen.add(key)
-            keywords.append(keyword)
-            if len(keywords) >= limit:
-                return keywords
-    return keywords
+    return collect_master_skills(master_data, limit)
 
 def _append_unique_skills(existing: list[str], additions: list[str], limit: int = 80) -> list[str]:
-    merged = []
-    seen = set()
-    for skill in [*existing, *additions]:
-        clean = _as_clean_text(skill)
-        if not clean:
-            continue
-        key = clean.lower()
-        if key in seen:
-            continue
-        seen.add(key)
-        merged.append(clean[:80])
-        if len(merged) >= limit:
-            break
-    return merged
+    return coerce_skill_list([*existing, *additions], limit)
 
 def _extract_master_projects(master_data: dict) -> list[dict]:
     projects = master_data.get("projects") if isinstance(master_data, dict) else []
@@ -767,7 +702,12 @@ def _ensure_score_friendly_profile(
     if len(result["headline"]) > 220:
         result["headline"] = result["headline"][:217].rstrip() + "..."
 
-    score_keywords = _append_unique_skills([], missing_keywords + master_keywords + master_project_skills, 24)
+    # ATS keywords also contain names, contact fragments and section headings.
+    # Only promote keywords backed by explicit skill fields into LinkedIn skills.
+    grounded_skills = _append_unique_skills(master_keywords, master_project_skills, 80)
+    missing_keys = {skill.lower() for skill in _coerce_skill_list(missing_keywords)}
+    prioritized = [skill for skill in grounded_skills if skill.lower() in missing_keys]
+    score_keywords = _append_unique_skills(prioritized, grounded_skills, 24)
     if score_keywords:
         relevant_keys = {skill.lower() for skill in score_keywords}
         current_relevant = [
@@ -1130,14 +1070,17 @@ async def optimize_linkedin(request: Request, payload: LinkedInOptimizeRequest):
             None,
             partial(_compute_linkedin_scores, master_score_text, current_profile_text, raw_data),
         )
-        missing_keywords = current_scores.get("keyword_details", {}).get("missing_keywords", [])
         master_keywords = _collect_master_keywords(master_data)
+        skill_keys = {skill.lower() for skill in master_keywords}
+        missing_keywords = [skill for skill in _coerce_skill_list(current_scores.get("keyword_details", {}).get("missing_keywords", []))
+                            if skill.lower() in skill_keys]
                     
         # 2. Prompt Gemini to rewrite the full profile
         prompt = f"""You are an expert LinkedIn profile optimizer and career coach. 
 Your goal is to completely rewrite the user's LinkedIn profile to make it highly professional, keyword-rich, and impactful.
 You must use the provided "Master Resume Data" as the ultimate source of truth for their skills, experiences, and achievements.
 Do not invent facts. Enhance the descriptions using action verbs and highlight measurable impact.
+All skills and associatedSkills values must be actual professional skills, tools, technologies or competencies supported by the source. Never put emails, phone numbers, contact details, URLs, names, locations, section headings or certification headings in skill lists.
 The current algorithmic profile strength score is {round(current_score, 1)}.
 Optimize specifically for this scoring rubric:
 - Completeness: keep headline, about, experience, education, and skills populated when source data exists.

@@ -1,0 +1,454 @@
+/**
+ * Match Breakdown panel.
+ *
+ * Every rule is scoped under .vg-match-panel and every value is stated
+ * outright — this markup lands inside LinkedIn's and Indeed's own stylesheets,
+ * where an inherited font-size or line-height would pull the layout apart.
+ */
+
+.vg-match-panel {
+    position: fixed;
+    z-index: 2147483647;
+    width: 330px;
+    max-height: calc(100vh - 24px);
+    overflow-y: auto;
+    box-sizing: border-box;
+    padding: 14px;
+
+    background: #0d0d18;
+    background-image: radial-gradient(120% 60% at 50% 0%, rgba(109, 74, 255, 0.16) 0%, rgba(13, 13, 24, 0) 60%);
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    border-radius: 15px;
+    box-shadow: 0 24px 60px -12px rgba(0, 0, 0, 0.75), 0 8px 20px -8px rgba(0, 0, 0, 0.6);
+
+    font-family: Geist, "Segoe UI", -apple-system, BlinkMacSystemFont, Arial, sans-serif;
+    color: #e9e9f2;
+    text-align: left;
+    line-height: 1.4;
+
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(6px);
+    pointer-events: none;
+    transition: opacity .16s ease, transform .16s ease, visibility .16s;
+}
+
+.vg-match-panel.vg-mp-open {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+    pointer-events: auto;
+}
+
+.vg-match-panel *,
+.vg-match-panel *::before,
+.vg-match-panel *::after {
+    box-sizing: border-box;
+}
+
+.vg-match-panel .vg-mp-icon,
+.vg-match-panel .vg-mp-group-icon,
+.vg-match-panel .vg-mp-tip-icon,
+.vg-match-panel .vg-mp-cta-spark,
+.vg-match-panel .vg-mp-cta-arrow {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+}
+
+.vg-match-panel svg {
+    width: 13px;
+    height: 13px;
+    display: block;
+}
+
+/* ── Brand row ─────────────────────────────────────────────────────── */
+
+.vg-match-panel .vg-mp-brand {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 11px;
+}
+
+.vg-match-panel .vg-mp-brand-left {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+}
+
+.vg-match-panel .vg-mp-logo {
+    width: 21px;
+    height: 21px;
+    object-fit: contain;
+    border-radius: 7px;
+}
+
+.vg-match-panel .vg-mp-wordmark {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.2em;
+    color: #ffffff;
+}
+
+.vg-match-panel .vg-mp-tools {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.vg-match-panel .vg-mp-tool {
+    all: unset;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 7px;
+    color: #8b8ba7;
+    cursor: pointer;
+    transition: background .15s ease, color .15s ease;
+}
+
+.vg-match-panel .vg-mp-tool:hover {
+    background: rgba(255, 255, 255, 0.07);
+    color: #ffffff;
+}
+
+/* ── Title and score ───────────────────────────────────────────────── */
+
+.vg-match-panel .vg-mp-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 13px;
+}
+
+.vg-match-panel .vg-mp-title {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    color: #ffffff;
+    line-height: 1.15;
+}
+
+.vg-match-panel .vg-mp-sub {
+    margin: 3px 0 0;
+    font-size: 10.5px;
+    color: #8b8ba7;
+}
+
+.vg-match-panel .vg-mp-scorebox {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 7px;
+    flex: 0 0 auto;
+}
+
+.vg-match-panel .vg-mp-score {
+    display: flex;
+    align-items: baseline;
+    gap: 1px;
+}
+
+.vg-match-panel .vg-mp-score-value {
+    font-size: 23px;
+    font-weight: 800;
+    color: #ffffff;
+    line-height: 1;
+    letter-spacing: -0.02em;
+}
+
+.vg-match-panel .vg-mp-score-max {
+    font-size: 12px;
+    font-weight: 600;
+    color: #6f6f8c;
+}
+
+.vg-match-panel .vg-mp-tier {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 8px;
+    border-radius: 999px;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    white-space: nowrap;
+}
+
+.vg-match-panel .vg-mp-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+}
+
+.vg-match-panel .vg-mp-tier-good {
+    background: rgba(16, 185, 129, 0.14);
+    border: 1px solid rgba(16, 185, 129, 0.35);
+    color: #6ee7b7;
+}
+
+.vg-match-panel .vg-mp-tier-fair {
+    background: rgba(245, 158, 11, 0.14);
+    border: 1px solid rgba(245, 158, 11, 0.35);
+    color: #fcd34d;
+}
+
+.vg-match-panel .vg-mp-tier-poor {
+    background: rgba(239, 68, 68, 0.14);
+    border: 1px solid rgba(239, 68, 68, 0.35);
+    color: #fca5a5;
+}
+
+/* ── Salary / deadline chips ───────────────────────────────────────── */
+
+.vg-match-panel .vg-mp-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    margin: -6px 0 11px;
+}
+
+.vg-match-panel .vg-mp-chip {
+    display: inline-block;
+    padding: 3px 8px;
+    border-radius: 999px;
+    font-size: 10px;
+    font-weight: 600;
+}
+
+.vg-match-panel .vg-mp-chip-pay {
+    background: rgba(16, 185, 129, 0.13);
+    border: 1px solid rgba(16, 185, 129, 0.32);
+    color: #6ee7b7;
+}
+
+.vg-match-panel .vg-mp-chip-due {
+    background: rgba(245, 158, 11, 0.13);
+    border: 1px solid rgba(245, 158, 11, 0.32);
+    color: #fcd34d;
+}
+
+/* ── Metric cards ──────────────────────────────────────────────────── */
+
+.vg-match-panel .vg-mp-metrics {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 13px;
+}
+
+.vg-match-panel .vg-mp-metric {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 8px 10px;
+    background: rgba(255, 255, 255, 0.035);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 12px;
+}
+
+.vg-match-panel .vg-mp-metric-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 27px;
+    height: 27px;
+    flex: 0 0 auto;
+    border-radius: 8px;
+    background: rgba(124, 92, 255, 0.14);
+    color: #a78bfa;
+}
+
+.vg-match-panel .vg-mp-metric-body {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.vg-match-panel .vg-mp-metric-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: #ffffff;
+    margin-bottom: 5px;
+}
+
+.vg-match-panel .vg-mp-track {
+    height: 4px;
+    border-radius: 2px;
+    background: rgba(255, 255, 255, 0.08);
+    overflow: hidden;
+}
+
+.vg-match-panel .vg-mp-fill {
+    height: 100%;
+    border-radius: 3px;
+    background: linear-gradient(90deg, #7c5cff 0%, #6d4aff 100%);
+    transition: width .5s cubic-bezier(.16, 1, .3, 1);
+}
+
+.vg-match-panel .vg-mp-metric-value {
+    flex: 0 0 auto;
+    font-size: 11.5px;
+    font-weight: 700;
+    color: #ffffff;
+    min-width: 34px;
+    text-align: right;
+}
+
+/* ── Keyword groups ────────────────────────────────────────────────── */
+
+.vg-match-panel .vg-mp-group {
+    margin-bottom: 10px;
+}
+
+.vg-match-panel .vg-mp-group-head {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 6px;
+}
+
+.vg-match-panel .vg-mp-group-title {
+    font-size: 11px;
+    font-weight: 600;
+    color: #ffffff;
+}
+
+.vg-match-panel .vg-mp-good {
+    color: #a78bfa;
+}
+
+.vg-match-panel .vg-mp-poor {
+    color: #f87171;
+}
+
+.vg-match-panel .vg-mp-pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+}
+
+.vg-match-panel .vg-mp-pill {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 10px;
+    font-weight: 600;
+    line-height: 1.5;
+}
+
+.vg-match-panel .vg-mp-pill-good {
+    background: rgba(124, 92, 255, 0.13);
+    border: 1px solid rgba(124, 92, 255, 0.38);
+    color: #c4b5fd;
+}
+
+.vg-match-panel .vg-mp-pill-poor {
+    background: rgba(239, 68, 68, 0.11);
+    border: 1px solid rgba(239, 68, 68, 0.34);
+    color: #fca5a5;
+}
+
+.vg-match-panel .vg-mp-pill-more {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    color: #8b8ba7;
+}
+
+/* ── Suggestion ────────────────────────────────────────────────────── */
+
+.vg-match-panel .vg-mp-tip {
+    padding: 10px;
+    margin-bottom: 11px;
+    background: rgba(255, 255, 255, 0.035);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 12px;
+}
+
+.vg-match-panel .vg-mp-tip-head {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 4px;
+    color: #a78bfa;
+}
+
+.vg-match-panel .vg-mp-tip-title {
+    font-size: 11px;
+    font-weight: 600;
+    color: #ffffff;
+}
+
+.vg-match-panel .vg-mp-tip-body {
+    margin: 0;
+    font-size: 10.5px;
+    color: #8b8ba7;
+    line-height: 1.5;
+}
+
+/* ── Actions ───────────────────────────────────────────────────────── */
+
+.vg-match-panel .vg-mp-cta {
+    all: unset;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    width: 100%;
+    height: 38px;
+    border-radius: 10px;
+    background: linear-gradient(90deg, #7b3ff5 0%, #5b32ea 52%, #3f2bd4 100%);
+    color: #ffffff;
+    font-size: 12.5px;
+    font-weight: 700;
+    cursor: pointer;
+    box-shadow: 0 8px 20px -8px rgba(91, 50, 234, 0.9);
+    transition: filter .15s ease, transform .15s ease;
+}
+
+.vg-match-panel .vg-mp-cta:hover {
+    filter: brightness(1.08);
+    transform: translateY(-1px);
+}
+
+.vg-match-panel .vg-mp-cta svg {
+    width: 14px;
+    height: 14px;
+}
+
+.vg-match-panel .vg-mp-link {
+    all: unset;
+    display: block;
+    width: 100%;
+    margin-top: 9px;
+    text-align: center;
+    font-size: 10.5px;
+    font-weight: 600;
+    color: #8b8ba7;
+    cursor: pointer;
+    transition: color .15s ease;
+}
+
+.vg-match-panel .vg-mp-link:hover {
+    color: #c4b5fd;
+}
+
+/* The panel's own scrollbar, so a short window does not get a grey slab. */
+.vg-match-panel::-webkit-scrollbar {
+    width: 8px;
+}
+
+.vg-match-panel::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.12);
+    border-radius: 4px;
+}
+
+.vg-match-panel::-webkit-scrollbar-track {
+    background: transparent;
+}

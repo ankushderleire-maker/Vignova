@@ -2,7 +2,7 @@
     "manifest_version": 3,
     "name": "Vignova - Your Career AI Assistant",
     "short_name": "Vignova",
-    "version": "1.4.0",
+    "version": "2.0.0",
     "description": "AI career copilot: tailor resumes, auto-fill applications, and track jobs with Kanban.",
     "minimum_chrome_version": "116",
     "icons": {
@@ -11,7 +11,7 @@
         "128": "icons/icon128.png"
     },
     "action": {
-        "default_title": "Vignova – Career AI",
+        "default_title": "Vignova \u2013 Career AI",
         "default_icon": {
             "16": "icons/icon16.png",
             "48": "icons/icon48.png"
@@ -29,12 +29,14 @@
             "js": [
                 "utils/api.js",
                 "utils/localScorer.js",
+                "content/matchPanel.js",
                 "content/overlay.js",
                 "content/linkedin.js"
             ],
             "css": [
                 "styles/button.css",
-                "content/overlay.css"
+                "content/overlay.css",
+                "content/matchPanel.css"
             ],
             "run_at": "document_idle"
         },
@@ -46,12 +48,14 @@
             "js": [
                 "utils/api.js",
                 "utils/localScorer.js",
+                "content/matchPanel.js",
                 "content/overlay.js",
                 "content/indeed.js"
             ],
             "css": [
                 "styles/button.css",
-                "content/overlay.css"
+                "content/overlay.css",
+                "content/matchPanel.css"
             ],
             "run_at": "document_idle"
         },
@@ -60,7 +64,9 @@
                 "<all_urls>"
             ],
             "js": [
+                "content/jobExtractor.js",
                 "agent/observer.js",
+                "agent/atsProfiles.js",
                 "agent/ruleEngine.js",
                 "agent/atsDetector.js",
                 "agent/planner.js",

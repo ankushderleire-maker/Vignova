@@ -1,0 +1,902 @@
+/* ═══════════════════════════════════════════════════════════════════════
+   Vignova Extension — result overlay
+
+   Injected into LinkedIn's own document, so every declaration carries
+   !important: the host stylesheet is happy to restyle a bare <ol>, <li>,
+   <button> or <svg>, and it loads after us.
+
+   Colours are sampled from the approved design, not invented.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* The landing page's typeface, so the extension reads as the same product.
+   Relative URL: Chrome rewrites it to the extension origin when it injects
+   this file, and assets/* is already web-accessible. */
+@font-face {
+    font-family: Geist;
+    font-style: normal;
+    font-weight: 100 900;
+    font-display: swap;
+    src: url('../assets/geist-latin.woff2') format('woff2');
+}
+
+.vignova-overlay-backdrop {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    background: rgba(23, 18, 46, 0.30) !important;
+    z-index: 99998 !important;
+    backdrop-filter: blur(5px) !important;
+    animation: vignova-fade-in 0.3s ease !important;
+}
+
+.vignova-overlay {
+    position: fixed !important;
+    top: 50% !important;
+    left: 50% !important;
+    transform: translate(-50%, -50%) !important;
+    width: 660px !important;
+    max-width: 92vw !important;
+    background: #fdfcff !important;
+    border: 1px solid #f0eefb !important;
+    border-radius: 22px !important;
+    padding: 0 !important;
+    z-index: 99999 !important;
+    font-family: Geist, Arial, Helvetica, sans-serif !important;
+    color: #14142e !important;
+    box-shadow: 0 32px 70px rgba(38, 22, 84, 0.20), 0 2px 8px rgba(38, 22, 84, 0.06) !important;
+    animation: vignova-slide-up 0.3s ease !important;
+    overflow: hidden !important;
+    box-sizing: border-box !important;
+}
+
+.vignova-overlay *,
+.vignova-overlay *::before,
+.vignova-overlay *::after {
+    box-sizing: border-box !important;
+}
+
+@keyframes vignova-fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes vignova-slide-up {
+    from { opacity: 0; transform: translate(-50%, -45%); }
+    to { opacity: 1; transform: translate(-50%, -50%); }
+}
+
+/* ─── Brand row ────────────────────────────────────────────────────────
+   Deliberately not a bar: no fill, no rule underneath. It reads as the
+   top of the card, the way the design has it. */
+.vignova-overlay-header {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    padding: 22px 26px 0 !important;
+    background: transparent !important;
+    border: none !important;
+}
+
+.vignova-overlay-brand {
+    display: flex !important;
+    align-items: center !important;
+    gap: 9px !important;
+    font-weight: 800 !important;
+    font-size: 17px !important;
+    line-height: 1 !important;
+}
+
+/* Same purple-to-blue wordmark as the popup and the dashboard sidebar. */
+.vignova-overlay-wordmark {
+    font-weight: 850 !important;
+    letter-spacing: 1.5px !important;
+    background-image: linear-gradient(110deg, #861cf6 0%, #5141f5 45%, #157bdc 100%) !important;
+    -webkit-background-clip: text !important;
+    background-clip: text !important;
+    color: transparent !important;
+    line-height: 1 !important;
+}
+
+.vignova-overlay-close {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 36px !important;
+    height: 36px !important;
+    padding: 0 !important;
+    background: #eeedfd !important;
+    border: 1px solid #e4e2fa !important;
+    border-radius: 11px !important;
+    color: #3d4160 !important;
+    cursor: pointer !important;
+    transition: background 0.2s, color 0.2s !important;
+}
+
+.vignova-overlay-close:hover {
+    background: #e4e1fb !important;
+    color: #14142e !important;
+}
+
+.vignova-overlay-close svg {
+    display: block !important;
+    width: 17px !important;
+    height: 17px !important;
+}
+
+/* ─── Body ─── */
+.vignova-overlay-body {
+    padding: 18px 26px 26px !important;
+    text-align: center !important;
+    max-height: calc(90vh - 76px) !important;
+    overflow-y: auto !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Loading state
+   ═══════════════════════════════════════════════════════════════════════ */
+.vignova-loading {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 18px !important;
+    text-align: left !important;
+}
+
+.vignova-loading-top {
+    display: flex !important;
+    align-items: center !important;
+    gap: 10px !important;
+    flex-wrap: wrap !important;
+}
+
+/* ─── The illustration ─── */
+.vignova-loading-art {
+    position: relative !important;
+    flex: 0 0 208px !important;
+    height: 232px !important;
+    display: grid !important;
+    place-items: center !important;
+}
+
+/* Two pages fanned behind the front one. */
+.vignova-doc-stack {
+    position: absolute !important;
+    width: 152px !important;
+    height: 196px !important;
+    border-radius: 14px !important;
+    background: #efecfd !important;
+}
+
+.vignova-doc-stack.s1 {
+    transform: translate(-16px, -10px) rotate(-7deg) !important;
+    background: #eae6fc !important;
+}
+
+.vignova-doc-stack.s2 {
+    transform: translate(14px, -18px) rotate(6deg) !important;
+    background: #f2effe !important;
+}
+
+.vignova-doc {
+    position: relative !important;
+    display: block !important;
+    width: 156px !important;
+    padding: 16px 15px !important;
+    border-radius: 14px !important;
+    background: #fbfaff !important;
+    box-shadow: 0 16px 38px rgba(70, 44, 133, 0.14) !important;
+    animation: vignova-doc-float 4s ease-in-out infinite !important;
+}
+
+@keyframes vignova-doc-float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-5px); }
+}
+
+.vignova-doc-head {
+    display: flex !important;
+    align-items: center !important;
+    gap: 9px !important;
+    margin-bottom: 14px !important;
+}
+
+.vignova-doc-avatar {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    flex: 0 0 34px !important;
+    width: 34px !important;
+    height: 34px !important;
+    border-radius: 50% !important;
+    background: #ded9f6 !important;
+    color: #aaa1da !important;
+}
+
+.vignova-doc-avatar svg {
+    display: block !important;
+    width: 20px !important;
+    height: 20px !important;
+}
+
+.vignova-doc-head-lines {
+    display: block !important;
+    flex: 1 1 auto !important;
+}
+
+.vignova-doc-group {
+    display: block !important;
+    margin-bottom: 13px !important;
+}
+
+.vignova-doc-group:last-child {
+    margin-bottom: 0 !important;
+}
+
+.vignova-doc-line {
+    display: block !important;
+    height: 6px !important;
+    border-radius: 3px !important;
+    background: #eae7f8 !important;
+    margin: 0 0 6px !important;
+}
+
+.vignova-doc-line:last-child {
+    margin-bottom: 0 !important;
+}
+
+/* The heading of each block, a shade stronger than its body copy. */
+.vignova-doc-line.accent {
+    background: #c9c0f1 !important;
+    height: 7px !important;
+    margin-bottom: 8px !important;
+}
+
+/* The line currently "being written". */
+.vignova-doc-line.live {
+    background: linear-gradient(90deg, #eae7f8 0%, #cfc5f4 50%, #eae7f8 100%) !important;
+    background-size: 220% 100% !important;
+    animation: vignova-line-sweep 1.9s ease-in-out infinite !important;
+}
+
+@keyframes vignova-line-sweep {
+    0% { background-position: 130% 0; }
+    100% { background-position: -70% 0; }
+}
+
+.vignova-doc-line.w45 { width: 45% !important; }
+.vignova-doc-line.w55 { width: 55% !important; }
+.vignova-doc-line.w70 { width: 70% !important; }
+.vignova-doc-line.w75 { width: 75% !important; }
+.vignova-doc-line.w85 { width: 85% !important; }
+.vignova-doc-line.w90 { width: 90% !important; }
+.vignova-doc-line.w100 { width: 100% !important; }
+
+.vignova-doc-badge {
+    position: absolute !important;
+    right: -2px !important;
+    bottom: 30px !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 10px !important;
+    background: #e8e6fd !important;
+    border-radius: 16px !important;
+    padding: 10px 16px 10px 10px !important;
+    box-shadow: 0 10px 26px rgba(70, 44, 133, 0.12) !important;
+}
+
+.vignova-doc-badge-icon {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    flex: 0 0 32px !important;
+    width: 32px !important;
+    height: 32px !important;
+    border-radius: 50% !important;
+    background: #d6cffa !important;
+    color: #5b2ee0 !important;
+}
+
+.vignova-doc-badge-icon svg {
+    display: block !important;
+    width: 17px !important;
+    height: 17px !important;
+}
+
+.vignova-doc-badge-text {
+    font-size: 12.5px !important;
+    font-weight: 700 !important;
+    line-height: 1.32 !important;
+    color: #4d21c9 !important;
+    white-space: nowrap !important;
+}
+
+.vignova-spark {
+    position: absolute !important;
+    display: block !important;
+    color: #6d3ff5 !important;
+    line-height: 0 !important;
+    animation: vignova-twinkle 2.6s ease-in-out infinite !important;
+}
+
+.vignova-spark svg {
+    display: block !important;
+    width: 100% !important;
+    height: 100% !important;
+}
+
+.vignova-loading-art .vignova-spark.s1 { top: 8px !important; right: 12px !important; width: 22px !important; height: 22px !important; }
+.vignova-loading-art .vignova-spark.s2 { top: 24px !important; right: 3px !important; width: 9px !important; height: 9px !important; animation-delay: 0.8s !important; }
+.vignova-loading-art .vignova-spark.s3 { bottom: 16px !important; left: 4px !important; width: 14px !important; height: 14px !important; animation-delay: 1.5s !important; }
+
+@keyframes vignova-twinkle {
+    0%, 100% { opacity: 0.4; transform: scale(0.82); }
+    50% { opacity: 1; transform: scale(1); }
+}
+
+/* ─── Ring, copy and steps ─── */
+.vignova-loading-main {
+    flex: 1 1 300px !important;
+    min-width: 280px !important;
+    text-align: center !important;
+}
+
+.vignova-ring {
+    position: relative !important;
+    width: 84px !important;
+    height: 84px !important;
+    margin: 0 auto 12px !important;
+}
+
+.vignova-ring svg {
+    display: block !important;
+    width: 84px !important;
+    height: 84px !important;
+}
+
+#vignova-ring-arc {
+    transition: stroke-dashoffset 0.25s linear !important;
+}
+
+.vignova-ring-value {
+    position: absolute !important;
+    inset: 0 !important;
+    display: grid !important;
+    place-items: center !important;
+    font-size: 19px !important;
+    font-weight: 800 !important;
+    letter-spacing: -0.01em !important;
+    color: #14142e !important;
+}
+
+.vignova-loading-title {
+    margin: 0 0 8px !important;
+    font-size: 22px !important;
+    font-weight: 800 !important;
+    letter-spacing: -0.015em !important;
+    line-height: 1.25 !important;
+    color: #14142e !important;
+}
+
+.vignova-loading-sub {
+    margin: 0 auto 20px !important;
+    max-width: 380px !important;
+    font-size: 15px !important;
+    line-height: 1.5 !important;
+    color: #4a4f6a !important;
+}
+
+.vignova-steps {
+    display: flex !important;
+    align-items: flex-start !important;
+    justify-content: center !important;
+    gap: 0 !important;
+    list-style: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+.vignova-step {
+    position: relative !important;
+    flex: 1 1 0 !important;
+    max-width: 104px !important;
+    text-align: center !important;
+    list-style: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+/* The connector, drawn back toward the previous dot. */
+.vignova-step + .vignova-step::before {
+    content: "" !important;
+    position: absolute !important;
+    top: 13px !important;
+    right: 50% !important;
+    width: 100% !important;
+    height: 2px !important;
+    background: #7c5cf0 !important;
+}
+
+.vignova-step-dot {
+    position: relative !important;
+    z-index: 1 !important;
+    display: block !important;
+    width: 28px !important;
+    height: 28px !important;
+    margin: 0 auto 12px !important;
+    border-radius: 50% !important;
+    border: 3px solid #e7e2fb !important;
+    background: #fdfcff !important;
+}
+
+.vignova-step.active .vignova-step-dot {
+    border-color: #e7e2fb !important;
+    border-top-color: #5b2ef0 !important;
+    border-right-color: #5b2ef0 !important;
+    animation: vignova-spin 0.9s linear infinite !important;
+}
+
+.vignova-step.done .vignova-step-dot {
+    border-color: #5b2ef0 !important;
+    background: #5b2ef0 !important;
+}
+
+.vignova-step.done .vignova-step-dot::after {
+    content: "" !important;
+    position: absolute !important;
+    left: 7px !important;
+    top: 3px !important;
+    width: 6px !important;
+    height: 11px !important;
+    border: solid #ffffff !important;
+    border-width: 0 2.4px 2.4px 0 !important;
+    transform: rotate(45deg) !important;
+}
+
+@keyframes vignova-spin {
+    to { transform: rotate(360deg); }
+}
+
+.vignova-step-label {
+    display: block !important;
+    font-size: 14px !important;
+    font-weight: 700 !important;
+    line-height: 1.35 !important;
+    color: #14142e !important;
+}
+
+/* ─── Footer note ─── */
+.vignova-loading-foot {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    flex-wrap: wrap !important;
+    gap: 8px 0 !important;
+    border-top: 1px solid #eeecf8 !important;
+    padding-top: 16px !important;
+}
+
+.vignova-foot-item {
+    display: flex !important;
+    align-items: center !important;
+    gap: 9px !important;
+    padding: 0 13px !important;
+    font-size: 12.5px !important;
+    line-height: 1.4 !important;
+    color: #2e3350 !important;
+}
+
+.vignova-foot-item + .vignova-foot-item {
+    border-left: 1px solid #e4e2f2 !important;
+}
+
+.vignova-foot-item svg {
+    display: block !important;
+    flex: 0 0 auto !important;
+    width: 17px !important;
+    height: 17px !important;
+    color: #2e3350 !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Success state
+   ═══════════════════════════════════════════════════════════════════════ */
+.vignova-done-hero {
+    display: block !important;
+    width: 300px !important;
+    margin: 0 auto 4px !important;
+}
+
+.vignova-done-hero svg {
+    display: block !important;
+    width: 100% !important;
+    height: auto !important;
+}
+
+.vignova-overlay-success-title {
+    font-size: 30px !important;
+    font-weight: 800 !important;
+    letter-spacing: -0.02em !important;
+    line-height: 1.2 !important;
+    margin-bottom: 8px !important;
+    color: #14142e !important;
+}
+
+.vignova-overlay-success-sub {
+    font-size: 15.5px !important;
+    line-height: 1.5 !important;
+    color: #4a4f6a !important;
+    margin-bottom: 20px !important;
+}
+
+/* ─── Result tabs ─── */
+.vignova-result-tabs {
+    display: flex !important;
+    align-items: stretch !important;
+    gap: 0 !important;
+    background: #fdfcff !important;
+    border: 1px solid #edebf8 !important;
+    border-radius: 15px !important;
+    padding: 0 !important;
+    margin-bottom: 16px !important;
+    overflow: hidden !important;
+}
+
+.vignova-rtab {
+    display: flex !important;
+    flex: 1 1 0 !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 12px !important;
+    min-width: 0 !important;
+    padding: 17px 10px !important;
+    font-family: inherit !important;
+    font-size: 16px !important;
+    font-weight: 700 !important;
+    line-height: 1.25 !important;
+    color: #14142e !important;
+    text-align: left !important;
+    background: transparent !important;
+    border: 2px solid transparent !important;
+    border-radius: 15px !important;
+    cursor: pointer !important;
+    transition: background 0.18s, border-color 0.18s, color 0.18s !important;
+}
+
+.vignova-rtab + .vignova-rtab {
+    box-shadow: -1px 0 0 0 #edebf8 !important;
+}
+
+.vignova-rtab:hover {
+    background: #faf9ff !important;
+}
+
+.vignova-rtab.active {
+    background: #f6f4fe !important;
+    border-color: #6d28f0 !important;
+    color: #5b21d6 !important;
+    box-shadow: none !important;
+}
+
+.vignova-rtab-icon {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    flex: 0 0 44px !important;
+    width: 44px !important;
+    height: 44px !important;
+    border-radius: 12px !important;
+    background: #ebe8fd !important;
+    color: #5b21d6 !important;
+}
+
+.vignova-rtab.active .vignova-rtab-icon {
+    background: #e2d9fd !important;
+}
+
+.vignova-rtab-icon svg {
+    display: block !important;
+    width: 21px !important;
+    height: 21px !important;
+}
+
+.vignova-rtab-content {
+    display: none !important;
+    text-align: left !important;
+}
+
+.vignova-rtab-content.active {
+    display: block !important;
+    animation: vignova-fade-in 0.3s ease !important;
+}
+
+.vignova-text-preview {
+    max-height: 210px !important;
+    overflow-y: auto !important;
+    font-size: 13.5px !important;
+    line-height: 1.6 !important;
+    color: #2e3350 !important;
+    background: #faf9ff !important;
+    padding: 14px !important;
+    border: 1px solid #edebf8 !important;
+    border-radius: 12px !important;
+    margin-bottom: 12px !important;
+    white-space: normal !important;
+    text-align: left !important;
+}
+
+.vignova-overlay-inline-error {
+    padding: 14px !important;
+    background: #fdf3f3 !important;
+    border: 1px solid #f7dede !important;
+    border-radius: 12px !important;
+    font-size: 13.5px !important;
+    line-height: 1.5 !important;
+    color: #b02a37 !important;
+    text-align: center !important;
+}
+
+/* ─── Buttons ─── */
+.vignova-overlay-download-btn {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 13px !important;
+    width: 100% !important;
+    padding: 18px 24px !important;
+    font-family: inherit !important;
+    font-size: 18px !important;
+    font-weight: 800 !important;
+    letter-spacing: -0.01em !important;
+    background: linear-gradient(90deg, #8b3ff5 0%, #5a2eec 48%, #2f22c8 100%) !important;
+    color: #ffffff !important;
+    border: none !important;
+    border-radius: 14px !important;
+    cursor: pointer !important;
+    text-decoration: none !important;
+    box-shadow: 0 10px 24px rgba(75, 40, 210, 0.26) !important;
+    transition: transform 0.18s, box-shadow 0.18s !important;
+}
+
+.vignova-overlay-download-btn:hover {
+    transform: translateY(-1px) !important;
+    box-shadow: 0 14px 28px rgba(75, 40, 210, 0.32) !important;
+}
+
+.vignova-overlay-download-btn svg {
+    display: block !important;
+    width: 21px !important;
+    height: 21px !important;
+}
+
+.vignova-overlay-copy-btn {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 9px !important;
+    width: 100% !important;
+    padding: 13px !important;
+    font-family: inherit !important;
+    font-size: 14.5px !important;
+    font-weight: 700 !important;
+    background: #f5f5fd !important;
+    border: 1px solid #e8e6f6 !important;
+    color: #14142e !important;
+    border-radius: 13px !important;
+    cursor: pointer !important;
+    transition: background 0.18s !important;
+}
+
+.vignova-overlay-copy-btn:hover {
+    background: #eeedfa !important;
+}
+
+.vignova-overlay-copy-btn svg {
+    display: block !important;
+    width: 17px !important;
+    height: 17px !important;
+}
+
+.vignova-overlay-view-btn {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 11px !important;
+    width: 100% !important;
+    margin: 12px 0 0 !important;
+    padding: 16px 20px !important;
+    font-family: inherit !important;
+    font-size: 16px !important;
+    font-weight: 700 !important;
+    background: #f5f5fd !important;
+    border: 1px solid #e8e6f6 !important;
+    border-radius: 14px !important;
+    color: #14142e !important;
+    cursor: pointer !important;
+    text-decoration: none !important;
+    transition: background 0.18s !important;
+}
+
+.vignova-overlay-view-btn:hover {
+    background: #eeedfa !important;
+}
+
+.vignova-overlay-view-btn svg {
+    display: block !important;
+    width: 18px !important;
+    height: 18px !important;
+}
+
+/* ─── Credits ─── */
+.vignova-overlay-credits {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 10px !important;
+    margin-top: 18px !important;
+    padding-top: 16px !important;
+    border-top: 1px solid #eeecf8 !important;
+    font-size: 15px !important;
+    color: #2e3350 !important;
+}
+
+.vignova-overlay-credits svg {
+    display: block !important;
+    width: 18px !important;
+    height: 18px !important;
+    color: #2e3350 !important;
+}
+
+.vignova-overlay-credits strong {
+    font-weight: 700 !important;
+    color: #14142e !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Error state
+   ═══════════════════════════════════════════════════════════════════════ */
+.vignova-overlay-error-icon {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 62px !important;
+    height: 62px !important;
+    margin: 8px auto 16px !important;
+    border-radius: 50% !important;
+    background: #fdeaea !important;
+    color: #dc3545 !important;
+}
+
+.vignova-overlay-error-icon svg {
+    display: block !important;
+    width: 30px !important;
+    height: 30px !important;
+}
+
+.vignova-overlay-error-title {
+    font-size: 20px !important;
+    font-weight: 800 !important;
+    letter-spacing: -0.015em !important;
+    color: #14142e !important;
+    margin-bottom: 8px !important;
+}
+
+.vignova-overlay-error-msg {
+    font-size: 14px !important;
+    color: #4a4f6a !important;
+    margin-bottom: 20px !important;
+    line-height: 1.5 !important;
+}
+
+.vignova-overlay-retry-btn {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 10px !important;
+    width: 100% !important;
+    padding: 15px 20px !important;
+    font-family: inherit !important;
+    font-size: 15px !important;
+    font-weight: 700 !important;
+    background: linear-gradient(90deg, #8b3ff5 0%, #5a2eec 48%, #2f22c8 100%) !important;
+    color: #ffffff !important;
+    border: none !important;
+    border-radius: 14px !important;
+    cursor: pointer !important;
+    box-shadow: 0 10px 24px rgba(75, 40, 210, 0.24) !important;
+}
+
+.vignova-overlay-retry-btn svg {
+    display: block !important;
+    width: 17px !important;
+    height: 17px !important;
+}
+
+/* ─── Narrow windows: the illustration steps aside ─── */
+@media (max-width: 700px) {
+    .vignova-loading-top {
+        justify-content: center !important;
+    }
+
+    .vignova-loading-art {
+        display: none !important;
+    }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   "Already generated" confirmation
+   ═══════════════════════════════════════════════════════════════════════ */
+.vignova-overlay-notice-icon {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 64px !important;
+    height: 64px !important;
+    margin: 8px auto 16px !important;
+    border-radius: 50% !important;
+    background: #efeafd !important;
+    color: #5b21d6 !important;
+}
+
+.vignova-overlay-notice-icon svg {
+    display: block !important;
+    width: 30px !important;
+    height: 30px !important;
+}
+
+.vignova-overlay-success-sub strong {
+    font-weight: 700 !important;
+    color: #14142e !important;
+}
+
+.vignova-dup-list {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    justify-content: center !important;
+    gap: 10px !important;
+    list-style: none !important;
+    margin: 0 0 16px !important;
+    padding: 0 !important;
+}
+
+.vignova-dup-item {
+    display: flex !important;
+    align-items: center !important;
+    gap: 9px !important;
+    margin: 0 !important;
+    padding: 10px 15px 10px 10px !important;
+    background: #f6f4fe !important;
+    border: 1px solid #e8e4fb !important;
+    border-radius: 12px !important;
+    font-size: 14px !important;
+    font-weight: 700 !important;
+    line-height: 1 !important;
+    color: #14142e !important;
+    list-style: none !important;
+}
+
+.vignova-dup-icon {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    flex: 0 0 30px !important;
+    width: 30px !important;
+    height: 30px !important;
+    border-radius: 9px !important;
+    background: #e2d9fd !important;
+    color: #5b21d6 !important;
+}
+
+.vignova-dup-icon svg {
+    display: block !important;
+    width: 16px !important;
+    height: 16px !important;
+}
+
+.vignova-dup-note {
+    margin: 0 auto 20px !important;
+    max-width: 420px !important;
+    font-size: 13.5px !important;
+    line-height: 1.5 !important;
+    color: #4a4f6a !important;
+}

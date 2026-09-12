@@ -677,7 +677,7 @@ function AtsScoreContent() {
                                                         onChange={() => setSelectedJobId(job.id)}
                                                         className="mt-1 h-4 w-4 shrink-0 accent-[var(--primary)]"
                                                     />
-                                                    <CompanyLogo company={job.company} jobUrl={(job as any).jobUrl} size={40} rounded="rounded-xl" />
+                                                    <CompanyLogo company={job.company} jobUrl={(job as any).jobUrl} logoUrl={(job as any).companyLogo} size={40} rounded="rounded-xl" />
                                                     <span className="flex-1 min-w-0">
                                                         <span className="flex items-start justify-between gap-3">
                                                             <span className="min-w-0">

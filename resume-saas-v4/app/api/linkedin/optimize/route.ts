@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { callBackend } from "@/lib/career-ops";
+import { sanitizeLinkedInProfile } from "@/lib/linkedin-skills";
 
 export const maxDuration = 300;
 
@@ -50,5 +51,5 @@ export async function POST(req: NextRequest) {
         );
     }
 
-    return NextResponse.json(result.data);
+    return NextResponse.json(sanitizeLinkedInProfile(result.data));
 }

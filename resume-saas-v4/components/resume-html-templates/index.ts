@@ -30,6 +30,9 @@ export { CambridgeTemplate, CAMBRIDGE_STYLES, generateCambridgeHtml } from './Ca
 export { BerlinTemplate, BERLIN_STYLES, generateBerlinHtml } from './BerlinTemplate';
 export { GenevaTemplate, GENEVA_STYLES, generateGenevaHtml } from './GenevaTemplate';
 export { MilanoTemplate, MILANO_STYLES, generateMilanoHtml } from './MilanoTemplate';
+// The layout the generator writes for
+export { SignatureTemplate, SIGNATURE_STYLES, generateSignatureHtml } from './SignatureTemplate';
+export { MeridianTemplate, MERIDIAN_STYLES, generateMeridianHtml } from './MeridianTemplate';
 
 export type { HtmlTemplateProps } from './BaseTemplate';
 export { getSettings, getCssVariables, BaseWrapper, BASE_STYLES } from './BaseTemplate';
@@ -60,6 +63,8 @@ import { generateCambridgeHtml } from './CambridgeTemplate';
 import { generateBerlinHtml } from './BerlinTemplate';
 import { generateGenevaHtml } from './GenevaTemplate';
 import { generateMilanoHtml } from './MilanoTemplate';
+import { generateSignatureHtml } from './SignatureTemplate';
+import { generateMeridianHtml } from './MeridianTemplate';
 
 export type TemplateId =
     | 'classic'
@@ -86,7 +91,9 @@ export type TemplateId =
     | 'cambridge'
     | 'berlin'
     | 'geneva'
-    | 'milano';
+    | 'milano'
+    | 'signature'
+    | 'meridian';
 
 /**
  * Map of template IDs to their HTML generator functions
@@ -117,6 +124,8 @@ export const HTML_TEMPLATE_GENERATORS: Record<TemplateId, (data: any, designSett
     berlin: generateBerlinHtml,
     geneva: generateGenevaHtml,
     milano: generateMilanoHtml,
+    signature: generateSignatureHtml,
+    meridian: generateMeridianHtml,
 };
 
 /**

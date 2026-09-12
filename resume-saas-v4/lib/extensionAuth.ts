@@ -58,10 +58,11 @@ export async function getExtensionUser(req: Request) {
     // Fetch user from DB
     const user = await db.users.findUnique({
         where: { id: payload.userId },
-        select: { id: true, email: true, full_name: true, extensionSettings: true },
+        select: { id: true, email: true, full_name: true, extensionSettings: true, status: true },
     });
 
     if (!user) return { error: "User not found", status: 401 };
+    if (user.status !== "ACTIVE") return { error: "This account is not active. Contact Vignova support.", status: 403 };
 
     // Check subscription and extension access
     const found = await db.subscriptions.findFirst({
@@ -73,7 +74,9 @@ export async function getExtensionUser(req: Request) {
     // match score and the profile lookup all went dead for anyone whose row
     // had not been created. Treated as FREE instead; the paid routes check the
     // plan themselves via checkAiAccess.
-    const subscription = found ?? {
+    const expired = found?.expires_at && found.expires_at.getTime() <= Date.now();
+    const subscription = found ? (expired ? { ...found, plan_type: "FREE", credits_remaining: 0,
+        has_multi_profile: false, has_unlimited_resumes: false } : found) : {
         id: "",
         user_id: user.id,
         plan_type: "FREE",
@@ -89,41 +92,7 @@ export async function getExtensionUser(req: Request) {
         updated_at: new Date(),
     };
 
-    if (!found) {
-        return { user, subscription, error: null, status: 200 };
-    }
-
-    // 3-tier extension access check
-    let hasAccess = subscription.has_extension_access;
-
-    if (!hasAccess) {
-        // Check the plan_configs table
-        const planConfig = await db.plan_configs.findUnique({
-            where: { plan_type: subscription.plan_type },
-        });
-        if (planConfig?.has_extension_access) {
-            hasAccess = true;
-            await db.subscriptions.update({
-                where: { id: subscription.id },
-                data: { has_extension_access: true },
-            });
-        }
-    }
-
-    if (!hasAccess) {
-        // Fallback: PRO and PREMIUM always get access
-        if (subscription.plan_type === "PRO" || subscription.plan_type === "PREMIUM") {
-            hasAccess = true;
-            await db.subscriptions.update({
-                where: { id: subscription.id },
-                data: { has_extension_access: true },
-            });
-        }
-    }
-
-    // All users get extension access.
-    // Premium feature gating is handled in the extension popup UI itself.
-
+    // Free accounts can use the extension. Every paid endpoint checks current entitlements.
     return {
         user,
         subscription,

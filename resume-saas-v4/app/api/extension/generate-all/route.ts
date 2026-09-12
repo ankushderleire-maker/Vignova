@@ -1,12 +1,17 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { toResumeData } from "@/lib/tailoredResume";
 import { getExtensionUser } from "@/lib/extensionAuth";
 import { getTemplateGenerator } from "@/components/resume-html-templates";
 import { generatePdfFromHtml } from "@/lib/pdf/puppeteer";
 import { withCors, handleCorsOptions } from "@/lib/extensionCors";
 import { findExistingWork, findJobByUrl, duplicateResponse } from "@/lib/extensionDuplicate";
-import { spendCredit, creditBalance } from "@/lib/credits";
+import { spendCredit, refundCredit } from "@/lib/credits";
 import { checkAiAccess } from "@/lib/extensionPlan";
+import { callBackend } from "@/lib/career-ops";
+import { jsonObject } from "@/lib/extensionDashboard";
+
+export const maxDuration = 120;
 
 export async function OPTIONS() {
     return handleCorsOptions();
@@ -21,6 +26,7 @@ export async function OPTIONS() {
  * Returns: { pdfBase64, coverLetter, draftEmail, credits_remaining, ... }
  */
 export async function POST(req: Request) {
+    let reservedFor: string | null = null;
     try {
         // ─── 1. Auth ───
         const auth = await getExtensionUser(req);
@@ -76,7 +82,12 @@ export async function POST(req: Request) {
             ));
         }
 
-        const masterProfile = profile.parsed_data as any;
+        const masterProfile = jsonObject(profile.parsed_data);
+        const focus = typeof hint === "string" ? hint.trim().slice(0, 500) : "";
+        const generationDescription = focus ? `${jobDescription}\n\nCandidate focus: ${focus}. Only emphasize facts supported by the profile.` : jobDescription;
+        const spent = await spendCredit(userId);
+        if (!spent.ok) return withCors(NextResponse.json({ error: "You're out of credits.", upgradeRequired: true, outOfCredits: true }, { status: 402 }));
+        reservedFor = userId;
 
         // ─── 6. Save Job ───
         // Regenerating updates the row we already have. Creating a second one
@@ -101,122 +112,12 @@ export async function POST(req: Request) {
                 },
             });
 
-        // ─── 7. Build profile context (shared by cover letter & email) ───
-        const fullName = `${masterProfile.first_name || masterProfile.fullName || ""} ${masterProfile.last_name || ""}`.trim();
-        const currentTitle = masterProfile.experience?.[0]?.role || masterProfile.experience?.[0]?.title || "";
-        const currentCompany = masterProfile.experience?.[0]?.company || "";
-        const email = masterProfile.email || masterProfile.contact?.email || "";
-        const phone = masterProfile.phone || masterProfile.contact?.phone || "";
-
-        const skillsList = Array.isArray(masterProfile.skills)
-            ? masterProfile.skills.join(", ")
-            : typeof masterProfile.skills === "string"
-                ? masterProfile.skills
-                : typeof masterProfile.skills === "object" && masterProfile.skills?.technical
-                    ? (Array.isArray(masterProfile.skills.technical) ? masterProfile.skills.technical.join(", ") : masterProfile.skills.technical)
-                    : "";
-
-        const experienceSummary = Array.isArray(masterProfile.experience)
-            ? masterProfile.experience.slice(0, 3).map((e: any) => `${e.role || e.title || ""} at ${e.company || ""}`).join("; ")
-            : "";
-
-        const educationSummary = Array.isArray(masterProfile.education)
-            ? masterProfile.education.map((e: any) => `${e.degree || ""} from ${e.school || ""}`).join("; ")
-            : "";
-
-        // ─── 8. Parallel generation: Resume + Cover Letter + Email ───
-        const OLLAMA_BASE_URL = process.env.OLLAMA_BASE_URL || "http://localhost:11434";
-        const OLLAMA_MODEL = process.env.OLLAMA_MODEL || "llama3.2";
-        const AI_BACKEND_URL = process.env.AI_BACKEND_URL || "http://localhost:8000";
-
-        const jdSnippet = jobDescription.substring(0, 3000);
-
-        // Cover letter prompt
-        const coverLetterPrompt = `Write a professional, compelling cover letter for the following job application.
-
-APPLICANT:
-Name: ${fullName}
-Current Role: ${currentTitle} at ${currentCompany}
-Skills: ${skillsList}
-Experience: ${experienceSummary}
-Education: ${educationSummary}
-
-JOB:
-Title: ${jobTitle || "the position"}
-Company: ${company || "the company"}
-Description: ${jdSnippet}
-
-INSTRUCTIONS:
-- Write a professional cover letter (3-4 paragraphs)
-- Highlight relevant skills and experience that match the job description
-- Show enthusiasm and cultural fit
-- Keep it concise (250-350 words)
-- Do NOT include addresses or date headers
-- Start with "Dear Hiring Manager," or similar
-- End with a professional closing
-- Output ONLY the cover letter text, no extra commentary`;
-
-        // Email prompt
-        const emailPrompt = `Write a concise, professional application email for the following job.
-
-APPLICANT:
-Name: ${fullName}
-Current Role: ${currentTitle} at ${currentCompany}
-Email: ${email}
-Phone: ${phone}
-
-JOB:
-Title: ${jobTitle || "the position"}
-Company: ${company || "the company"}
-Description: ${jdSnippet}
-
-INSTRUCTIONS:
-- Write a short, professional email (150-200 words) to apply for this job
-- Subject line format: "Application for [Job Title] — [Your Name]"
-- Start with a brief, engaging opening
-- Mention 2-3 key qualifications that match
-- Express enthusiasm for the role
-- Close professionally with contact info
-- Format it as:
-  Subject: ...
-  
-  [email body]
-  
-  Best regards,
-  ${fullName}
-  ${email}${phone ? "\n  " + phone : ""}
-- Output ONLY the email, no extra commentary`;
-
-        // Run all 3 in parallel
+        // All outputs use the same configured AI backend and the active profile.
+        const generationBody = { jobDescription: generationDescription, masterProfile };
         const [resumeResult, coverLetterResult, emailResult] = await Promise.allSettled([
-            // Resume generation (via AI backend)
-            fetch(`${AI_BACKEND_URL}/api/generate-tailored-resume`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ jobDescription, masterProfile }),
-            }),
-            // Cover letter (via Ollama)
-            fetch(`${OLLAMA_BASE_URL}/api/generate`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    model: OLLAMA_MODEL,
-                    prompt: coverLetterPrompt,
-                    stream: false,
-                    options: { temperature: 0.7, num_predict: 800 },
-                }),
-            }),
-            // Email draft (via Ollama)
-            fetch(`${OLLAMA_BASE_URL}/api/generate`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    model: OLLAMA_MODEL,
-                    prompt: emailPrompt,
-                    stream: false,
-                    options: { temperature: 0.7, num_predict: 500 },
-                }),
-            }),
+            callBackend<any>("/api/generate-tailored-resume", { method: "POST", timeoutMs: 120000, body: generationBody, headers: { "X-Client-Id": userId } }),
+            callBackend<{ response: string }>("/api/generate-cover-letter", { method: "POST", timeoutMs: 90000, body: generationBody, headers: { "X-Client-Id": userId } }),
+            callBackend<{ response: string }>("/api/generate-draft-email", { method: "POST", timeoutMs: 90000, body: generationBody, headers: { "X-Client-Id": userId } }),
         ]);
 
         // ─── 9. Process resume result ───
@@ -224,57 +125,11 @@ INSTRUCTIONS:
         let resumeData = null;
         let savedResume = null;
 
-        if (resumeResult.status === "fulfilled" && resumeResult.value.ok) {
-            const aiResult = await resumeResult.value.json();
+        if (resumeResult.status === "fulfilled" && resumeResult.value.ok && resumeResult.value.data?.data) {
+            const aiResult = resumeResult.value.data;
             const aiData = aiResult.data;
 
-            resumeData = {
-                fullName: aiData.fullName || masterProfile.fullName,
-                jobTitle: aiData.jobTitle || jobTitle,
-                contact: {
-                    email: aiData.email || masterProfile.email,
-                    phone: aiData.phone || masterProfile.phone,
-                    location: aiData.location || masterProfile.location || "",
-                    linkedin: aiData.linkedin || masterProfile.linkedin || "",
-                    website: aiData.website || "",
-                    // The profile form collects a GitHub URL and every template can now
-                    // show one, but it was never copied into the contact block, so what
-                    // the user typed never reached the page.
-                    github: aiData.github || masterProfile.github || "",
-                },
-                summary: aiData.summary,
-                skills: aiData.skills?.technical
-                    ? (Array.isArray(aiData.skills.technical)
-                        ? aiData.skills.technical
-                        : aiData.skills.technical.split(",").map((s: string) => s.trim()))
-                    : [],
-                experience: aiData.experience?.map((exp: any) => ({
-                    id: exp.id || Math.random().toString(),
-                    company: exp.company,
-                    role: exp.role,
-                    startDate: exp.startDate,
-                    endDate: exp.endDate,
-                    description: Array.isArray(exp.description) ? exp.description : [exp.description],
-                    location: exp.location || "",
-                })) || [],
-                projects: aiData.projects
-                    ? aiData.projects.map((proj: any) => ({
-                        id: proj.id || Math.random().toString(),
-                        name: proj.name,
-                        techStack: proj.techStack,
-                        description: Array.isArray(proj.description) ? proj.description : [proj.description],
-                        link: proj.link || "",
-                    }))
-                    : [],
-                education: aiData.education?.map((edu: any) => ({
-                    id: edu.id || Math.random().toString(),
-                    school: edu.school,
-                    degree: edu.degree,
-                    field: edu.field,
-                    startDate: edu.startDate || "",
-                    endDate: edu.endDate || "",
-                })) || [],
-            };
+            resumeData = toResumeData(aiData, masterProfile, jobTitle);
 
             // Save resume to DB
             savedResume = await db.generatedResume.create({
@@ -290,7 +145,7 @@ INSTRUCTIONS:
 
             // Generate PDF
             try {
-                let templateId = "classic";
+                let templateId = "signature";
                 const settings = (user as any).extensionSettings;
                 if (settings) {
                     const { mode, templateId: specificId, templateIds } = settings;
@@ -318,15 +173,15 @@ INSTRUCTIONS:
         // ─── 10. Process cover letter result ───
         let coverLetter = null;
         if (coverLetterResult.status === "fulfilled" && coverLetterResult.value.ok) {
-            const clData = await coverLetterResult.value.json();
-            coverLetter = clData.response?.trim() || null;
+            const clData = coverLetterResult.value.data;
+            coverLetter = clData?.response?.trim() || null;
         }
 
         // ─── 11. Process email result ───
         let draftEmail = null;
         if (emailResult.status === "fulfilled" && emailResult.value.ok) {
-            const emData = await emailResult.value.json();
-            draftEmail = emData.response?.trim() || null;
+            const emData = emailResult.value.data;
+            draftEmail = emData?.response?.trim() || null;
         }
 
         // ─── 12. Save cover letter and email to the job ───
@@ -348,6 +203,7 @@ INSTRUCTIONS:
         // three generations failed still cost a credit and then answered
         // 502.
         if (!resumeData && !coverLetter && !draftEmail) {
+            await refundCredit(userId, "extension application pack generation failed"); reservedFor = null;
             await db.jobApplication.update({
                 where: { id: job.id },
                 data: { status: "SAVED" },
@@ -363,16 +219,14 @@ INSTRUCTIONS:
         }
 
         // ─── 14. Update job status ───
-        // Ahead of the charge, and tolerant of failure: a job row that will
-        // not update is not worth landing in the catch below with the
-        // credit already taken.
+        // The generated output is saved; a status update failure should not lose it.
         await db.jobApplication.update({
             where: { id: job.id },
             data: { status: "SAVED" },
         }).catch((err) => console.error("[EXTENSION_GENERATE_ALL] status update failed", err));
 
-        // ─── 15. Charge, last, once nothing else can fail ───
-        const spent = await spendCredit(userId);
+        // At least one output is saved; keep the reserved credit.
+        reservedFor = null;
 
         return withCors(NextResponse.json({
             success: true,
@@ -382,10 +236,11 @@ INSTRUCTIONS:
             pdfBase64,
             coverLetter,
             draftEmail,
-            credits_remaining: spent.ok ? spent.remaining : await creditBalance(userId),
+            credits_remaining: spent.remaining,
         }));
 
     } catch (error) {
+        if (reservedFor) await refundCredit(reservedFor, "extension generate-all failed");
         console.error("[GENERATE_ALL]", error);
         return withCors(NextResponse.json({ error: "Internal server error" }, { status: 500 }));
     }

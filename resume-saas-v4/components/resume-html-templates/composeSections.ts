@@ -30,7 +30,7 @@ const SECTION_HEADINGS: Record<string, string[]> = {
     profile: ["professional summary", "summary", "profile", "about", "objective"],
     experience: ["professional experience", "experience", "work experience", "employment"],
     education: ["education", "academic background"],
-    skills: ["skills", "key skills", "technical skills", "core competencies", "expertise"],
+    skills: ["skills", "key skills", "technical skills", "technology skills", "core competencies", "expertise"],
     projects: ["projects", "selected projects", "key projects"],
     certifications: ["certifications", "certificates", "licenses"],
     languages: ["languages"],

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { db } from "@/lib/db";
+import { mergeExtensionSettings } from "@/lib/extensionDashboard";
 
 export async function GET() {
     try {
@@ -40,13 +41,8 @@ export async function POST(req: Request) {
             templateIds: Array.isArray(templateIds) ? templateIds : [],
         };
 
-        const user = await db.users.update({
-            where: { id: (session?.user as any)?.id as string },
-            data: { extensionSettings: settings },
-            select: { extensionSettings: true },
-        });
-
-        return NextResponse.json(user.extensionSettings);
+        const merged = await mergeExtensionSettings((session?.user as any).id, settings);
+        return NextResponse.json(merged);
     } catch (error) {
         console.error("[EXTENSION_SETTINGS_POST]", error);
         return NextResponse.json({ error: "Internal Error" }, { status: 500 });

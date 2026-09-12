@@ -2,7 +2,10 @@
 
 import { useState, useEffect } from "react";
 import { Chrome, Download, Save, Check, LayoutTemplate, Dice5, ListChecks, AlertCircle } from "lucide-react";
-import { AVAILABLE_TEMPLATES } from "@/components/resume-engine/templates";
+// The real registry. The list this used to read predates thirteen of the
+// templates and still names four — minimalist, startup, timeline, sidebar —
+// that no generator exists for, so choosing one silently produced Classic.
+import { TEMPLATES as AVAILABLE_TEMPLATES } from "@/lib/stores/resumeStore";
 import { TemplateThumbnail } from "@/components/resume-engine/TemplateThumbnail";
 import Link from "next/link";
 
@@ -202,7 +205,7 @@ export default function ExtensionPage() {
 
                                                 <div className="p-3 w-full bg-[var(--sidebar-bg)] border-t border-[var(--border-color)]">
                                                     <div className="font-semibold text-sm text-[var(--foreground)]">{t.name}</div>
-                                                    <div className="text-[10px] text-[var(--foreground)]/60 capitalize">{t.type}</div>
+                                                    <div className="text-[10px] text-[var(--foreground)]/60 capitalize">{t.layout === "two" ? "two column" : "single column"}</div>
                                                 </div>
 
                                                 {settings.templateId === t.id && (
@@ -253,7 +256,7 @@ export default function ExtensionPage() {
 
                                                     <div className="p-3 w-full bg-[var(--sidebar-bg)] border-t border-[var(--border-color)]">
                                                         <div className="font-semibold text-sm text-[var(--foreground)]">{t.name}</div>
-                                                        <div className="text-[10px] text-[var(--foreground)]/60 capitalize">{t.type}</div>
+                                                        <div className="text-[10px] text-[var(--foreground)]/60 capitalize">{t.layout === "two" ? "two column" : "single column"}</div>
                                                     </div>
 
                                                     {isSelected && (

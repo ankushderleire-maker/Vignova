@@ -5,8 +5,13 @@ import { getTemplateGenerator } from "@/components/resume-html-templates";
 import { generatePdfFromHtml } from "@/lib/pdf/puppeteer";
 import { withCors, handleCorsOptions } from "@/lib/extensionCors";
 import { findExistingWork, findJobByUrl, duplicateResponse } from "@/lib/extensionDuplicate";
-import { spendCredit, creditBalance } from "@/lib/credits";
+import { spendCredit, refundCredit } from "@/lib/credits";
 import { checkAiAccess } from "@/lib/extensionPlan";
+import { callBackend } from "@/lib/career-ops";
+import { jsonObject } from "@/lib/extensionDashboard";
+import { toResumeData } from "@/lib/tailoredResume";
+
+export const maxDuration = 120;
 
 // CORS preflight
 export async function OPTIONS() {
@@ -27,10 +32,12 @@ export async function OPTIONS() {
  * 4. Call AI backend for tailored resume
  * 5. Format + save resume
  * 6. Generate PDF
- * 7. Deduct credit
+ * A credit is reserved before generation and refunded on failure.
+ * 7. Keep the reservation after successful persistence
  * 8. Return { resumeData, pdfBase64, jobId, resumeId }
  */
 export async function POST(req: Request) {
+    let reservedFor: string | null = null;
     try {
         // ─── 1. Auth Check ───
         const auth = await getExtensionUser(req);
@@ -46,7 +53,7 @@ export async function POST(req: Request) {
 
         // ─── 2. Validate Input ───
         const body = await req.json();
-        const { jobDescription, jobTitle, company, jobUrl, force = false, source = "EXTENSION" } = body;
+        const { jobDescription, jobTitle, company, jobUrl, hint, force = false, source = "EXTENSION" } = body;
 
         if (!jobDescription || !jobTitle || !company) {
             return withCors(NextResponse.json(
@@ -68,7 +75,7 @@ export async function POST(req: Request) {
 
         // ─── 4. Plan and credits ───
         // Tailoring calls a model, so it is Pro-and-up. Free accounts keep
-        // the match score, job tracking and autofill.
+        // the match score and job tracking.
         const denied = checkAiAccess(subscription, "Tailor Resume");
         if (denied) return denied;
 
@@ -95,7 +102,12 @@ export async function POST(req: Request) {
             ));
         }
 
-        const masterProfile = profile.parsed_data as any;
+        const masterProfile = jsonObject(profile.parsed_data);
+        const focus = typeof hint === "string" ? hint.trim().slice(0, 500) : "";
+        const generationDescription = focus ? `${jobDescription}\n\nCandidate focus: ${focus}. Only emphasize facts supported by the profile.` : jobDescription;
+        const spent = await spendCredit(userId);
+        if (!spent.ok) return withCors(NextResponse.json({ error: "You're out of credits.", upgradeRequired: true, outOfCredits: true }, { status: 402 }));
+        reservedFor = userId;
 
         // ─── 6. Save Job to DB ───
         // Regenerating updates the row we already have. Creating a second one
@@ -120,81 +132,20 @@ export async function POST(req: Request) {
                 },
             });
 
-        // ─── 7. Call AI Backend ───
-        const AI_BACKEND_URL = process.env.AI_BACKEND_URL || "http://localhost:8000";
-
-        const aiResponse = await fetch(`${AI_BACKEND_URL}/api/generate-tailored-resume`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                jobDescription,
-                masterProfile,
-            }),
+        // Call the authenticated shared AI service with the active profile.
+        const aiResult = await callBackend<{ data: any }>("/api/generate-tailored-resume", {
+            method: "POST", timeoutMs: 120000, headers: { "X-Client-Id": userId },
+            body: { jobDescription: generationDescription, masterProfile },
         });
-
-        if (!aiResponse.ok) {
-            // Update job status to failed
-            await db.jobApplication.update({
-                where: { id: job.id },
-                data: { status: "SAVED" },
-            });
-            return withCors(NextResponse.json(
-                { error: "AI resume generation failed. Please try again." },
-                { status: 502 }
-            ));
+        if (!aiResult.ok || !aiResult.data?.data) {
+            await db.jobApplication.update({ where: { id: job.id }, data: { status: "SAVED" } }).catch(() => {});
+            await refundCredit(userId, "extension resume generation failed"); reservedFor = null;
+            return withCors(NextResponse.json({ error: "AI resume generation failed. Please try again.", creditCharged: false }, { status: 502 }));
         }
-
-        const aiResult = await aiResponse.json();
-        const aiData = aiResult.data;
+        const aiData = aiResult.data.data;
 
         // ─── 8. Format Resume Data ───
-        const resumeData = {
-            fullName: aiData.fullName || masterProfile.fullName,
-            jobTitle: aiData.jobTitle || jobTitle,
-            contact: {
-                email: aiData.email || masterProfile.email,
-                phone: aiData.phone || masterProfile.phone,
-                location: aiData.location || masterProfile.location || "",
-                linkedin: aiData.linkedin || masterProfile.linkedin || "",
-                website: aiData.website || "",
-                // The profile form collects a GitHub URL and every template can now
-                // show one, but it was never copied into the contact block, so what
-                // the user typed never reached the page.
-                github: aiData.github || masterProfile.github || "",
-            },
-            summary: aiData.summary,
-            skills: aiData.skills?.technical
-                ? (Array.isArray(aiData.skills.technical)
-                    ? aiData.skills.technical
-                    : aiData.skills.technical.split(",").map((s: string) => s.trim()))
-                : [],
-            experience: aiData.experience?.map((exp: any) => ({
-                id: exp.id || Math.random().toString(),
-                company: exp.company,
-                role: exp.role,
-                startDate: exp.startDate,
-                endDate: exp.endDate,
-                description: Array.isArray(exp.description) ? exp.description : [exp.description],
-                location: exp.location || "",
-            })) || [],
-            projects: aiData.projects
-                ? aiData.projects.map((proj: any) => ({
-                    id: proj.id || Math.random().toString(),
-                    name: proj.name,
-                    techStack: proj.techStack,
-                    description: Array.isArray(proj.description) ? proj.description : [proj.description],
-                    link: proj.link || "",
-                }))
-                : [],
-            education: aiData.education?.map((edu: any) => ({
-                id: edu.id || Math.random().toString(),
-                school: edu.school,
-                degree: edu.degree,
-                field: edu.field,
-                startDate: edu.startDate || "",
-                endDate: edu.endDate || "",
-            })) || [],
-        };
+        const resumeData = toResumeData(aiData, masterProfile, jobTitle);
 
         // ─── 9. Save Resume to DB ───
         const savedResume = await db.generatedResume.create({
@@ -212,7 +163,7 @@ export async function POST(req: Request) {
         let pdfBase64 = null;
         try {
             // Determine template based on extension settings
-            let templateId = "classic";
+            let templateId = "signature";
             const settings = (user as any).extensionSettings;
 
             if (settings) {
@@ -244,16 +195,14 @@ export async function POST(req: Request) {
         }
 
         // ─── 11. Update Job Status ───
-        // Ahead of the charge, and tolerant of failure: a job row that will
-        // not update is not worth landing in the catch below with the
-        // credit already taken.
+        // The generated output is saved; a status update failure should not lose it.
         await db.jobApplication.update({
             where: { id: job.id },
             data: { status: "SAVED" }, // Standardize status for dashboard
         }).catch((err) => console.error("[EXTENSION_GENERATE] status update failed", err));
 
-        // ─── 12. Charge, last, once nothing else can fail ───
-        const spent = await spendCredit(userId);
+        // Generated output is persisted; keep the reserved credit.
+        reservedFor = null;
 
         return withCors(NextResponse.json({
             success: true,
@@ -261,10 +210,11 @@ export async function POST(req: Request) {
             resumeId: savedResume.id,
             resumeData,
             pdfBase64,
-            credits_remaining: spent.ok ? spent.remaining : await creditBalance(userId),
+            credits_remaining: spent.remaining,
         }));
 
     } catch (error) {
+        if (reservedFor) await refundCredit(reservedFor, "extension generate failed");
         console.error("[EXTENSION_GENERATE]", error);
         return withCors(NextResponse.json(
             { error: "Internal server error" },

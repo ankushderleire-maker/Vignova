@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getExtensionUser } from "@/lib/extensionAuth";
 import { db } from "@/lib/db";
+import { callBackend } from "@/lib/career-ops";
 import { withCors, handleCorsOptions } from "@/lib/extensionCors";
 
 export const OPTIONS = handleCorsOptions;
@@ -15,8 +16,8 @@ export async function POST(req: Request) {
         const body = await req.json();
         const { jobDescription } = body;
 
-        if (!jobDescription) {
-            return withCors(NextResponse.json({ error: "Missing job description" }, { status: 400 }));
+        if (typeof jobDescription !== "string" || jobDescription.trim().length < 50 || jobDescription.length > 20000) {
+            return withCors(NextResponse.json({ error: "Enter a job description between 50 and 20,000 characters." }, { status: 400 }));
         }
 
         // Fetch User's Primary Profile
@@ -114,31 +115,14 @@ export async function POST(req: Request) {
 
         console.log(`[EXTENSION_SCORE] Sending to Python: Profile Len=${userProfile.length}, JD Len=${jobDescription.length}, Skills=${userSkillsArray.length}`);
 
-        // Call Python Backend
-        const AI_BACKEND_URL = process.env.AI_BACKEND_URL || "http://localhost:8000";
-
-        const scoreRes = await fetch(`${AI_BACKEND_URL}/api/score-job`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                userProfile,
-                jobDescription,
-                userSkills: userSkillsArray
-            })
+        const result = await callBackend<any>("/api/score-job", {
+            method: "POST", timeoutMs: 60000, headers: { "X-Client-Id": auth.user.id },
+            body: { userProfile, jobDescription, userSkills: userSkillsArray },
         });
-
-        if (!scoreRes.ok) {
-            const errText = await scoreRes.text();
-            console.error("Python Scoring API Error:", errText);
-            return withCors(NextResponse.json({ error: "Failed to calculate score. Backend service optional." }, { status: 500 }));
+        if (!result.ok || result.data?.error || !result.data?.breakdown) {
+            return withCors(NextResponse.json({ error: "Keyword analysis is unavailable. Please try again." }, { status: 502 }));
         }
-
-        const scoreData = await scoreRes.json();
-
-        return withCors(NextResponse.json({
-            success: true,
-            ...scoreData
-        }));
+        return withCors(NextResponse.json({ success: true, ...result.data }));
 
     } catch (error) {
         console.error("[EXTENSION_SCORE]", error);

@@ -69,7 +69,7 @@ export const PLACEHOLDER_RESUME_DATA: ResumeData = {
     languages: ["English", "Hindi", "Marathi"]
 };
 
-export type TemplateId = 'modern' | 'classic' | 'creative' | 'professional' | 'minimal' | 'executive' | 'elegant' | 'tech' | 'corporate' | 'luxe' | 'nordic' | 'bold' | 'compact' | 'accent' | 'diamond' | 'cascade' | 'horizon' | 'atlas' | 'prism' | 'chronicle' | 'europass' | 'cambridge' | 'berlin' | 'geneva' | 'milano';
+export type TemplateId = 'modern' | 'classic' | 'creative' | 'professional' | 'minimal' | 'executive' | 'elegant' | 'tech' | 'corporate' | 'luxe' | 'nordic' | 'bold' | 'compact' | 'accent' | 'diamond' | 'cascade' | 'horizon' | 'atlas' | 'prism' | 'chronicle' | 'europass' | 'cambridge' | 'berlin' | 'geneva' | 'milano' | 'signature' | 'meridian';
 
 export interface TemplateMetadata {
     id: TemplateId;
@@ -268,6 +268,20 @@ export const TEMPLATES: TemplateMetadata[] = [
         thumbnail: '/templates/geneva-thumb.png',
     },
     {
+        id: 'signature',
+        layout: "single",
+        name: 'Signature',
+        description: 'Letter-spaced header, grouped skills — our house layout',
+        thumbnail: '/templates/signature-thumb.png',
+    },
+    {
+        id: 'meridian',
+        layout: "single",
+        name: 'Meridian',
+        description: 'Ruled headings, employer under the role, impact lines',
+        thumbnail: '/templates/meridian-thumb.png',
+    },
+    {
         id: 'milano',
         layout: "two",
         name: 'Milano',
@@ -292,7 +306,7 @@ interface ResumeStore {
 
 export const useResumeStore = create<ResumeStore>((set, get) => ({
     resumeData: PLACEHOLDER_RESUME_DATA,
-    selectedTemplate: 'modern',
+    selectedTemplate: 'signature',
     hoveredTemplate: null,
 
     setResumeData: (data) => set({ resumeData: data }),

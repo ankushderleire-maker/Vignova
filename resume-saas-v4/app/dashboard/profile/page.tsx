@@ -5,7 +5,7 @@ import {
   User, Briefcase, GraduationCap, Code2,
   Plus, Trash2, Save, Loader2, Link as LinkIcon,
   Mail, Phone, MapPin, Globe, Layout, X, ChevronDown, Check, Crown, FileText,
-  FolderGit2, Award, Languages, Upload, AlertTriangle, CheckCircle2, AlertCircle, Linkedin
+  FolderGit2, Award, Languages, Upload, AlertTriangle, CheckCircle2, AlertCircle, Linkedin, Trophy
 } from "lucide-react";
 import { DotLottieReact } from '@lottiefiles/dotlottie-react';
 import { linkedInToProfile, type ImportSummary } from "@/lib/linkedin-to-profile";
@@ -16,9 +16,12 @@ type Education = { id: string; school: string; degree: string; field: string; st
 type Project = { id: string; name: string; techStack: string; link: string; description: string; };
 type Certification = { id: string; name: string; issuer: string; date: string; url: string; };
 type Language = { id: string; name: string; proficiency: string; };
+type Achievement = { id: string; title: string; description: string; date: string; };
 
 export type ResumeData = {
   fullName: string; jobTitle: string; email: string; phone: string; location: string; website: string; linkedin: string; github: string;
+  /** Right to work, as it appears in a contact line: "Stamp 1G", "EU Citizen". */
+  workAuthorization: string;
   summary: string;
   skills: { technical: string; soft: string; };
   experience: Experience[];
@@ -26,13 +29,18 @@ export type ResumeData = {
   projects: Project[];
   certifications: Certification[];
   languages: Language[];
+  achievements: Achievement[];
+  /** The references note, usually one line. */
+  references: string;
 };
 
 const INITIAL_STATE: ResumeData = {
   fullName: "", jobTitle: "", email: "", phone: "", location: "", website: "", linkedin: "", github: "",
+  workAuthorization: "",
   summary: "",
   skills: { technical: "", soft: "" },
-  experience: [], education: [], projects: [], certifications: [], languages: []
+  experience: [], education: [], projects: [], certifications: [], languages: [],
+  achievements: [], references: ""
 };
 
 // --- CONTEXT ---
@@ -40,9 +48,9 @@ type ProfileContextType = {
   data: ResumeData;
   updateField: (field: keyof ResumeData, value: string) => void;
   updateNested: (parent: "skills", field: string, value: string) => void;
-  addListItem: (list: "experience" | "education" | "projects" | "certifications" | "languages", item: any) => void;
-  updateListItem: (list: "experience" | "education" | "projects" | "certifications" | "languages", index: number, field: string, value: string) => void;
-  removeListItem: (list: "experience" | "education" | "projects" | "certifications" | "languages", index: number) => void;
+  addListItem: (list: "experience" | "education" | "projects" | "certifications" | "languages" | "achievements", item: any) => void;
+  updateListItem: (list: "experience" | "education" | "projects" | "certifications" | "languages" | "achievements", index: number, field: string, value: string) => void;
+  removeListItem: (list: "experience" | "education" | "projects" | "certifications" | "languages" | "achievements", index: number) => void;
   activeSection: string;
   setActiveSection: (sec: string) => void;
   isSaving: boolean;
@@ -345,15 +353,15 @@ function ProfileProvider({ children }: { children: React.ReactNode }) {
 
   const updateField = (field: keyof ResumeData, value: string) => setData(prev => ({ ...prev, [field]: value }));
   const updateNested = (parent: "skills", field: string, value: string) => setData(prev => ({ ...prev, [parent]: { ...prev[parent], [field]: value } }));
-  const addListItem = (list: "experience" | "education" | "projects" | "certifications" | "languages", item: any) => setData(prev => ({ ...prev, [list]: [...prev[list], item] as any }));
-  const updateListItem = (list: "experience" | "education" | "projects" | "certifications" | "languages", index: number, field: string, value: string) => {
+  const addListItem = (list: "experience" | "education" | "projects" | "certifications" | "languages" | "achievements", item: any) => setData(prev => ({ ...prev, [list]: [...prev[list], item] as any }));
+  const updateListItem = (list: "experience" | "education" | "projects" | "certifications" | "languages" | "achievements", index: number, field: string, value: string) => {
     setData(prev => {
       const arr = [...prev[list]];
       arr[index] = { ...arr[index], [field]: value } as any;
       return { ...prev, [list]: arr };
     });
   };
-  const removeListItem = (list: "experience" | "education" | "projects" | "certifications" | "languages", index: number) => setData(prev => ({ ...prev, [list]: prev[list].filter((_, i) => i !== index) as any }));
+  const removeListItem = (list: "experience" | "education" | "projects" | "certifications" | "languages" | "achievements", index: number) => setData(prev => ({ ...prev, [list]: prev[list].filter((_, i) => i !== index) as any }));
 
   return (
     <ProfileContext.Provider value={{ data, updateField, updateNested, addListItem, updateListItem, removeListItem, activeSection, setActiveSection, isSaving, handleSave, isLoading, profiles, selectedProfileId, setSelectedProfileId, createNewProfile, deleteProfile, loadFromPdf, loadFromLinkedIn, subscription, showFeedback, hideFeedback }}>
@@ -479,6 +487,7 @@ function PersonalInfoForm() {
           <FormInput label="LinkedIn URL" icon={LinkIcon} type="url" maxLength={200} value={data.linkedin} onChange={(e: any) => updateField("linkedin", e.target.value)} />
           <FormInput label="Personal Website" icon={Globe} type="url" maxLength={200} value={data.website} onChange={(e: any) => updateField("website", e.target.value)} />
           <FormInput label="GitHub URL" icon={Code2} type="url" maxLength={200} value={data.github} onChange={(e: any) => updateField("github", e.target.value)} />
+          <FormInput label="Work Authorisation" icon={FileText} maxLength={60} placeholder="e.g. Stamp 1G, EU Citizen, H-1B" value={data.workAuthorization} onChange={(e: any) => updateField("workAuthorization", e.target.value)} />
         </div>
 
         <div className="mt-6 space-y-1 group/textarea">
@@ -779,6 +788,78 @@ function CertificationsForm() {
   );
 }
 
+// --- FORM: ACHIEVEMENTS & REFERENCES ---
+function AchievementsForm() {
+  const { data, addListItem, removeListItem, updateListItem, updateField } = useProfile();
+  return (
+    <div className="space-y-8 animate-slide-up-fade">
+      <div className="flex justify-end items-center sm:items-end">
+        <button onClick={() => addListItem("achievements", { id: Date.now().toString(), title: "", description: "", date: "" })} className="text-xs flex items-center gap-1.5 text-[var(--primary)] hover:bg-[var(--primary)]/10 px-3 py-1.5 rounded-lg transition-colors font-bold">
+          <Plus className="w-4 h-4" /> Add Achievement
+        </button>
+      </div>
+
+      {data.achievements.length === 0 && (
+        <div className="border border-dashed border-[var(--border-color)] bg-gray-50/50 dark:bg-white/5 rounded-2xl p-10 text-center flex flex-col items-center">
+          <Trophy className="w-10 h-10 text-gray-400 mb-3" />
+          <p className="text-[var(--foreground)]/80 font-bold mb-1">No achievements added yet</p>
+          <p className="text-sm text-[var(--text-secondary)]">Awards, recognition, competition results — anything a recruiter would find notable.</p>
+        </div>
+      )}
+
+      <div className="space-y-6">
+        {data.achievements.map((item, i) => (
+          <div key={item.id} className="mt-4 relative group/card transition-all duration-300 bg-[var(--sidebar-bg)] border border-[var(--border-color)] rounded-xl p-5 shadow-sm hover:shadow-md">
+            <div className="flex justify-between items-center mb-5">
+              <h3 className="font-bold text-base text-[var(--foreground)]/90 flex items-center gap-2">
+                <span className="w-7 h-7 rounded-lg bg-[var(--primary)]/10 text-[var(--primary)] text-xs flex items-center justify-center font-bold">{i + 1}</span>
+                Achievement Entry
+              </h3>
+              <button title="Delete Entry" onClick={() => removeListItem("achievements", i)} className="text-[var(--text-secondary)] hover:text-red-500 hover:bg-red-50 p-1.5 rounded-lg transition-all opacity-0 group-hover/card:opacity-100">
+                <Trash2 className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-5">
+              <FormInput label="Title" maxLength={100} placeholder="e.g. Best Performance Award" value={item.title} onChange={(e: any) => updateListItem("achievements", i, "title", e.target.value)} />
+              <FormInput label="Year" maxLength={20} placeholder="e.g. 2023" value={item.date} onChange={(e: any) => updateListItem("achievements", i, "date", e.target.value)} />
+            </div>
+
+            <div className="mt-5 space-y-1 group/textarea">
+              <label className="text-[10px] uppercase font-bold text-gray-500 transition-colors group-focus-within/textarea:text-[var(--primary)] flex items-center gap-1.5 tracking-wider">
+                <Layout className="w-3.5 h-3.5" /> What it was for
+              </label>
+              <textarea
+                maxLength={300}
+                className="w-full bg-transparent border border-[var(--border-color)] rounded-lg px-3 py-2.5 text-sm font-medium text-[var(--foreground)]/90 focus:border-[var(--primary)] focus:ring-1 focus:ring-[var(--primary)]/20 outline-none min-h-[70px] leading-relaxed resize-y placeholder:text-[var(--text-secondary)]/50 transition-all hover:border-gray-400 dark:hover:border-gray-600"
+                value={item.description}
+                onChange={(e) => updateListItem("achievements", i, "description", e.target.value)}
+                placeholder="One line — what you were recognised for."
+              />
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="bg-[var(--sidebar-bg)] border border-[var(--border-color)] rounded-xl p-5 shadow-sm">
+        <div className="space-y-1 group/textarea">
+          <label className="text-[10px] uppercase font-bold text-gray-500 transition-colors group-focus-within/textarea:text-[var(--primary)] flex items-center gap-1.5 tracking-wider">
+            <FileText className="w-3.5 h-3.5" /> References
+          </label>
+          <textarea
+            maxLength={300}
+            className="w-full bg-transparent border border-[var(--border-color)] rounded-lg px-3 py-2.5 text-sm font-medium text-[var(--foreground)]/90 focus:border-[var(--primary)] focus:ring-1 focus:ring-[var(--primary)]/20 outline-none min-h-[70px] leading-relaxed resize-y placeholder:text-[var(--text-secondary)]/50 transition-all hover:border-gray-400 dark:hover:border-gray-600"
+            value={data.references || ""}
+            onChange={(e) => updateField("references", e.target.value)}
+            placeholder="Professional references can be provided upon request."
+          />
+          <p className="text-[11px] text-[var(--text-secondary)] pt-1">Left empty, the section is left off the resume. One line per reference.</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // --- FORM: LANGUAGES ---
 function LanguagesForm() {
   const { data, addListItem, removeListItem, updateListItem } = useProfile();
@@ -831,6 +912,7 @@ const SECTIONS = [
   { id: "Projects", icon: FolderGit2 },
   { id: "Certifications", icon: Award },
   { id: "Languages", icon: Languages },
+  { id: "Achievements", icon: Trophy },
 ];
 
 function InternalSidebar() {
@@ -844,6 +926,7 @@ function InternalSidebar() {
     if (secId === "Projects") return data.projects.length > 0;
     if (secId === "Certifications") return data.certifications.length > 0;
     if (secId === "Languages") return data.languages.length > 0;
+    if (secId === "Achievements") return data.achievements.length > 0 || !!data.references?.trim();
     return false;
   };
 
@@ -1297,6 +1380,7 @@ function MainContent() {
               {activeSection === "Projects" && "Add significant personal or professional projects."}
               {activeSection === "Certifications" && "Add relevant professional certifications."}
               {activeSection === "Languages" && "Add languages you speak and your proficiency."}
+            {activeSection === "Achievements" && "Awards and recognition, and the note about references."}
             </p>
           </div>
         </div>
@@ -1394,6 +1478,7 @@ function MainContent() {
             {activeSection === "Projects" && <ProjectsForm />}
             {activeSection === "Certifications" && <CertificationsForm />}
             {activeSection === "Languages" && <LanguagesForm />}
+            {activeSection === "Achievements" && <AchievementsForm />}
           </div>
         )}
       </div>
