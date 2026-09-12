@@ -42,11 +42,18 @@ export default function InterviewPrepPage() {
 
   // Fetch jobs and profiles for dropdowns
   useEffect(() => {
+    const requestedJobId = new URLSearchParams(window.location.search).get("jobId") || "";
+
     fetch("/api/jobs").then(r => r.json()).then(data => {
       const ok = (j: Job) => j.jobTitle?.trim().length >= 3;
       const list = (data.data || data.jobs || data || []).filter(ok);
       setJobs(list);
-      if (list.length > 0) setSelectedJobId(list[0].id);
+      if (requestedJobId && list.some((job: Job) => job.id === requestedJobId)) {
+        setSource("job");
+        setSelectedJobId(requestedJobId);
+      } else if (list.length > 0) {
+        setSelectedJobId(list[0].id);
+      }
     }).catch(() => setJobs([]));
 
     fetch("/api/profiles").then(r => r.json()).then(data => {
