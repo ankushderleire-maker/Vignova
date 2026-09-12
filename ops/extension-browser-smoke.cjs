@@ -80,7 +80,6 @@ const root = path.resolve(__dirname, '../Browser_Extension');
 
         console.log('Checking keyword badge');
         await boards[0].page.bringToFront();
-        assert.equal(await boards[0].page.$$eval('#vignova-linkedin-container img[src^="chrome-extension://"], .vignova-score-badge img[src^="chrome-extension://"], .vg-match-panel img[src^="chrome-extension://"]', els => els.length), 0);
         await boards[0].page.waitForFunction(()=>document.querySelector('.vignova-score-badge')?.textContent.includes('keywords'),{polling:100});
         await boards[0].page.waitForSelector('.vignova-status-select');
         await boards[0].page.select('.vignova-status-select','SAVED');

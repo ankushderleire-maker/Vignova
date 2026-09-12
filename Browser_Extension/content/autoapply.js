@@ -261,11 +261,14 @@
 
             btn.textContent = "";
             const div = document.createElement("div");
-            div.style.cssText = "width:48px;height:48px;background:linear-gradient(135deg,#f3ecff,#e6f1ff);border-radius:9px;display:grid;place-items:center;color:#fff;";
-            const mark = document.createElement("span");
-            mark.textContent = "V";
-            mark.style.cssText = "width:34px;height:34px;display:grid;place-items:center;border-radius:10px;background:linear-gradient(135deg,#861cf6 0%,#5141f5 48%,#15a9ff 100%);font-weight:900;font-size:21px;line-height:1;font-family:Inter,Arial,sans-serif;";
-            div.appendChild(mark);
+            // The mark is deep violet, so it used to disappear into the
+            // near-black tile that was here. A soft brand tint instead,
+            // matching the injected bar and the overlay.
+            div.style.cssText = "background:linear-gradient(135deg,#f3ecff,#e6f1ff);border-radius:9px;padding:7px;display:flex;align-items:center;justify-content:center;";
+            const img = document.createElement("img");
+            img.src = chrome.runtime.getURL('icons/logo.png');
+            img.style.cssText = "width:34px;height:34px;object-fit:contain;display:block;";
+            div.appendChild(img);
             btn.appendChild(div);
 
             // Vertical Drag logic

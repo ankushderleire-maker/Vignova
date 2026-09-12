@@ -81,15 +81,8 @@
 .vg-match-panel .vg-mp-logo {
     width: 21px;
     height: 21px;
-    display: grid;
-    place-items: center;
+    object-fit: contain;
     border-radius: 7px;
-    background: linear-gradient(135deg, #861cf6 0%, #5141f5 48%, #15a9ff 100%);
-    color: #fff;
-    font-size: 13px;
-    font-weight: 900;
-    line-height: 1;
-    font-family: Inter, Arial, sans-serif;
 }
 
 .vg-match-panel .vg-mp-wordmark {
