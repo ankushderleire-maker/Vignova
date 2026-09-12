@@ -54,7 +54,7 @@ const root = path.resolve(__dirname, '../Browser_Extension');
         }, value);
         const boards = [];
         for (const [name, url, html] of [
-            ['linkedin', 'https://www.linkedin.com/jobs/view/123/', '<div class="job-details-jobs-unified-top-card__title-container"><h1>Machine Learning Engineer</h1></div><div class="company-name">Example Labs</div><div class="location">Dublin, Ireland</div><div class="jobs-description__content">Build machine learning systems with Python and SQL. Work with Docker, Kubernetes, and model evaluation in a collaborative engineering team.</div>'],
+            ['linkedin', 'https://www.linkedin.com/jobs/view/123/', '<aside class="jobs-search-results-list"><img src="https://media.licdn.com/dms/image/v2/archer-company-logo.png" alt="Archer Recruitment"></aside><main class="jobs-search__job-details--container"><div class="job-details-jobs-unified-top-card__container--two-pane"><a href="/company/example-labs"><img src="https://media.licdn.com/dms/image/v2/ey-company-logo.png" alt="EY"></a><div class="job-details-jobs-unified-top-card__title-container"><h1>Machine Learning Engineer</h1></div><a class="job-details-jobs-unified-top-card__company-name" href="/company/example-labs">Example Labs</a><div class="job-details-jobs-unified-top-card__bullet">Dublin, Ireland</div></div><div class="jobs-description__content">Build machine learning systems with Python and SQL. Work with Docker, Kubernetes, and model evaluation in a collaborative engineering team.</div></main>'],
             ['indeed', 'https://www.indeed.com/viewjob?jk=123', '<div class="jobsearch-JobInfoHeader-title-container"><h1>Engineer</h1></div><div id="jobDescriptionText">JavaScript developer</div>'],
         ]) {
             const page = await browser.newPage();
@@ -81,6 +81,12 @@ const root = path.resolve(__dirname, '../Browser_Extension');
         console.log('Checking keyword badge');
         await boards[0].page.bringToFront();
         await boards[0].page.waitForFunction(()=>document.querySelector('.vignova-score-badge')?.textContent.includes('keywords'),{polling:100});
+        await boards[0].page.waitForSelector('.vignova-status-select');
+        await boards[0].page.select('.vignova-status-select','SAVED');
+        await boards[0].page.waitForFunction(()=>document.querySelector('.vignova-status-flash'),{polling:100});
+        const statusCall=await worker.evaluate(()=>globalThis.uiCalls.filter(c=>c.url.endsWith('/job-status')).at(-1));
+        assert.equal(statusCall.body.companyLogo,'https://media.licdn.com/dms/image/v2/ey-company-logo.png');
+        assert.ok(!String(statusCall.body.companyLogo).includes('archer'));
         await boards[0].page.hover('.vignova-score-badge');
         await boards[0].page.waitForSelector('.vg-mp-open');
         assert.equal(await boards[0].page.$eval('.vg-mp-title',e=>e.textContent),'Keyword Score');

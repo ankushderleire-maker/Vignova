@@ -8,7 +8,7 @@ Updated September 12, 2026. **Ready for final QA as an update to the existing Ch
 - Removed **Auto Apply** and **Job Alerts**, their extension handlers, alert backend prototype, alarms permission and optional notification permission.
 - Renamed **Check ATS Score** to **Keyword Score**. The Keywords ring and LinkedIn/Indeed hover badges report matched keywords divided by detected keywords. Removed the hover panel's semantic/domain percentages. Scores describe keyword coverage, not an ATS outcome; different extractors may detect different keyword sets.
 - Monster extraction reads the selected job through a content-script message, including when the dashboard reopens without an activeTab grant. It uses the live Monster job-view selectors and structured JobPosting data. Search results alone show guidance to open a posting or explicitly paste text. Errors no longer silently open blank editors. Saved jobs use the posting URL, not the search URL; equal job titles preserve the user's selected link. When a supported job board exposes an employer logo, the save request includes it and the backend stores the sanitized logo URL.
-- LinkedIn extraction now expands/scrolls the selected job detail pane before reading the description, including `/jobs/search-results/?currentJobId=...` pages. The **Read the current page** button shows an inline reading state and keeps any failure message inside the Change Job dialog.
+- LinkedIn extraction now expands/scrolls the selected job detail pane before reading the description, including `/jobs/search-results/?currentJobId=...` pages. Integrated save/status actions take the employer logo from the selected detail pane instead of the first result in the left list. The **Read the current page** button shows an inline reading state and keeps any failure message inside the Change Job dialog.
 - Recent Jobs falls back to the deployed `/api/extension/recent-jobs` endpoint when `/overview` is unavailable. Weekly activity is hidden until valid statistics exist. The older list uses a neutral Tracked label because it does not provide a status. Loading failures have a retry action.
 - Interview Prep and LinkedIn Optimizer open their existing dashboard workflows after checking current paid access. The extension no longer depends on an undeployed interview API.
 - Autofill discovers an eligible application form in the top page or iframe, fills the current step and stops for user review. It rejects search-only pages, does not click Continue/Submit, and restricts remote responses to supported field actions on observed unmatched fields. Fixed completion status leaving the button stuck on Stop. Users continue and submit applications themselves.
@@ -51,9 +51,9 @@ Unauthenticated GET checks on September 11 are recorded in `ops/artifacts/extens
 - Whole Next.js `tsc --noEmit`: passed.
 - JavaScript syntax, manifest/resources, popup IDs, Python syntax and final ZIP integrity are checked while packaging. Screenshots in `ops/artifacts/extension-v2/` contain synthetic fixture data, not production accounts.
 
-Current test package: `VignovaExtension_v2.0.0_TEST_ONLY.zip`, 39 files, SHA-256 `aa2c24cc77698757472b9f22f9e4cb0b136bf6737e68203323f85c0647b8cbc4`.
+Current test package: `VignovaExtension_v2.0.0_TEST_ONLY.zip`, 39 files, SHA-256 `f4ea2444dd3eeff374f9c6015bb6e5c3755545485aa13c7e1b5bcde6b3ef756a`.
 
-Chrome Web Store update package for the existing listing: `VignovaExtension_v2.0.0.zip`, 39 files, SHA-256 `aa2c24cc77698757472b9f22f9e4cb0b136bf6737e68203323f85c0647b8cbc4`.
+Chrome Web Store update package for the existing listing: `VignovaExtension_v2.0.0.zip`, 39 files, SHA-256 `f4ea2444dd3eeff374f9c6015bb6e5c3755545485aa13c7e1b5bcde6b3ef756a`.
 
 These tests do **not** prove real paid AI generation or a production PDF download. No production deployment, real account writes, application submission or store upload occurred.
 
