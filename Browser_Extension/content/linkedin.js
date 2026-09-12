@@ -55,6 +55,15 @@
         if (text) btn.appendChild(document.createTextNode(" " + text.trim()));
     }
 
+    function createInlineLogo(size = 34) {
+        const logo = document.createElement("span");
+        logo.className = "vignova-inline-logo";
+        logo.textContent = "V";
+        logo.title = "Vignova AI";
+        logo.style.cssText = `width:${size}px;height:${size}px;display:grid;place-items:center;flex:0 0 auto;border-radius:${Math.max(7, Math.round(size * 0.28))}px;background:linear-gradient(135deg,#861cf6 0%,#5141f5 48%,#15a9ff 100%);color:#fff;font-weight:900;font-size:${Math.max(14, Math.round(size * 0.62))}px;line-height:1;font-family:Inter,Arial,sans-serif;margin-left:2px;margin-right:10px;`;
+        return logo;
+    }
+
     const BUTTON_ID = "vignova-linkedin-tailor-btn";
     const LETTER_BUTTON_ID = "vignova-linkedin-letter-btn";
     const CONTAINER_ID = "vignova-linkedin-container";
@@ -143,13 +152,22 @@
 
     // ─── Observe DOM Changes (LinkedIn is SPA) ───
     let _mutationTimer = null;
-    const observer = new MutationObserver(() => {
+    const observer = new MutationObserver((mutations) => {
         if (!hasValidExtensionContext()) {
             observer.disconnect();
             return;
         }
-        // Debounce: coalesce rapid DOM mutations into a single callback
-        if (_mutationTimer) clearTimeout(_mutationTimer);
+
+        // Ignore mutations caused by our own controls. LinkedIn fires telemetry
+        // for repeated third-party DOM churn, so only rescan when its job UI
+        // changes or our bar is missing.
+        const fromVignova = mutations.every(m => {
+            const target = m.target instanceof Element ? m.target : m.target?.parentElement;
+            return target?.closest?.("#vignova-linkedin-container,.vignova-score-badge,.vg-match-panel,.vignova-card-badge");
+        });
+        if (fromVignova) return;
+
+        if (_mutationTimer) return;
         _mutationTimer = setTimeout(() => {
             _mutationTimer = null;
 
@@ -166,7 +184,7 @@
             }
 
             stampJobListCards();
-        }, 300);
+        }, 1200);
     });
 
     observer.observe(document.body, {
@@ -322,10 +340,7 @@
         if (!container) return;
         container.textContent = "";
 
-        const logo = document.createElement("img");
-        logo.src = chrome.runtime.getURL("icons/logo.png");
-        logo.style.cssText = "height:34px;width:auto;object-fit:contain;margin-right:10px;flex:0 0 auto;";
-        container.appendChild(logo);
+        container.appendChild(createInlineLogo());
 
         const note = document.createElement("span");
         note.className = "vignova-update-note";
@@ -409,17 +424,8 @@
         // Canonical, because that is the key the generate handlers write under.
         checkJobState(canonicalJobUrl(), tailorBtn, saveBtn);
 
-        // Add Vignova Branding Logo
-        const logoImg = document.createElement("img");
-        logoImg.src = chrome.runtime.getURL("icons/logo.png");
-        logoImg.style.height = "34px";
-        logoImg.style.width = "auto";
-        logoImg.style.objectFit = "contain";
-        logoImg.style.marginLeft = "2px";
-        logoImg.style.marginRight = "10px";
-        logoImg.style.flex = "0 0 auto";
-        logoImg.title = "Vignova AI";
-        container.appendChild(logoImg);
+        // Add Vignova Branding Logo without a chrome-extension:// image URL.
+        container.appendChild(createInlineLogo());
 
         // 0. Match Score Badge
         const scoreBadge = document.createElement("div");
