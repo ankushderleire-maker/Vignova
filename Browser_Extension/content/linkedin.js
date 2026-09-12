@@ -490,12 +490,29 @@
      * URL itself is the discriminator: company marks carry "company-logo" in
      * the path, faces carry "profile-displayphoto".
      */
-    function scrapeCompanyLogo() {
-        const scope =
+    function selectedJobDetailRoot() {
+        const selectors = [
+            ".jobs-search__job-details--container",
+            ".jobs-details__main-content",
+            ".jobs-search__job-details",
+            ".scaffold-layout__detail",
+            ".job-view-layout",
+            ".jobs-details",
+        ];
+        for (const selector of selectors) {
+            const el = document.querySelector(selector);
+            if (el && el.getClientRects().length > 0) return el;
+        }
+        const topCard =
             document.querySelector(".job-details-jobs-unified-top-card__container--two-pane") ||
-            document.querySelector(".jobs-unified-top-card") ||
             document.querySelector(".job-details-jobs-unified-top-card") ||
-            document;
+            document.querySelector(".jobs-unified-top-card");
+        return topCard?.closest(".jobs-search__job-details--container, .jobs-details__main-content, .jobs-search__job-details, .scaffold-layout__detail, main") || topCard || null;
+    }
+
+    function scrapeCompanyLogo() {
+        const scope = selectedJobDetailRoot();
+        if (!scope) return "";
 
         const images = Array.from(
             scope.querySelectorAll(
@@ -509,6 +526,7 @@
             // Only an image LinkedIn itself labels as a company logo. Taking
             // the next licdn image along would sooner or later put someone's
             // post picture on the card, and a wrong logo is worse than none.
+            // The scope is the selected detail pane, not the left results list.
             if (/company-logo/.test(src)) return src;
         }
         return "";
@@ -791,14 +809,16 @@
     // ─── Scrape Job Data from LinkedIn DOM ───
     async function scrapeLinkedInJob() {
         const jobId = getJobIdFromUrl();
+        const root = selectedJobDetailRoot() || document;
 
         let jobTitleEl =
-            document.querySelector(".t-24.t-bold.inline") ||
-            document.querySelector(".job-details-jobs-unified-top-card__job-title") ||
-            document.querySelector('.job-details-jobs-unified-top-card__job-title-link') ||
-            document.querySelector("h2.t-24") ||
-            document.querySelector("h1.t-24") ||
-            document.querySelector(".jobs-search__job-details--container h2") ||
+            root.querySelector(".t-24.t-bold.inline") ||
+            root.querySelector(".job-details-jobs-unified-top-card__job-title") ||
+            root.querySelector('.job-details-jobs-unified-top-card__job-title-link') ||
+            root.querySelector("h2.t-24") ||
+            root.querySelector("h1.t-24") ||
+            root.querySelector("h1") ||
+            root.querySelector("h2") ||
             document.querySelector(".job-details-jobs-unified-top-card__container--two-pane h2");
 
         if (!jobTitleEl && jobId) {
@@ -810,10 +830,11 @@
         }
         const jobTitle = jobTitleEl?.innerText?.trim() || "Job Role";
 
-        let companyEl = document.querySelector('.job-details-jobs-unified-top-card__company-name') ||
-                        document.querySelector('.jobs-unified-top-card__company-name') ||
-                        document.querySelector('.job-details-jobs-unified-top-card__primary-description a') ||
-                        document.querySelector('.job-details-jobs-unified-top-card__container--two-pane a[href*="/company/"]');
+        let companyEl = root.querySelector('.job-details-jobs-unified-top-card__company-name') ||
+                        root.querySelector('.jobs-unified-top-card__company-name') ||
+                        root.querySelector('.job-details-jobs-unified-top-card__primary-description a[href*="/company/"]') ||
+                        root.querySelector('.jobs-unified-top-card__subtitle-primary-grouping a[href*="/company/"]') ||
+                        root.querySelector('a[href*="/company/"]');
         
         if (!companyEl && jobTitleEl) {
             // Traverse up from jobTitleEl to find a container that also has a company link
@@ -831,22 +852,25 @@
         const company = companyEl?.innerText?.trim() || "Company";
 
         const location =
-            document.querySelector(".job-details-jobs-unified-top-card__bullet")?.innerText?.trim() ||
+            root.querySelector(".job-details-jobs-unified-top-card__bullet")?.innerText?.trim() ||
+            root.querySelector(".job-details-jobs-unified-top-card__primary-description-container")?.innerText?.trim() ||
             "";
 
         let descriptionEl =
-            document.querySelector("#job-details") ||
-            document.querySelector(".jobs-description__content") ||
-            document.querySelector(".jobs-box__html-content") ||
-            document.querySelector("article.jobs-description__container") ||
-            document.querySelector("article") ||
-            document.querySelector('div[class*="description"]') ||
-            document.getElementById("job-details-content") ||
-            document.querySelector('div.job-details-module__content');
+            root.querySelector("#job-details") ||
+            root.querySelector(".jobs-description__content") ||
+            root.querySelector(".jobs-description") ||
+            root.querySelector(".jobs-box__html-content") ||
+            root.querySelector("article.jobs-description__container") ||
+            root.querySelector("[class*='jobs-description']") ||
+            root.querySelector("article") ||
+            root.querySelector('div[class*="description"]') ||
+            root.querySelector("#job-details-content") ||
+            root.querySelector('div.job-details-module__content');
 
         // Fallback for extreme obfuscation: look for the "About the job" heading
         if (!descriptionEl) {
-            const headings = Array.from(document.querySelectorAll("h2"));
+            const headings = Array.from(root.querySelectorAll("h2"));
             const aboutHeading = headings.find(h => h.textContent.toLowerCase().includes("about the job"));
             if (aboutHeading) {
                 // The description is usually the next sibling <p> or wrapped in the parent's parent
@@ -861,7 +885,7 @@
 
         if (descriptionEl) {
             // Attempt to expand
-            const buttons = Array.from(document.querySelectorAll('button'));
+            const buttons = Array.from(root.querySelectorAll('button'));
             const moreBtn = buttons.find(b => {
                 const text = b.innerText?.trim().toLowerCase() || b.textContent?.trim().toLowerCase();
                 return (text === "see more" || text === "show more" || text.includes("more")) &&
