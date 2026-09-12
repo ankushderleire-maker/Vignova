@@ -733,10 +733,29 @@
             $('jobChoices').append(node('p', 'empty', 'Open a posting or paste its description to check keywords.'));
         $('changeJobDialog').showModal();
     };
-    $('useCurrentJobBtn').onclick = () => {
-        $('changeJobDialog').close();
+    $('useCurrentJobBtn').onclick = async () => {
+        const button = $('useCurrentJobBtn');
+        const original = button.innerHTML;
+        button.disabled = true;
+        button.replaceChildren(icon('refresh'), document.createTextNode(' Reading current page...'));
         state.job = null;
-        void analyzeCurrent();
+        try {
+            const job = await readJob();
+            selectJob(job);
+            $('changeJobDialog').close();
+            await analyzeCurrent();
+        }
+        catch (e) {
+            const message = e?.message || 'The job description is not available yet. Open the full posting, wait for it to load, or paste the description.';
+            $('jobChoices').replaceChildren(node('p', 'helper', message));
+            $('openSelectedJobBtn').hidden = !state.selectedJobUrl;
+            if (!$('changeJobDialog').open) $('changeJobDialog').showModal();
+        }
+        finally {
+            button.disabled = false;
+            button.innerHTML = original;
+            VignovaIcons.render(button);
+        }
     };
     $('usePastedJobBtn').onclick = () => {
         $('changeJobDialog').close();
