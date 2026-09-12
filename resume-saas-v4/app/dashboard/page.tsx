@@ -526,7 +526,7 @@ export default function DashboardPage() {
                                         <div className="flex shrink-0 flex-col items-end gap-1.5">
                                             <Chip label={item.type === "interview" ? "Interview" : "Deadline"} tone={item.type === "interview" ? "brand" : "bad"} />
                                             <a
-                                                href={`/dashboard/jobs/${item.job.id}`}
+                                                href={item.type === "interview" ? `/dashboard/interview-prep?jobId=${item.job.id}` : `/dashboard/jobs/${item.job.id}`}
                                                 className="rounded-lg border border-[var(--border-color)] px-2.5 py-1 text-[11px] font-semibold text-[var(--foreground)] transition hover:border-[var(--primary)]/40 hover:text-[var(--primary)]"
                                             >
                                                 {item.type === "interview" ? "Prep" : "View"}
