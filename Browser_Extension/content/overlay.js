@@ -163,7 +163,7 @@ const Vignova_Overlay = {
         return `
             <div class="vignova-overlay-header">
                 <span class="vignova-overlay-brand">
-                    <span class="vignova-overlay-logo">V</span>
+                    <img src="${chrome.runtime.getURL('icons/logo.png')}" alt="" style="width:26px;height:26px;object-fit:contain;">
                     <span class="vignova-overlay-wordmark">VIGNOVA</span>
                 </span>
                 <button class="vignova-overlay-close" id="vignova-close-overlay" aria-label="Close">${VG_ICON.close}</button>

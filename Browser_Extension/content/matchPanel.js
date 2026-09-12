@@ -114,7 +114,14 @@
         // ── Brand row ──
         const brand = el("div", "vg-mp-brand");
         const mark = el("div", "vg-mp-brand-left");
-        const logo = el("span", "vg-mp-logo", "V");
+        const logo = document.createElement("img");
+        try {
+            logo.src = chrome.runtime.getURL("icons/logo.png");
+        } catch {
+            logo.remove();
+        }
+        logo.className = "vg-mp-logo";
+        logo.alt = "";
         mark.appendChild(logo);
         mark.appendChild(el("span", "vg-mp-wordmark", "VIGNOVA"));
         brand.appendChild(mark);
