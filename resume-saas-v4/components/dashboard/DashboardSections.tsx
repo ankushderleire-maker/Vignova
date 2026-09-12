@@ -156,7 +156,7 @@ export function PipelineColumn({
     href: string;
 }) {
     return (
-        <div className="flex flex-col rounded-xl border border-[var(--border-color)] bg-[var(--background)] p-3">
+        <div className="flex min-w-[250px] flex-col rounded-xl border border-[var(--border-color)] bg-[var(--background)] p-3">
             <div className="flex items-center gap-2 mb-3">
                 <span className={`grid place-items-center h-7 w-7 shrink-0 rounded-lg ${accent}`}>
                     <Icon className="h-3.5 w-3.5" />

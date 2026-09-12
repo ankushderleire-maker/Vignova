@@ -431,36 +431,38 @@ export default function DashboardPage() {
                     subtitle="Your job search at a glance"
                     action={<PanelLink href="/dashboard/jobs" />}
                 >
-                    <div className="grid grid-cols-2 2xl:grid-cols-4 gap-3 h-full">
-                        {([
-                            ["Saved", pipeline.saved, Bookmark, "bg-slate-500/12 text-slate-500 dark:text-slate-300", "SAVED"],
-                            ["Applied", pipeline.applied, Send, "bg-blue-500/12 text-blue-600 dark:text-blue-400", "APPLIED"],
-                            ["Interviewing", pipeline.interviewing, Users, "bg-amber-500/12 text-amber-600 dark:text-amber-400", "INTERVIEW"],
-                            ["Offered", pipeline.offered, Award, "bg-emerald-500/12 text-emerald-600 dark:text-emerald-400", "OFFER"],
-                        ] as const).map(([label, list, icon, accent, status]) => (
-                            <PipelineColumn
-                                key={label}
-                                label={label}
-                                count={list.length}
-                                icon={icon}
-                                accent={accent}
-                                href={`/dashboard/jobs?status=${status}`}
-                            >
-                                {list.length === 0 ? (
-                                    <p className="px-2 py-3 text-center text-[10px] text-[var(--text-secondary)]">Nothing here yet.</p>
-                                ) : (
-                                    list.slice(0, 3).map((job) => (
-                                        <PipelineItem
-                                            key={job.id}
-                                            title={job.jobTitle}
-                                            company={job.company}
-                                            when={relative(job.updatedAt || job.createdAt)}
-                                            href={`/dashboard/jobs/${job.id}`}
-                                        />
-                                    ))
-                                )}
-                            </PipelineColumn>
-                        ))}
+                    <div className="-mx-1 overflow-x-auto px-1 pb-2">
+                        <div className="grid min-w-[1048px] grid-cols-4 gap-3">
+                            {([
+                                ["Saved", pipeline.saved, Bookmark, "bg-slate-500/12 text-slate-500 dark:text-slate-300", "SAVED"],
+                                ["Applied", pipeline.applied, Send, "bg-blue-500/12 text-blue-600 dark:text-blue-400", "APPLIED"],
+                                ["Interviewing", pipeline.interviewing, Users, "bg-amber-500/12 text-amber-600 dark:text-amber-400", "INTERVIEW"],
+                                ["Offered", pipeline.offered, Award, "bg-emerald-500/12 text-emerald-600 dark:text-emerald-400", "OFFER"],
+                            ] as const).map(([label, list, icon, accent, status]) => (
+                                <PipelineColumn
+                                    key={label}
+                                    label={label}
+                                    count={list.length}
+                                    icon={icon}
+                                    accent={accent}
+                                    href={`/dashboard/jobs?status=${status}`}
+                                >
+                                    {list.length === 0 ? (
+                                        <p className="px-2 py-3 text-center text-[10px] text-[var(--text-secondary)]">Nothing here yet.</p>
+                                    ) : (
+                                        list.slice(0, 3).map((job) => (
+                                            <PipelineItem
+                                                key={job.id}
+                                                title={job.jobTitle}
+                                                company={job.company}
+                                                when={relative(job.updatedAt || job.createdAt)}
+                                                href={`/dashboard/jobs/${job.id}`}
+                                            />
+                                        ))
+                                    )}
+                                </PipelineColumn>
+                            ))}
+                        </div>
                     </div>
                 </Panel>
             </div>
