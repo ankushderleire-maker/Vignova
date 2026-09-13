@@ -557,11 +557,17 @@ const Vignova_Overlay = {
 
         const feature = info?.feature || "This feature";
         const outOfCredits = !!info?.outOfCredits;
+        // Allowances are metered per bucket, so "Out of credits" is no longer
+        // the whole story — a user can have writing credits left and no
+        // tailoring ones. The server names the bucket it refused on.
+        const BUCKETS = { tailoring: "tailoring", writing: "writing", interview: "interview" };
+        const bucket = BUCKETS[info?.bucket] || "";
+        const outTitle = bucket ? `Out of ${bucket} credits` : "Out of credits";
 
         const body = this.overlay.querySelector(".vignova-overlay-body");
         body.innerHTML = `
             <span class="vignova-overlay-notice-icon">${outOfCredits ? VG_ICON.coins : VG_ICON.spark}</span>
-            <div class="vignova-overlay-success-title">${outOfCredits ? "Out of credits" : feature + " is a Pro feature"}</div>
+            <div class="vignova-overlay-success-title">${outOfCredits ? outTitle : feature + " is a Pro feature"}</div>
             <div class="vignova-overlay-success-sub">${this._toHtml(info?.message || "")}</div>
 
             <ul class="vignova-dup-list">

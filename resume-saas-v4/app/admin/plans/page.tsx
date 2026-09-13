@@ -19,7 +19,12 @@ interface PlanConfig {
     name: string;
     description: string;
     monthly_price: number;
+    /** Legacy single pool, superseded by the three buckets below. */
     credits: number;
+    tailoring_credits: number;
+    writing_credits: number;
+    interview_credits: number;
+    max_profiles: number;
     has_extension_access: boolean;
     has_multi_profile: boolean;
     has_unlimited_resumes: boolean;
@@ -127,6 +132,10 @@ export default function AdminPlansPage() {
                     description: plan.description,
                     monthly_price: plan.monthly_price,
                     credits: plan.credits,
+                    tailoring_credits: plan.tailoring_credits,
+                    writing_credits: plan.writing_credits,
+                    interview_credits: plan.interview_credits,
+                    max_profiles: plan.max_profiles,
                     has_extension_access: plan.has_extension_access,
                     has_multi_profile: plan.has_multi_profile,
                     has_unlimited_resumes: plan.has_unlimited_resumes,
@@ -188,7 +197,11 @@ export default function AdminPlansPage() {
                 {/* Info banner */}
                 <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-4 text-sm text-blue-300">
                     <strong>How it works:</strong> Changes here are saved to the database and immediately sync to the billing page and upgrade logic.
-                    When a user purchases a plan, they get the credits and features configured here.
+                    When a user purchases a plan, they get the allowances and features configured here.
+                    Allowances are metered per bucket rather than from one shared pool, so a cover letter
+                    can cost less than a tailored resume without fractional credits. Changing a number
+                    takes effect on each user's next request: the ceiling moves without wiping what they
+                    have already spent this month.
                 </div>
 
                 {plans.length === 0 ? (
@@ -297,16 +310,69 @@ export default function AdminPlansPage() {
                                             />
                                         </div>
 
-                                        {/* Credits */}
+
+                                        {/* Tailoring credits / month */}
                                         <div>
-                                            <label className="text-xs text-gray-500 mb-1 block">Credits Per Cycle</label>
+                                            <label className="text-xs text-gray-500 mb-1 block">
+                                                Tailoring credits / month <span className="text-gray-600">(-1 = unlimited)</span>
+                                            </label>
                                             <input
                                                 type="number"
-                                                value={current.credits}
+                                                min={-1}
+                                                value={current.tailoring_credits}
                                                 disabled={!isEditing}
-                                                onChange={(e) => setEditingPlan({ ...current, credits: parseInt(e.target.value) || 0 })}
+                                                onChange={(e) => setEditingPlan({ ...current, tailoring_credits: parseInt(e.target.value) })}
                                                 className="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-white text-sm disabled:opacity-50"
                                             />
+                                            <p className="text-[11px] text-gray-600 mt-1">Resume generation. An application pack spends one of these and one writing credit.</p>
+                                        </div>
+
+                                        {/* Writing credits / month */}
+                                        <div>
+                                            <label className="text-xs text-gray-500 mb-1 block">
+                                                Writing credits / month <span className="text-gray-600">(-1 = unlimited)</span>
+                                            </label>
+                                            <input
+                                                type="number"
+                                                min={-1}
+                                                value={current.writing_credits}
+                                                disabled={!isEditing}
+                                                onChange={(e) => setEditingPlan({ ...current, writing_credits: parseInt(e.target.value) })}
+                                                className="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-white text-sm disabled:opacity-50"
+                                            />
+                                            <p className="text-[11px] text-gray-600 mt-1">Cover letters, application emails, recruiter messages and LinkedIn optimization.</p>
+                                        </div>
+
+                                        {/* Interview credits / month */}
+                                        <div>
+                                            <label className="text-xs text-gray-500 mb-1 block">
+                                                Interview credits / month <span className="text-gray-600">(-1 = unlimited)</span>
+                                            </label>
+                                            <input
+                                                type="number"
+                                                min={-1}
+                                                value={current.interview_credits}
+                                                disabled={!isEditing}
+                                                onChange={(e) => setEditingPlan({ ...current, interview_credits: parseInt(e.target.value) })}
+                                                className="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-white text-sm disabled:opacity-50"
+                                            />
+                                            <p className="text-[11px] text-gray-600 mt-1">One credit buys a full set of AI interview questions for one job.</p>
+                                        </div>
+
+                                        {/* Master profiles */}
+                                        <div>
+                                            <label className="text-xs text-gray-500 mb-1 block">
+                                                Master profiles <span className="text-gray-600">(-1 = unlimited)</span>
+                                            </label>
+                                            <input
+                                                type="number"
+                                                min={-1}
+                                                value={current.max_profiles}
+                                                disabled={!isEditing}
+                                                onChange={(e) => setEditingPlan({ ...current, max_profiles: parseInt(e.target.value) })}
+                                                className="w-full bg-black/30 border border-white/10 rounded-lg px-3 py-2 text-white text-sm disabled:opacity-50"
+                                            />
+                                            <p className="text-[11px] text-gray-600 mt-1">Stored profiles allowed. Not a monthly allowance — it is a cap on saved records.</p>
                                         </div>
 
                                         {/* Resume Creation Label */}

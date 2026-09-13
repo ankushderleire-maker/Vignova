@@ -3,12 +3,16 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { requireAdmin } from "@/lib/admin-guard";
 import { db } from "@/lib/db";
+import { getBalances } from "@/lib/credits";
 
 // Fallback plan configs if DB has none
+// Kept only for a database with no plan_configs rows. These numbers used to
+// say PRO 50 / PREMIUM 100 while seed-plans.ts said 40 / 150 — and this is the
+// table that actually ran when someone paid.
 const FALLBACK_PLANS: Record<string, { credits: number; hasExtension: boolean; hasMultiProfile: boolean; hasUnlimited: boolean }> = {
-    FREE: { credits: 3, hasExtension: false, hasMultiProfile: false, hasUnlimited: false },
+    FREE: { credits: 3, hasExtension: true, hasMultiProfile: false, hasUnlimited: false },
     PRO: { credits: 50, hasExtension: true, hasMultiProfile: true, hasUnlimited: false },
-    PREMIUM: { credits: 100, hasExtension: true, hasMultiProfile: true, hasUnlimited: true },
+    PREMIUM: { credits: -1, hasExtension: true, hasMultiProfile: true, hasUnlimited: true },
 };
 
 const BILLING_MONTHS: Record<string, number> = {
@@ -98,8 +102,15 @@ export async function POST(req: Request) {
             });
         }
 
+        // Hand them the new plan's allowances immediately rather than making
+        // them wait for the next period. ensurePeriod() notices that the
+        // configured total changed and raises each bucket's ceiling, keeping
+        // whatever they had already spent this month.
+        const balances = await getBalances(targetUserId, plan_type);
+
         return NextResponse.json({
             success: true,
+            credits: balances,
             subscription: {
                 plan_type: subscription.plan_type,
                 billing_cycle: subscription.billing_cycle,
