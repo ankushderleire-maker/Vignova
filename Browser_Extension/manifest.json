@@ -29,6 +29,7 @@
             "js": [
                 "utils/api.js",
                 "utils/localScorer.js",
+                "utils/score.js",
                 "content/matchPanel.js",
                 "content/overlay.js",
                 "content/linkedin.js"
@@ -48,6 +49,7 @@
             "js": [
                 "utils/api.js",
                 "utils/localScorer.js",
+                "utils/score.js",
                 "content/matchPanel.js",
                 "content/overlay.js",
                 "content/indeed.js"

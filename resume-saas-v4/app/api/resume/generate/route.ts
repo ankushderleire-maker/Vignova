@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { db } from "@/lib/db";
-import { spendCredit } from "@/lib/credits";
+import { spendCredits, creditBalance } from "@/lib/credits";
 
 export const maxDuration = 300;
 
@@ -13,10 +13,14 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // 1. Check credits — do NOT deduct yet
-    const sub = await db.subscriptions.findFirst({ where: { user_id: userId } });
-    if (!sub || sub.credits_remaining <= 0) {
-        return NextResponse.json({ error: "Insufficient Credits" }, { status: 403 });
+    // 1. Check the tailoring allowance — do NOT deduct yet
+    // ensurePeriod() inside creditBalance also refills a bucket left over from
+    // an earlier month.
+    if ((await creditBalance(userId, "tailoring")) <= 0) {
+        return NextResponse.json(
+            { error: "You're out of tailoring credits.", bucket: "tailoring", outOfCredits: true },
+            { status: 403 }
+        );
     }
 
     // 2. Forward request to Python backend
@@ -49,7 +53,7 @@ export async function POST(req: Request) {
     // 3. Generation succeeded — charge for it, atomically and last, so a
     //    concurrent request cannot spend the same credit twice.
     const data = await backendRes.json();
-    await spendCredit(userId);
+    await spendCredits(userId, "tailoring");
 
     return NextResponse.json(data);
 }

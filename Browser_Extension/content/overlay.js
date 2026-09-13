@@ -316,6 +316,9 @@ const Vignova_Overlay = {
     showAllResults(pdfBase64, coverLetter, email, fileName, creditsRemaining, focusTab) {
         this._stopProgress();
         if (!this.overlay) return;
+        // Read by refreshAccountUI(): a credits write must not wipe the pack
+        // the user is reading.
+        this._resultsOpen = true;
 
         const body = this.overlay.querySelector(".vignova-overlay-body");
         body.innerHTML = `
@@ -502,20 +505,39 @@ const Vignova_Overlay = {
             <button class="vignova-overlay-download-btn" id="vignova-dup-again">
                 ${VG_ICON.retry} Generate Again
             </button>
-            <a href="https://app.vignova.io/dashboard/jobs/${encodeURIComponent(info.existing?.jobId || "")}" target="_blank" class="vignova-overlay-view-btn">
+            <button type="button" class="vignova-overlay-view-btn" id="vignova-dup-open">
                 Open What I Have ${VG_ICON.arrow}
-            </a>
+            </button>
             <button class="vignova-overlay-copy-btn" id="vignova-dup-cancel" style="margin-top:12px;">Cancel</button>
         `;
 
         return new Promise((resolve) => {
+            let settled = false;
+            const settle = (value) => {
+                if (settled) return;
+                settled = true;
+                this._pendingDismiss = null;
+                resolve(value);
+            };
+            // Closing the overlay by any other route counts as declining.
+            this._pendingDismiss = settle;
+
+            // settle() first: showLoading() calls remove(), and remove()
+            // auto-settles a pending prompt as declined — doing it the other
+            // way round threw the real answer away.
             body.querySelector("#vignova-dup-again").addEventListener("click", () => {
+                settle(true);
                 this.showLoading();
-                resolve(true);
             });
             body.querySelector("#vignova-dup-cancel").addEventListener("click", () => {
+                settle(false);
                 this.remove();
-                resolve(false);
+            });
+            // "Open What I Have" used to be a link to the dashboard. It now
+            // reopens the existing pack in this same overlay.
+            body.querySelector("#vignova-dup-open")?.addEventListener("click", () => {
+                settle("open");
+                this.showLoading();
             });
         });
     },
@@ -628,7 +650,17 @@ const Vignova_Overlay = {
      * Remove overlay from DOM
      */
     remove() {
+        this._resultsOpen = false;
         this._stopProgress();
+        // A prompt waiting on a click must not hang when the overlay is closed
+        // some other way (the X, the backdrop, a link that navigates away).
+        // handleTailorClick() awaits that promise, so leaving it unsettled left
+        // the button stuck on "Generating..." and isProcessing true forever.
+        if (this._pendingDismiss) {
+            const dismiss = this._pendingDismiss;
+            this._pendingDismiss = null;
+            dismiss(false);
+        }
         if (this.backdrop) {
             this.backdrop.remove();
             this.backdrop = null;
@@ -668,8 +700,19 @@ const Vignova_Generate = {
 
         if (!first || !first.duplicate) return first;
 
-        const goAhead = await Vignova_Overlay.showDuplicate(first);
-        if (!goAhead) return { success: false, cancelled: true };
+        const choice = await Vignova_Overlay.showDuplicate(first);
+
+        // "Open What I Have" — show the existing pack right here rather than
+        // sending the user to the dashboard in a new tab.
+        if (choice === "open") {
+            const opened = await this.showExisting(data.jobUrl, first.existing);
+            return { success: false, cancelled: true, duplicate: true, opened, existing: first.existing };
+        }
+
+        // Declining is not a failure: work exists for this posting, and the
+        // caller needs `existing` to show "Resume Created" rather than
+        // snapping the button back to "Tailor Resume".
+        if (!choice) return { success: false, cancelled: true, duplicate: true, existing: first.existing };
 
         const again = await chrome.runtime.sendMessage({
             type: "API_GENERATE_ALL",
@@ -681,6 +724,54 @@ const Vignova_Generate = {
             return { success: false, handled: true };
         }
         return again;
+    },
+
+    /**
+     * Reopens an already-generated pack in the page overlay.
+     *
+     * The resume PDF is re-rendered from its stored id; the cover letter and
+     * application email come back as text on the job row, which the job-status
+     * read already selects. Nothing here spends a credit.
+     */
+    async showExisting(jobUrl, existing) {
+        Vignova_Overlay.showLoading();
+
+        const [state, doc] = await Promise.all([
+            chrome.runtime.sendMessage({
+                type: "API_GET_JOB_STATE",
+                data: { jobUrl, include: "content" },
+            }).catch(() => null),
+            existing?.resumeId
+                ? chrome.runtime.sendMessage({
+                    type: "API_DOWNLOAD_DOCUMENT",
+                    data: { documentId: existing.resumeId, docType: "resume" },
+                }).catch(() => null)
+                : Promise.resolve(null),
+        ]);
+
+        const pdfBase64 = doc?.pdfBase64 || "";
+        const coverLetter = state?.coverLetterText || "";
+        const draftEmail = state?.draftEmailText || "";
+
+        if (!pdfBase64 && !coverLetter && !draftEmail) {
+            Vignova_Overlay.showError(
+                "Could not load what you already have. Please try again.",
+                null,
+                "Nothing to open"
+            );
+            return false;
+        }
+
+        const fileName = `${(existing?.company || "Resume").replace(/[^a-zA-Z0-9]/g, "_")}_Resume.pdf`;
+        Vignova_Overlay.showAllResults(
+            pdfBase64,
+            coverLetter,
+            draftEmail,
+            fileName,
+            undefined,
+            pdfBase64 ? "resume" : (coverLetter ? "coverletter" : "email")
+        );
+        return true;
     },
 };
 

@@ -5,7 +5,7 @@ import { withCors, handleCorsOptions } from "@/lib/extensionCors";
 import { findJobByUrl } from "@/lib/extensionDuplicate";
 import { checkAiAccess } from "@/lib/extensionPlan";
 import { callBackend } from "@/lib/career-ops";
-import { spendCredit, refundCredit } from "@/lib/credits";
+import { spendCredits, refundCredits } from "@/lib/credits";
 
 export const maxDuration = 120;
 
@@ -24,7 +24,7 @@ export async function POST(req: Request) {
         const { jobTitle, company, jobUrl, description, force = false } = body;
 
         // Writing a letter calls a model, so it is Pro-and-up.
-        const denied = checkAiAccess(auth.subscription, "Cover Letter");
+        const denied = await checkAiAccess(auth.subscription, "Cover Letter", "writing", auth.user!.id);
         if (denied) return denied;
 
         if (!description || description.length < 50) {
@@ -54,7 +54,7 @@ export async function POST(req: Request) {
             return withCors(NextResponse.json({ error: "No profile found" }, { status: 404 }));
         }
 
-        const spent = await spendCredit(user.id);
+        const spent = await spendCredits(user.id, "writing");
         if (!spent.ok) return withCors(NextResponse.json({ error: "You're out of credits.", upgradeRequired: true, outOfCredits: true }, { status: 402 }));
         reservedFor = user.id;
 
@@ -73,14 +73,14 @@ export async function POST(req: Request) {
             body: { jobDescription: `${jobTitle || ""} at ${company || ""}\n\n${description}`, masterProfile: data },
         });
         if (!result.ok) {
-            await refundCredit(user.id, "extension cover letter generation failed");
+            await refundCredits(user.id, "writing", "extension cover letter generation failed");
             reservedFor = null;
             return withCors(NextResponse.json({ error: "Cover letter generation failed. Please try again.", creditCharged: false }, { status: 502 }));
         }
         const coverLetter = result.data?.response?.trim() || "";
 
         if (!coverLetter) {
-            await refundCredit(user.id, "extension cover letter empty response");
+            await refundCredits(user.id, "writing", "extension cover letter empty response");
             reservedFor = null;
             return withCors(NextResponse.json({ error: "Empty response from AI", creditCharged: false }, { status: 500 }));
         }
@@ -120,7 +120,7 @@ export async function POST(req: Request) {
         }));
 
     } catch (error) {
-        if (reservedFor) await refundCredit(reservedFor, "extension cover letter failed");
+        if (reservedFor) await refundCredits(reservedFor, "writing", "extension cover letter failed");
         console.error("[COVER_LETTER]", error);
         return withCors(NextResponse.json({ error: "Internal Error" }, { status: 500 }));
     }

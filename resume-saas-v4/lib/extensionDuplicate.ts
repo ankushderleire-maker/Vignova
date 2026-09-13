@@ -53,6 +53,9 @@ export async function findJobByUrl(userId: string, jobUrl?: string | null) {
             company: true,
             // So a status change can fill in a logo the row is missing.
             companyLogo: true,
+            // The extension's status dropdown renders this, so a posting shows
+            // "Saved" / "Interview" instead of an empty placeholder.
+            status: true,
             coverLetter: true,
             draftEmail: true,
             createdAt: true,

@@ -5,7 +5,7 @@ import { getTemplateGenerator } from "@/components/resume-html-templates";
 import { generatePdfFromHtml } from "@/lib/pdf/puppeteer";
 import { withCors, handleCorsOptions } from "@/lib/extensionCors";
 import { findExistingWork, findJobByUrl, duplicateResponse } from "@/lib/extensionDuplicate";
-import { spendCredit, refundCredit } from "@/lib/credits";
+import { spendCredits, refundCredits } from "@/lib/credits";
 import { checkAiAccess } from "@/lib/extensionPlan";
 import { callBackend } from "@/lib/career-ops";
 import { jsonObject } from "@/lib/extensionDashboard";
@@ -76,7 +76,7 @@ export async function POST(req: Request) {
         // ─── 4. Plan and credits ───
         // Tailoring calls a model, so it is Pro-and-up. Free accounts keep
         // the match score and job tracking.
-        const denied = checkAiAccess(subscription, "Tailor Resume");
+        const denied = await checkAiAccess(subscription, "Tailor Resume", "tailoring", userId);
         if (denied) return denied;
 
         // ─── 5. Fetch Default Master Profile (fallback to any profile) ───
@@ -105,7 +105,7 @@ export async function POST(req: Request) {
         const masterProfile = jsonObject(profile.parsed_data);
         const focus = typeof hint === "string" ? hint.trim().slice(0, 500) : "";
         const generationDescription = focus ? `${jobDescription}\n\nCandidate focus: ${focus}. Only emphasize facts supported by the profile.` : jobDescription;
-        const spent = await spendCredit(userId);
+        const spent = await spendCredits(userId, "tailoring");
         if (!spent.ok) return withCors(NextResponse.json({ error: "You're out of credits.", upgradeRequired: true, outOfCredits: true }, { status: 402 }));
         reservedFor = userId;
 
@@ -139,7 +139,7 @@ export async function POST(req: Request) {
         });
         if (!aiResult.ok || !aiResult.data?.data) {
             await db.jobApplication.update({ where: { id: job.id }, data: { status: "SAVED" } }).catch(() => {});
-            await refundCredit(userId, "extension resume generation failed"); reservedFor = null;
+            await refundCredits(userId, "tailoring", "extension resume generation failed"); reservedFor = null;
             return withCors(NextResponse.json({ error: "AI resume generation failed. Please try again.", creditCharged: false }, { status: 502 }));
         }
         const aiData = aiResult.data.data;
@@ -214,7 +214,7 @@ export async function POST(req: Request) {
         }));
 
     } catch (error) {
-        if (reservedFor) await refundCredit(reservedFor, "extension generate failed");
+        if (reservedFor) await refundCredits(reservedFor, "tailoring", "extension generate failed");
         console.error("[EXTENSION_GENERATE]", error);
         return withCors(NextResponse.json(
             { error: "Internal server error" },

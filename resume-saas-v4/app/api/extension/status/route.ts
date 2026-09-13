@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getExtensionUser } from "@/lib/extensionAuth";
 import { withCors, handleCorsOptions } from "@/lib/extensionCors";
+import { getBalances } from "@/lib/credits";
+import { planLimits } from "@/lib/planLimits";
 
 // CORS preflight
 export async function OPTIONS() {
@@ -13,7 +15,11 @@ export async function OPTIONS() {
  * Returns current user status for the extension popup.
  *
  * Headers: Authorization: Bearer <token>
- * Response: { user, credits_remaining, plan_type, defaultProfile }
+ * Response: { user, plan_type, credits, credits_remaining, defaultProfile }
+ *
+ * `credits` carries every bucket and the reset date — that is what the popup's
+ * usage panel renders. `credits_remaining` is the tailoring bucket, kept so an
+ * extension built before buckets keeps working after this deploys.
  */
 export async function GET(req: Request) {
     try {
@@ -71,11 +77,13 @@ export async function GET(req: Request) {
             is_default: p.is_default,
         }));
 
-        // Plan-specific credit totals
-        const planDefaults: Record<string, number> = { PREMIUM: 150, PRO: 40, FREE: 3 };
-        const planDefault = planDefaults[subscription!.plan_type] || 3;
-        // Use the larger of stored credits_total and plan default (handles stale DB values)
-        const creditsTotal = Math.max(subscription!.credits_total || 0, planDefault);
+        // Allowances come from plan_configs via planLimits, not from a table
+        // hardcoded here. This route used to carry its own {PREMIUM:150, PRO:40,
+        // FREE:3} while seed-plans.ts, api/plans and billing/upgrade each had a
+        // different set, so the number a user saw depended on the screen.
+        const balances = await getBalances(user!.id, subscription!.plan_type);
+        const limits = await planLimits(subscription!.plan_type);
+        const tailoring = balances.buckets.find(b => b.bucket === "tailoring");
 
         return withCors(NextResponse.json({
             user: {
@@ -83,8 +91,18 @@ export async function GET(req: Request) {
                 email: user!.email,
             },
             plan_type: subscription!.plan_type,
-            credits_remaining: subscription!.credits_remaining,
-            credits_total: creditsTotal,
+            credits: balances,
+            limits: {
+                max_profiles: limits.max_profiles,
+                has_extension_access: limits.has_extension_access,
+                has_multi_profile: limits.has_multi_profile,
+                has_linkedin_optimization: limits.has_linkedin_optimization,
+                has_interview_prep: limits.has_interview_prep,
+            },
+            // Legacy fields — the tailoring bucket, for extensions built before
+            // this deploy.
+            credits_remaining: tailoring?.remaining ?? 0,
+            credits_total: tailoring?.total ?? 0,
             defaultProfile: defaultProfile
                 ? {
                     id: defaultProfile.id,

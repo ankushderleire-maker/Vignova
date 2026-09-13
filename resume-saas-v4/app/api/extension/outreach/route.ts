@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { withCors, handleCorsOptions } from "@/lib/extensionCors";
 import { callBackend } from "@/lib/career-ops";
 import { checkAiAccess } from "@/lib/extensionPlan";
+import { spendCredits, refundCredits } from "@/lib/credits";
 
 export const OPTIONS = handleCorsOptions;
 
@@ -71,8 +72,11 @@ export async function POST(req: Request) {
         const action: Action = body.action === "email" ? "email" : "hr-message";
         const { jobTitle, company, jobDescription, recipient, source } = body;
 
-        // Both writers call a model, so they are Pro-and-up.
-        const denied = checkAiAccess(auth.subscription, action === "email" ? "Apply by Email" : "Message HR");
+        // Both writers call a model, so both are metered against the writing
+        // bucket. This route checked the plan but never actually charged, so
+        // recruiter messages and application emails were free on every plan.
+        const feature = action === "email" ? "Apply by Email" : "Message HR";
+        const denied = await checkAiAccess(auth.subscription, feature, "writing", user.id);
         if (denied) return denied;
 
         if (!jobTitle && !jobDescription) {
@@ -86,6 +90,16 @@ export async function POST(req: Request) {
             orderBy: [{ is_default: "desc" }, { created_at: "asc" }],
             select: { parsed_data: true },
         });
+
+        // Reserved before the model runs, refunded below if it fails.
+        const spent = await spendCredits(user.id, "writing");
+        if (!spent.ok) {
+            return withCors(NextResponse.json({
+                error: "You're out of writing credits.",
+                bucket: "writing", outOfCredits: true, upgradeRequired: true,
+                credits_remaining: spent.remaining,
+            }, { status: 402 }));
+        }
 
         const result = await callBackend<any>(ENDPOINTS[action], {
             method: "POST",
@@ -103,6 +117,7 @@ export async function POST(req: Request) {
         });
 
         if (!result.ok) {
+            await refundCredits(user.id, "writing", "extension outreach generation failed");
             return withCors(
                 NextResponse.json(
                     { error: result.error || "The AI writer is unavailable right now." },
@@ -111,7 +126,7 @@ export async function POST(req: Request) {
             );
         }
 
-        return withCors(NextResponse.json(result.data));
+        return withCors(NextResponse.json({ ...result.data, credits_remaining: spent.remaining }));
     } catch (error) {
         console.error("[EXTENSION_OUTREACH]", error);
         return withCors(NextResponse.json({ error: "Could not write that right now." }, { status: 500 }));

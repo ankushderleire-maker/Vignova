@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { db } from "@/lib/db";
-import { spendCredit, creditBalance } from "@/lib/credits";
+import { spendMany, creditBalance } from "@/lib/credits";
 
 export const maxDuration = 300;
 
@@ -13,10 +13,14 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // 1. Check credits
-    const sub = await db.subscriptions.findFirst({ where: { user_id: userId } });
-    if (!sub || sub.credits_remaining <= 0) {
-        return NextResponse.json({ error: "Insufficient Credits" }, { status: 403 });
+    // 1. Check the tailoring allowance
+    // ensurePeriod() inside creditBalance also refills a bucket left over from
+    // an earlier month.
+    if ((await creditBalance(userId, "tailoring")) <= 0) {
+        return NextResponse.json(
+            { error: "You're out of tailoring credits.", bucket: "tailoring", outOfCredits: true },
+            { status: 403 }
+        );
     }
 
     const body = await req.json();
@@ -152,14 +156,16 @@ INSTRUCTIONS:
 
         // Charged last, and atomically: the balance is decided by the
         // database rather than by arithmetic on a value read earlier.
-        const spent = await spendCredit(userId);
+        // Same price as the extension's pack: a resume and the writing that
+        // goes with it, taken together or not at all.
+        const spent = await spendMany(userId, { tailoring: 1, writing: 1 });
 
         return NextResponse.json({
             success: true,
             data: resumeData,
             coverLetter,
             draftEmail,
-            credits_remaining: spent.ok ? spent.remaining : await creditBalance(userId)
+            credits_remaining: await creditBalance(userId, "tailoring")
         });
 
     } catch (error) {

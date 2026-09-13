@@ -5,7 +5,7 @@ import { checkAiAccess } from "@/lib/extensionPlan";
 import { withCors, handleCorsOptions } from "@/lib/extensionCors";
 import { activeExtensionProfile, jsonObject } from "@/lib/extensionDashboard";
 import { callBackend } from "@/lib/career-ops";
-import { spendCredit, refundCredit } from "@/lib/credits";
+import { spendCredits, refundCredits } from "@/lib/credits";
 
 export const OPTIONS = handleCorsOptions;
 export const maxDuration = 120;
@@ -15,7 +15,7 @@ export async function POST(req: Request) {
     try {
         const auth = await getExtensionUser(req);
         if (auth.error || !auth.user) return withCors(NextResponse.json({ error: auth.error }, { status: auth.status }));
-        const denied = checkAiAccess(auth.subscription, "Interview Prep");
+        const denied = await checkAiAccess(auth.subscription, "Interview Prep", "interview", auth.user!.id);
         if (denied) return denied;
         const body = await req.json().catch(() => null);
         if (!body || typeof body.jobTitle !== "string" || !body.jobTitle.trim() || body.jobTitle.length > 200 ||
@@ -26,7 +26,7 @@ export async function POST(req: Request) {
         const profile = await activeExtensionProfile(auth.user.id);
         if (!profile) return withCors(NextResponse.json({ error: "Create a Master Profile before starting interview prep." }, { status: 404 }));
         // Claim the credit before invoking the model, so concurrent requests cannot run for free.
-        const spent = await spendCredit(auth.user.id);
+        const spent = await spendCredits(auth.user.id, "interview");
         if (!spent.ok) return withCors(NextResponse.json({ error: "You're out of credits.", upgradeRequired: true, outOfCredits: true }, { status: 402 }));
         reservedFor = auth.user.id;
         const result = await callBackend<{ questions: { question: string; tip?: string; type?: string }[] }>("/api/interview/questions", {
@@ -43,7 +43,7 @@ export async function POST(req: Request) {
         reservedFor = null;
         return withCors(NextResponse.json({ success: true, questions, interviewId: saved.id, credits_remaining: spent.remaining }));
     } catch (error) {
-        if (reservedFor) await refundCredit(reservedFor, "extension interview generation failed");
+        if (reservedFor) await refundCredits(reservedFor, "interview", "extension interview generation failed");
         console.error("[EXTENSION_INTERVIEW]", error);
         return withCors(NextResponse.json({ error: "Interview prep could not finish. Any reserved credit has been refunded; please try again." }, { status: 502 }));
     }

@@ -6,7 +6,18 @@ import { getTemplateGenerator } from "@/components/resume-html-templates";
 import { generatePdfFromHtml } from "@/lib/pdf/puppeteer";
 import { withCors, handleCorsOptions } from "@/lib/extensionCors";
 import { findExistingWork, findJobByUrl, duplicateResponse } from "@/lib/extensionDuplicate";
-import { spendCredit, refundCredit } from "@/lib/credits";
+import { spendMany, refundMany, getBalances } from "@/lib/credits";
+import type { Bucket } from "@/lib/planLimits";
+
+/**
+ * What one application pack costs.
+ *
+ * A resume plus a cover letter plus an email is three generations, so it is
+ * priced as a tailoring credit and a writing credit rather than one credit for
+ * everything. spendMany takes both inside a transaction: taking the first and
+ * failing on the second would charge for a pack that was never delivered.
+ */
+const PACK_COST: Partial<Record<Bucket, number>> = { tailoring: 1, writing: 1 };
 import { checkAiAccess } from "@/lib/extensionPlan";
 import { callBackend } from "@/lib/career-ops";
 import { jsonObject } from "@/lib/extensionDashboard";
@@ -62,7 +73,7 @@ export async function POST(req: Request) {
         // ─── 4. Plan and credits ───
         // The application pack calls a model three times, so it is
         // Pro-and-up. Free accounts keep the match score and tracking.
-        const denied = checkAiAccess(subscription, "Tailor Resume");
+        const denied = await checkAiAccess(subscription, "Application Pack", ["tailoring", "writing"], userId);
         if (denied) return denied;
 
         // ─── 5. Profile ───
@@ -85,8 +96,16 @@ export async function POST(req: Request) {
         const masterProfile = jsonObject(profile.parsed_data);
         const focus = typeof hint === "string" ? hint.trim().slice(0, 500) : "";
         const generationDescription = focus ? `${jobDescription}\n\nCandidate focus: ${focus}. Only emphasize facts supported by the profile.` : jobDescription;
-        const spent = await spendCredit(userId);
-        if (!spent.ok) return withCors(NextResponse.json({ error: "You're out of credits.", upgradeRequired: true, outOfCredits: true }, { status: 402 }));
+        const spent = await spendMany(userId, PACK_COST);
+        if (!spent.ok) {
+            return withCors(NextResponse.json({
+                error: `You're out of ${spent.bucket} credits.`,
+                bucket: spent.bucket,
+                credits_remaining: spent.remaining,
+                upgradeRequired: true,
+                outOfCredits: true,
+            }, { status: 402 }));
+        }
         reservedFor = userId;
 
         // ─── 6. Save Job ───
@@ -203,7 +222,7 @@ export async function POST(req: Request) {
         // three generations failed still cost a credit and then answered
         // 502.
         if (!resumeData && !coverLetter && !draftEmail) {
-            await refundCredit(userId, "extension application pack generation failed"); reservedFor = null;
+            await refundMany(userId, PACK_COST, "extension application pack generation failed"); reservedFor = null;
             await db.jobApplication.update({
                 where: { id: job.id },
                 data: { status: "SAVED" },
@@ -228,6 +247,8 @@ export async function POST(req: Request) {
         // At least one output is saved; keep the reserved credit.
         reservedFor = null;
 
+        const balances = await getBalances(userId);
+
         return withCors(NextResponse.json({
             success: true,
             jobId: job.id,
@@ -236,11 +257,14 @@ export async function POST(req: Request) {
             pdfBase64,
             coverLetter,
             draftEmail,
-            credits_remaining: spent.remaining,
+            // Legacy field the installed extension still reads, plus the full
+            // per-bucket picture for the usage panel.
+            credits_remaining: balances.buckets.find(b => b.bucket === "tailoring")?.remaining ?? 0,
+            credits: balances,
         }));
 
     } catch (error) {
-        if (reservedFor) await refundCredit(reservedFor, "extension generate-all failed");
+        if (reservedFor) await refundMany(reservedFor, PACK_COST, "extension generate-all failed");
         console.error("[GENERATE_ALL]", error);
         return withCors(NextResponse.json({ error: "Internal server error" }, { status: 500 }));
     }

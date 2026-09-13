@@ -7,6 +7,33 @@
     const clean = (text, limit = 200) => String(text || '').replace(/\s+/g, ' ').trim().slice(0, limit);
     const find = (root, selectors) => selectors.split('|').map(s => Array.from(root.querySelectorAll(s)).find(visible)).find(Boolean);
     const text = (root, selectors) => clean(find(root, selectors)?.innerText);
+    /**
+     * Readable text of an element, without any CSS or JS it happens to contain.
+     *
+     * Indeed's description wrapper (.react-native-html-content) holds two
+     * <style> blocks, and their @layer rules come back in innerText — roughly
+     * 2,600 characters of CSS that were being scored as job keywords, which is
+     * how a real posting came out at 0% match.
+     */
+    /**
+     * Off-screen is not the same as absent.
+     *
+     * Indeed's job pane reports zero client rects while holding the whole
+     * posting, so the visible() gate skipped it and the extractor came back
+     * empty. Content lookups only need the node to be real and not
+     * aria-hidden; rect-based visibility stays for picking between duplicates.
+     */
+    const notHidden = el => !!el && !el.closest('[hidden],[aria-hidden="true"]');
+    const findRich = (root, selectors, min = 1) => selectors.split('|')
+        .map(selector => Array.from(root.querySelectorAll(selector))
+            .filter(notHidden).map(el => richText(el)).find(value => value.length >= min))
+        .find(Boolean) || '';
+    const richText = el => {
+        if (!el) return '';
+        const copy = el.cloneNode(true);
+        copy.querySelectorAll('style,script,noscript,template').forEach(node => node.remove());
+        return (copy.innerText || copy.textContent || '').trim();
+    };
     const isBadTitle = value => {
         const candidate = clean(value, 300).toLowerCase();
         return !candidate || candidate.length < 3 || /^\d+\s+notifications?$/.test(candidate) || candidate === 'jobs based on your preferences' || candidate === 'job role';
@@ -103,7 +130,7 @@
     }
     async function extract() {
         const url = new URL(location.href), monster = /(^|\.)monster\./i.test(url.hostname), linkedin = /(^|\.)linkedin\.com$/i.test(url.hostname);
-        const detail = find(document, '[data-testid="svx-job-view-wrapper"]|[data-testid="job-view"]|#JobView|#jobsearch-ViewjobPaneWrapper|.jobsearch-JobComponent|.jobs-search__job-details--container|.jobs-details__main-content|.job-details-jobs-unified-top-card__container--two-pane|.job-view-layout|.scaffold-layout__detail');
+        const detail = find(document, '[data-testid="svx-job-view-wrapper"]|[data-testid="desktop-job-header"]|[data-testid="job-view"]|#JobView|#jobsearch-ViewjobPaneWrapper|.jobsearch-JobComponent|.jobs-search__job-details--container|.jobs-details__main-content|.job-details-jobs-unified-top-card__container--two-pane|.job-view-layout|.scaffold-layout__detail');
         const root = detail || document;
         await prepareLinkedInDetail(root);
         // A search results page is not a job description. Never copy its list or pick an arbitrary first job.
@@ -114,14 +141,21 @@
         const linkedinJobId = linkedin ? url.searchParams.get('currentJobId') || url.pathname.match(/\/jobs\/view\/(\d+)/)?.[1] || '' : '';
         const titleSelectors = linkedin
             ? '[data-testid="jobTitle"]|.job-details-jobs-unified-top-card__job-title h1|.job-details-jobs-unified-top-card__job-title|.job-details-jobs-unified-top-card__job-title-link|.job-details-jobs-unified-top-card__title-container h1|.job-details-jobs-unified-top-card__title-container h2|.jobs-unified-top-card__job-title|[class*="job-title"]'
-            : '[data-testid="jobTitle"]|.job-details-jobs-unified-top-card__job-title h1|.job-details-jobs-unified-top-card__job-title|.job-details-jobs-unified-top-card__job-title-link|.job-details-jobs-unified-top-card__title-container h1|.job-details-jobs-unified-top-card__title-container h2|.jobs-unified-top-card__job-title|[data-testid="jobsearch-JobInfoHeader-title"]|h1.jobsearch-JobInfoHeader-title|h1|.posting-headline h2';
-        let title = text(root, titleSelectors) || clean(schema?.title);
+            : '[data-testid="jobTitle"]|.job-details-jobs-unified-top-card__job-title h1|.job-details-jobs-unified-top-card__job-title|.job-details-jobs-unified-top-card__job-title-link|.job-details-jobs-unified-top-card__title-container h1|.job-details-jobs-unified-top-card__title-container h2|.jobs-unified-top-card__job-title|[data-testid="vj-job-title"]|[data-testid="vj-job-title-compact"]|[data-testid="jobsearch-JobInfoHeader-title"]|h1.jobsearch-JobInfoHeader-title|h1|.posting-headline h2';
+        let title = text(root, titleSelectors) || clean(findRich(root, titleSelectors, 3)) || clean(schema?.title);
         if (linkedin && isBadTitle(title)) title = titleFromCurrentJobLink(linkedinJobId, root);
-        const company = text(root, '[data-testid="company"]|.job-details-jobs-unified-top-card__company-name|.jobs-unified-top-card__company-name|.job-details-jobs-unified-top-card__primary-description a[href*="/company/"]|.jobs-unified-top-card__subtitle-primary-grouping a[href*="/company/"]|[data-testid="inlineHeader-companyName"]|[data-company-name]|.company-name|.company') || clean(schema?.hiringOrganization?.name);
+        const company = text(root, '[data-testid="company-name"]|[data-testid="company"]|.job-details-jobs-unified-top-card__company-name|.jobs-unified-top-card__company-name|.job-details-jobs-unified-top-card__primary-description a[href*="/company/"]|.jobs-unified-top-card__subtitle-primary-grouping a[href*="/company/"]|[data-testid="inlineHeader-companyName"]|[data-company-name]|.company-name|.company') || clean(findRich(root, '[data-testid="company-name"]|[data-testid="inlineHeader-companyName"]', 2)) || clean(schema?.hiringOrganization?.name);
         const addresses = [].concat(schema?.jobLocation || []).map(place => place?.address).filter(Boolean);
         const address = addresses[0];
-        const jobLocation = text(root, '[data-testid="jobDetailLocation"]|[data-testid="svx-jobview-location-value"]|.job-details-jobs-unified-top-card__primary-description-container|.jobs-unified-top-card__bullet|[data-testid="inlineHeader-companyLocation"]|[data-testid="job-location"]|.location|.posting-categories .location') || [address?.addressLocality, address?.addressRegion, address?.addressCountry].filter(Boolean).join(', ');
-        let description = find(root, '[data-testid="description-clamp-wrapper"]|[data-testid="svx-description-container-inner"]|#jobDescriptionText|#job-details|.jobs-description__content|.jobs-description|.jobs-box__html-content|.jobs-description-content__text|.jobs-description-content|article.jobs-description__container|[data-testid="job-description"]|[class*="jobs-description"]|.job-description|#job-description|.posting-page .content|.section-wrapper')?.innerText || '';
+        const jobLocation = text(root, '[data-testid="text-location"]|[data-testid="jobDetailLocation"]|[data-testid="svx-jobview-location-value"]|.job-details-jobs-unified-top-card__primary-description-container|.jobs-unified-top-card__bullet|[data-testid="inlineHeader-companyLocation"]|[data-testid="job-location"]|.location|.posting-categories .location') || [address?.addressLocality, address?.addressRegion, address?.addressCountry].filter(Boolean).join(', ');
+        let description = findRich(root, '[data-testid="description-clamp-wrapper"]|[data-testid="svx-description-container-inner"]|#jobDescriptionText|.react-native-html-content|#job-details|.jobs-description__content|.jobs-description|.jobs-box__html-content|.jobs-description-content__text|.jobs-description-content|article.jobs-description__container|[data-testid="job-description"]|[class*="jobs-description"]|.job-description|#job-description|.posting-page .content|.section-wrapper', 50);
+        // Indeed's search pane labels the block "Full job description" instead
+        // of giving it a stable id.
+        if (!description) {
+            const heading = Array.from(root.querySelectorAll('[data-testid="vj-job-description-heading"]')).find(notHidden);
+            const near = [heading?.nextElementSibling, heading?.parentElement?.nextElementSibling].filter(Boolean);
+            description = near.map(richText).find(value => value.length >= 50) || '';
+        }
         if (!description && linkedin) description = descriptionFromAboutHeading(root);
         if (!description && schema?.description) description = new DOMParser().parseFromString(schema.description, 'text/html').body.textContent || '';
         if (!description && !monster && !linkedin && title && company) description = find(root, 'article|main')?.innerText || '';

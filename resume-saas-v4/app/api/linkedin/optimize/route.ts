@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { callBackend } from "@/lib/career-ops";
 import { sanitizeLinkedInProfile } from "@/lib/linkedin-skills";
+import { spendCredits, refundCredits } from "@/lib/credits";
 
 export const maxDuration = 300;
 
@@ -31,6 +32,18 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: "Missing analysisId" }, { status: 400 });
     }
 
+    // Metered against the writing bucket. This route called the model and
+    // charged nothing, so profile rewrites were free on every plan while the
+    // extension charged for a cover letter of similar cost. Reserved before
+    // the call and refunded below if it fails.
+    const spent = await spendCredits(userId, "writing");
+    if (!spent.ok) {
+        return NextResponse.json(
+            { error: "You're out of writing credits.", bucket: "writing", outOfCredits: true },
+            { status: 403 }
+        );
+    }
+
     const result = await callBackend<any>("/api/linkedin/optimize", {
         method: "POST",
         timeoutMs: 240_000,
@@ -45,11 +58,15 @@ export async function POST(req: NextRequest) {
     });
 
     if (!result.ok) {
+        await refundCredits(userId, "writing", "linkedin optimization failed");
         return NextResponse.json(
             { error: result.error || "AI optimization failed." },
             { status: result.status || 500 }
         );
     }
 
-    return NextResponse.json(sanitizeLinkedInProfile(result.data));
+    return NextResponse.json({
+        ...sanitizeLinkedInProfile(result.data),
+        credits_remaining: spent.remaining,
+    });
 }
