@@ -6,7 +6,8 @@ const appRequire=require('node:module').createRequire(path.join(app,'package.jso
 const ts=appRequire('typescript');
 function load(file,overrides={}){const filename=path.join(app,file),module={exports:{}};const {outputText}=ts.transpileModule(fs.readFileSync(filename,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020,esModuleInterop:true}});vm.runInThisContext('(function(require,module,exports){'+outputText+'\n})',{filename})(name=>Object.hasOwn(overrides,name)?overrides[name]:appRequire(name),module,module.exports);return module.exports;}
 const cors=load('lib/extensionCors.ts');
-const planLimits=load('lib/planLimits.ts',{'./db':{db:{plan_configs:{findUnique:async()=>null}}},'@/lib/db':{db:{plan_configs:{findUnique:async()=>null}}}});
+const catalog=load('lib/planCatalog.ts');
+const planLimits=load('lib/planLimits.ts',{'./db':{db:{plan_configs:{findUnique:async()=>null}}},'@/lib/db':{db:{plan_configs:{findUnique:async()=>null}}},'./planCatalog':catalog});
 const plan=load('lib/extensionPlan.ts',{
     '@/lib/extensionCors':cors,
     '@/lib/planLimits':planLimits,
@@ -30,7 +31,7 @@ function harness({planType='PRO',balance=4,error=null,existingJob=null}={}){
     db.jobApplication.create=async args=>{calls.push(['createJob',args]);return {id:'job1'};};
     db.jobApplication.update=async args=>{calls.push(['updateJob',args]);return {id:'job1'};};
     const shared=load('lib/extensionDashboard.ts',{'@/lib/db':{db}});
-    const overrides={'@/lib/db':{db},'@/components/resume-html-templates':{getTemplateGenerator:()=>()=>'<html>Resume</html>'},'@/lib/pdf/puppeteer':{generatePdfFromHtml:async()=>Buffer.from('%PDF-1.4 fixture')},'@/lib/extensionDuplicate':{findExistingWork:async()=>null,findJobByUrl:async()=>existingJob,duplicateResponse:()=>({duplicate:true})},'@/lib/tailoredResume':{toResumeData:data=>data},'@/lib/extensionCors':cors,'@/lib/extensionPlan':plan,'@/lib/extensionDashboard':shared,
+    const overrides={'@/lib/db':{db},'@/components/resume-html-templates':{getTemplateGenerator:()=>()=>'<html>Resume</html>'},'@/lib/pdf/puppeteer':{generatePdfFromHtml:async()=>Buffer.from('%PDF-1.4 fixture')},'@/lib/extensionDuplicate':{findExistingWork:async()=>null,findJobByUrl:async()=>existingJob,duplicateResponse:()=>({duplicate:true})},'@/lib/tailoredResume':{toResumeData:data=>data},'@/lib/extensionCors':cors,'@/lib/extensionPlan':plan,'@/lib/extensionDashboard':shared,'@/lib/planCatalog':catalog,
         '@/lib/extensionAuth':{getExtensionUser:async()=>error?{error,status:401}:{user:{id:USER,extensionSettings:settings},subscription:{user_id:USER,plan_type:planType,credits_remaining:balance},status:200}},
         '@/lib/credits':{
             ensurePeriod:async()=>({plan_type:planType,tailoring:50,writing:100,interview:5,max_profiles:5,has_extension_access:true,has_multi_profile:true,has_unlimited_resumes:false,has_linkedin_optimization:true,has_interview_prep:true}),

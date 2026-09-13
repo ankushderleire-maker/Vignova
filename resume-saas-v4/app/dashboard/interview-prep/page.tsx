@@ -4,6 +4,7 @@ import { BrandLockup } from "@/components/BrandLockup";
 import { useState, useEffect, useRef } from "react";
 import { Loader2, Briefcase, User, Lightbulb, AlertCircle, ArrowLeft, Download, History, Plus, Sparkles } from "lucide-react";
 import { useReactToPrint } from "react-to-print";
+import { CREDIT_COSTS, describeCost } from "@/lib/planCatalog";
 
 interface Job { id: string; jobTitle: string; company: string; description?: string; }
 interface Question { question: string; tip: string; type: string; }
@@ -120,15 +121,11 @@ export default function InterviewPrepPage() {
       setActiveCompany(job.company || "");
     }
 
-    let creditTaken = false;
     try {
-      const creditRes = await fetch("/api/credits/deduct", { method: "POST" });
-      if (!creditRes.ok) {
-        if (creditRes.status === 403) throw new Error("Insufficient Credits to perform this action.");
-        throw new Error("Failed to deduct credit.");
-      }
-      creditTaken = true;
-
+      // /api/interview/questions reserves the interview credit itself and
+      // refunds it if generation fails. This page used to reserve one as well,
+      // through /api/credits/deduct with no bucket, so every set of questions
+      // also cost a tailoring credit.
       const res = await fetch("/api/interview/questions", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
@@ -139,35 +136,14 @@ export default function InterviewPrepPage() {
       } catch (parseError) {
         throw new Error("The server took too long or returned an invalid response. Please try again.");
       }
-      if (!res.ok) throw new Error(data.error || data.detail || "Failed to generate questions");
+      if (!res.ok) throw new Error(data.message || data.error || data.detail || "Failed to generate questions");
       if (data.questions && Array.isArray(data.questions)) {
         setQuestions(data.questions);
         setPhase("results");
       } else throw new Error("The AI returned an invalid format. Please try again.");
     } catch (err: any) {
-      // The credit was reserved before the request; give it back.
-      if (creditTaken) await refundCredit("interview-prep: " + (err?.message || "failed"));
       setError(err.message || "An unexpected error occurred.");
       setPhase("setup");
-    }
-  };
-
-  /**
-   * Returns the credit reserved for work that then failed.
-   *
-   * The credit is taken before the generation runs so an empty balance
-   * cannot start expensive work; that only stays fair if a failure hands
-   * it back.
-   */
-  const refundCredit = async (reason: string) => {
-    try {
-      await fetch("/api/credits/refund", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ reason }),
-      });
-    } catch {
-      // Nothing useful to do here; the server logs a failed refund.
     }
   };
 
@@ -241,9 +217,9 @@ export default function InterviewPrepPage() {
               <div className="w-12 h-12 rounded-full bg-[var(--primary)]/10 flex items-center justify-center text-[var(--primary)]">
                 <Sparkles className="w-6 h-6" />
               </div>
-              <h3 className="text-xl font-bold text-[var(--foreground)]">Use 1 Credit?</h3>
+              <h3 className="text-xl font-bold text-[var(--foreground)]">Use {describeCost(CREDIT_COSTS.interviewQuestions)}?</h3>
               <p className="text-sm text-[var(--text-secondary)]">
-                Generating interview questions requires 1 credit to proceed. Do you want to continue?
+                A set of interview questions uses {describeCost(CREDIT_COSTS.interviewQuestions)}. If generation fails, it is returned automatically.
               </p>
               <div className="flex items-center gap-3 w-full pt-2">
                 <button onClick={() => setShowCreditModal(false)} className="flex-1 py-2.5 px-4 rounded-lg font-medium text-[var(--foreground)] bg-[var(--card-border-bg)] hover:bg-[var(--border-color)] transition">

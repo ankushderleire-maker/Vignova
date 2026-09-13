@@ -1,12 +1,22 @@
 import React from 'react';
-import dynamic from 'next/dynamic';
 import styles from './PricingCard.module.css';
 import { Check, X, Loader2 } from 'lucide-react';
-
 import { useRouter } from 'next/navigation';
+import type { AllowanceRow, FeatureRow } from '@/lib/planCatalog';
+
+export interface PricingCardPlan {
+    name: string;
+    description: string;
+    monthlyPrice: number;
+    popular: boolean;
+    /** Credit allowances and profile slots, from planAllowances(). */
+    allowances: AllowanceRow[];
+    /** Everything else the plan includes or leaves out, from planFeatures(). */
+    features: FeatureRow[];
+}
 
 interface PricingCardProps {
-    plan: any;
+    plan: PricingCardPlan;
     planKey: string;
     billingCycle: string;
     isCurrentPlan: boolean;
@@ -17,18 +27,6 @@ interface PricingCardProps {
     loading: boolean;
     totalPrice?: number;
 }
-
-const FEATURE_LABELS: Record<string, string> = {
-    resumeCreation: "Resume Creation",
-    extensionAccess: "Chrome Extension Access",
-    multiProfile: "Multiple Profiles",
-    unlimitedResumes: "Unlimited Resumes",
-    aiOptimization: "ATS Optimization",
-    linkedinOptimization: "AI LinkedIn Profile Optimization",
-    interviewPrep: "AI Interview Generator",
-    templates: "Templates",
-    support: "Support",
-};
 
 export const PricingCard: React.FC<PricingCardProps> = ({
     plan,
@@ -63,7 +61,7 @@ export const PricingCard: React.FC<PricingCardProps> = ({
 
     // Currency-aware formatter
     const fmt = (usd: number) => {
-        if (currency === "INR" && exchangeRate) return `₹${Math.round(usd * exchangeRate).toLocaleString("en-IN")}`;
+        if (currency === "INR" && exchangeRate) return `\u20B9${Math.round(usd * exchangeRate).toLocaleString("en-IN")}`;
         return `$${usd % 1 === 0 ? usd : usd.toFixed(2)}`;
     };
 
@@ -72,7 +70,7 @@ export const PricingCard: React.FC<PricingCardProps> = ({
     const priceDisplay = isFree ? "Free" : fmt(plan.monthlyPrice);
     const cycleLabel = isFree ? "forever" :
         billingCycle === "MONTHLY" ? "per month" :
-            billingCycle === "ANNUAL" ? "per month · billed yearly" : "per month · billed every 6 months";
+            billingCycle === "ANNUAL" ? "per month \u00B7 billed yearly" : "per month \u00B7 billed every 6 months";
 
     // Discount info for the current cycle
     const cycleDiscount = billingCycle === "ANNUAL" ? 20 : billingCycle === "SEMI_ANNUAL" ? 10 : 0;
@@ -81,7 +79,7 @@ export const PricingCard: React.FC<PricingCardProps> = ({
 
     return (
         <div className={`${styles.cardWrapper} ${themeClass} ${isPopular ? styles.popularCard : ''}`}>
-            {isPopular && <div className={styles.popularRibbon}>★ Most Popular</div>}
+            {isPopular && <div className={styles.popularRibbon}>{"\u2605"} Most Popular</div>}
             <div className={styles.innerCard}>
                 {/* Header */}
                 <div className={styles.header}>
@@ -104,29 +102,43 @@ export const PricingCard: React.FC<PricingCardProps> = ({
                     )}
                 </div>
 
-                {/* Features */}
-                <div className={styles.features}>
-                    {Object.entries(plan.features).map(([featureKey, value]) => (
-                        <div key={featureKey} className={styles.featureRow}>
-                            <div className={styles.iconWrapper}>
-                                {typeof value === "boolean" ? (
-                                    value ? (
-                                        <Check className={styles.checkIcon} />
-                                    ) : (
-                                        <X className={styles.xIcon} />
-                                    )
-                                ) : (
-                                    <Check className={styles.checkIcon} />
-                                )}
-                            </div>
-                            <span>
-                                {typeof value === "boolean" ? FEATURE_LABELS[featureKey] : String(value)}
+                {/* Allowances: the numbers the plan is bought for */}
+                <div className={styles.allowances}>
+                    {plan.allowances.map((row) => (
+                        <div
+                            key={row.key}
+                            className={`${styles.allowanceRow} ${row.included ? '' : styles.allowanceMissing}`}
+                        >
+                            <span className={styles.allowanceAmount} aria-hidden={row.unlimited || !row.included}>
+                                {row.amount}
+                            </span>
+                            <span className={styles.allowanceText}>
+                                <span className={styles.allowanceLabel}>{row.label}</span>
+                                {row.included && <span className={styles.allowanceDetail}>{row.detail}</span>}
                             </span>
                         </div>
                     ))}
                 </div>
 
-                {/* CTA Button or PayPal */}
+                {/* Features */}
+                <div className={styles.features}>
+                    {plan.features.map((feature) => (
+                        <div
+                            key={feature.label}
+                            className={`${styles.featureRow} ${feature.included ? '' : styles.featureMissing}`}
+                        >
+                            <div className={styles.iconWrapper}>
+                                {feature.included ? (
+                                    <Check className={styles.checkIcon} aria-label="Included" />
+                                ) : (
+                                    <X className={styles.xIcon} aria-label="Not included" />
+                                )}
+                            </div>
+                            <span>{feature.label}</span>
+                        </div>
+                    ))}
+                </div>
+
                 {/* CTA Button */}
                 <button
                     className={`${styles.ctaButton} ${ctaClass} ${isCurrentPlan || planKey === "FREE" || loading ? styles.ctaDisabled : ''}`}

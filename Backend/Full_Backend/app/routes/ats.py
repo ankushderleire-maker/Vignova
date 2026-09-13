@@ -15,6 +15,7 @@ Production fixes applied:
 import asyncio
 import json
 import logging
+import os
 from functools import partial
 
 import fitz  # PyMuPDF
@@ -225,6 +226,22 @@ _ATS_JD_MAX      = 5_000   # ~1.25k tokens
 _ATS_RESUME_MAX  = 6_000   # ~1.5k tokens
 
 
+INTERNAL_API_KEY = os.environ.get("INTERNAL_API_KEY", "")
+
+
+def _require_internal_auth(request: Request) -> None:
+    """
+    Only the Next.js server may ask for AI insights.
+
+    The backend is publicly reachable and this route calls the model. The
+    Next.js /api/ats/insights route checks the plan and spends a credit first;
+    calling here directly used to skip both.
+    """
+    key = request.headers.get("X-API-Key") or request.headers.get("x-internal-key")
+    if not INTERNAL_API_KEY or key != INTERNAL_API_KEY:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+
 @router.post("/api/enhance-ats-report")
 @limiter.limit("10/minute")
 async def enhance_ats_report(
@@ -233,6 +250,7 @@ async def enhance_ats_report(
     resume_text: str = Form(...),
     ats_scores:  str = Form(...),
 ):
+    _require_internal_auth(request)
     try:
         scores = json.loads(ats_scores)
     except json.JSONDecodeError as e:

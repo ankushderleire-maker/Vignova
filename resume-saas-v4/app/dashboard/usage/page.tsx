@@ -68,6 +68,9 @@ export default function UsagePage() {
         ? new Date(usage.resets_at).toLocaleDateString(undefined, {
               day: "numeric",
               month: "long",
+              // Periods start at midnight UTC; read in local time, a timezone
+              // behind UTC would show the last day of this month instead.
+              timeZone: "UTC",
           })
         : "";
 

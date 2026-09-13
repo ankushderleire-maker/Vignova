@@ -53,8 +53,13 @@ interface DashboardStats {
 
 interface SubscriptionData {
     plan_type: string;
-    credits_remaining: number;
-    credits_total?: number;
+    buckets?: {
+        bucket: "tailoring" | "writing" | "interview";
+        label: string;
+        remaining: number;
+        total: number;
+        unlimited: boolean;
+    }[];
 }
 
 type Job = {
@@ -367,8 +372,7 @@ export default function DashboardPage() {
                 />
                 <SubscriptionCard
                     plan={subscription?.plan_type || "Free"}
-                    creditsRemaining={subscription?.credits_remaining ?? 3}
-                    creditsTotal={subscription?.credits_total}
+                    buckets={subscription?.buckets}
                 />
             </div>
 

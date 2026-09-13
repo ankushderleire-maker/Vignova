@@ -1,6 +1,7 @@
 import { db } from "@/lib/db";
 import {
     BUCKETS,
+    BUCKET_LABELS,
     Bucket,
     PlanLimits,
     allowanceFor,
@@ -280,4 +281,39 @@ export async function spendCredit(userId: string): Promise<SpendResult> {
 /** @deprecated Legacy refund. Use refundCredits(userId, bucket, reason). */
 export async function refundCredit(userId: string, reason: string): Promise<void> {
     return refundCredits(userId, "tailoring", reason, 1);
+}
+
+/**
+ * What a dashboard route answers when a bucket is empty.
+ *
+ * Naming the bucket is the point. With separate allowances a user can have
+ * plenty of writing credits and no tailoring ones, and "You have 0 credits
+ * remaining" left them to work out which.
+ */
+export function outOfCreditsBody(bucket: Bucket, remaining = 0) {
+    const label = BUCKET_LABELS[bucket].toLowerCase();
+    const resets = nextPeriodStart().toLocaleDateString("en-GB", {
+        day: "numeric",
+        month: "long",
+        timeZone: "UTC",
+    });
+    return {
+        error: `You're out of ${label}.`,
+        message: `You've used all your ${label} for this month. They refresh on ${resets}, or you can upgrade for more.`,
+        bucket,
+        outOfCredits: true,
+        credits_remaining: remaining,
+    };
+}
+
+/** What a dashboard route answers when the plan does not include a feature at all. */
+export function notOnPlanBody(feature: string, planType: string) {
+    const plan = planType.charAt(0) + planType.slice(1).toLowerCase();
+    return {
+        error: `${feature} isn't included in the ${plan} plan.`,
+        message: `${feature} isn't included in the ${plan} plan. Upgrade to Pro or Premium to use it.`,
+        upgradeRequired: true,
+        feature,
+        plan: planType,
+    };
 }

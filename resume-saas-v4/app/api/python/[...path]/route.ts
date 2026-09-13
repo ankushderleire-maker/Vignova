@@ -4,6 +4,9 @@ import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 
 export const maxDuration = 300; // 5 minutes just in case
 
+/** Backend paths the browser may reach through this proxy. See the check below. */
+const ALLOWED_PATHS = new Set(["calculate-ats", "saved-jds"]);
+
 export async function POST(req: NextRequest, context: any) {
     const session = await getServerSession(authOptions);
     if (!(session?.user as any)?.id) {
@@ -16,12 +19,17 @@ export async function POST(req: NextRequest, context: any) {
         const pathArray = params?.path || [];
         const path = pathArray.join("/");
 
-        // Defense in depth: this proxy runs under a plain USER session, so it
-        // must never forward to admin-only backend paths. Admin operations go
-        // through the dedicated /api/admin/* routes (which enforce ADMIN role).
+        // Only the free, algorithmic endpoints the dashboard still calls go
+        // through here. This used to forward any non-admin path, so anyone
+        // signed in could reach /api/python/generate-tailored-resume (or the
+        // cover letter, email, interview and ATS-insight generators) directly
+        // and skip the route that checks their plan and charges a credit.
+        // Segments are restricted to plain characters as well: a ".." segment
+        // is resolved by the URL parser and would walk out of the allowlist.
         const firstSegment = String(pathArray[0] || "").toLowerCase();
-        if (firstSegment === "admin" || path.toLowerCase().includes("/admin")) {
-            return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+        const plainSegments = pathArray.every((segment: unknown) => /^[A-Za-z0-9_-]+$/.test(String(segment)));
+        if (!ALLOWED_PATHS.has(firstSegment) || !plainSegments) {
+            return NextResponse.json({ error: "Not found" }, { status: 404 });
         }
 
         const url = new URL(req.url);

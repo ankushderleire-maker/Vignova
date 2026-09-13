@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin-guard";
 import { db } from "@/lib/db";
+import { currentPeriodStart } from "@/lib/planLimits";
 
 export async function GET(req: Request) {
     const auth = await requireAdmin();
@@ -45,6 +46,9 @@ export async function GET(req: Request) {
                             expires_at: true,
                         },
                     },
+                    credit_buckets: {
+                        select: { bucket: true, remaining: true, total: true, period_start: true },
+                    },
                     _count: {
                         select: {
                             generated_resumes: true,
@@ -60,6 +64,7 @@ export async function GET(req: Request) {
             db.users.count({ where }),
         ]);
 
+        const periodStart = currentPeriodStart();
         return NextResponse.json({
             users: users.map((u) => ({
                 id: u.id,
@@ -69,6 +74,14 @@ export async function GET(req: Request) {
                 status: u.status,
                 createdAt: u.created_at,
                 subscription: u.subscriptions || null,
+                // Read-only. A row from an earlier month is shown as the full
+                // allowance it refills to on the user's next request, instead
+                // of being refilled here, so opening this list writes nothing.
+                credits: u.credit_buckets.map((row) => ({
+                    bucket: row.bucket,
+                    total: row.total,
+                    remaining: row.period_start < periodStart ? row.total : row.remaining,
+                })),
                 counts: {
                     resumes: u._count.generated_resumes,
                     jobs: u._count.job_applications,

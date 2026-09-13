@@ -21,6 +21,11 @@ interface UserDetail {
         credits_total: number;
         expires_at: string | null;
     } | null;
+    /** Live per-bucket balances from getBalances(). */
+    credits?: {
+        buckets: Array<{ bucket: string; remaining: number; total: number; unlimited: boolean }>;
+        resets_at: string;
+    };
     profiles: Array<{ id: string; name: string; is_default: boolean }>;
     resumes: Array<{ id: string; name: string; source: string; createdAt: string }>;
     jobs: Array<{ id: string; company: string; jobTitle: string; status: string; createdAt: string }>;
@@ -117,8 +122,14 @@ export default function AdminUserDetailPage() {
                             <p className="text-white">{user.subscription.billing_cycle}</p>
                         </div>
                         <div>
-                            <p className="text-xs text-gray-500">Credits</p>
-                            <p className="text-white">{user.subscription.credits_remaining} / {user.subscription.credits_total}</p>
+                            <p className="text-xs text-gray-500">Credits left (T / W / I)</p>
+                            <p className="text-white tabular-nums">
+                                {user.credits?.buckets?.length
+                                    ? user.credits.buckets
+                                          .map((b) => (b.unlimited ? "\u221E" : `${b.remaining}/${b.total}`))
+                                          .join(" \u00B7 ")
+                                    : "\u2014"}
+                            </p>
                         </div>
                         <div>
                             <p className="text-xs text-gray-500">Expires</p>

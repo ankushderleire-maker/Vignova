@@ -4,16 +4,24 @@ import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { requireAdmin } from "@/lib/admin-guard";
 import { db } from "@/lib/db";
 import { getBalances } from "@/lib/credits";
+import { DEFAULT_PLANS } from "@/lib/planCatalog";
 
 // Fallback plan configs if DB has none
 // Kept only for a database with no plan_configs rows. These numbers used to
 // say PRO 50 / PREMIUM 100 while seed-plans.ts said 40 / 150 — and this is the
 // table that actually ran when someone paid.
-const FALLBACK_PLANS: Record<string, { credits: number; hasExtension: boolean; hasMultiProfile: boolean; hasUnlimited: boolean }> = {
-    FREE: { credits: 3, hasExtension: true, hasMultiProfile: false, hasUnlimited: false },
-    PRO: { credits: 50, hasExtension: true, hasMultiProfile: true, hasUnlimited: false },
-    PREMIUM: { credits: -1, hasExtension: true, hasMultiProfile: true, hasUnlimited: true },
-};
+const FALLBACK_PLANS: Record<string, { credits: number; hasExtension: boolean; hasMultiProfile: boolean; hasUnlimited: boolean }> =
+    Object.fromEntries(
+        DEFAULT_PLANS.map((plan) => [
+            plan.plan_type,
+            {
+                credits: plan.credits,
+                hasExtension: plan.has_extension_access,
+                hasMultiProfile: plan.has_multi_profile,
+                hasUnlimited: plan.has_unlimited_resumes,
+            },
+        ])
+    );
 
 const BILLING_MONTHS: Record<string, number> = {
     MONTHLY: 1,

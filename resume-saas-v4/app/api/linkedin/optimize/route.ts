@@ -3,7 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { callBackend } from "@/lib/career-ops";
 import { sanitizeLinkedInProfile } from "@/lib/linkedin-skills";
-import { spendCredits, refundCredits } from "@/lib/credits";
+import { ensurePeriod, notOnPlanBody, outOfCreditsBody, refundCredits, spendCredits } from "@/lib/credits";
 
 export const maxDuration = 300;
 
@@ -36,12 +36,17 @@ export async function POST(req: NextRequest) {
     // charged nothing, so profile rewrites were free on every plan while the
     // extension charged for a cover letter of similar cost. Reserved before
     // the call and refunded below if it fails.
+    // A plan can leave LinkedIn optimization out entirely (Free does by
+    // default) and the pricing page says so, so that is enforced here before
+    // any credit moves.
+    const limits = await ensurePeriod(userId);
+    if (!limits.has_linkedin_optimization) {
+        return NextResponse.json(notOnPlanBody("LinkedIn optimization", limits.plan_type), { status: 403 });
+    }
+
     const spent = await spendCredits(userId, "writing");
     if (!spent.ok) {
-        return NextResponse.json(
-            { error: "You're out of writing credits.", bucket: "writing", outOfCredits: true },
-            { status: 403 }
-        );
+        return NextResponse.json(outOfCreditsBody("writing", spent.remaining), { status: 403 });
     }
 
     const result = await callBackend<any>("/api/linkedin/optimize", {
@@ -60,7 +65,7 @@ export async function POST(req: NextRequest) {
     if (!result.ok) {
         await refundCredits(userId, "writing", "linkedin optimization failed");
         return NextResponse.json(
-            { error: result.error || "AI optimization failed." },
+            { error: `${result.error || "AI optimization failed."} No credit was used.` },
             { status: result.status || 500 }
         );
     }

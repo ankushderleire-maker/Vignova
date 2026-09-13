@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { db } from "@/lib/db";
-import { spendCredits, creditBalance } from "@/lib/credits";
+import { callBackend } from "@/lib/career-ops";
+import { outOfCreditsBody, refundCredits, spendCredits } from "@/lib/credits";
 
 export const maxDuration = 300;
 
@@ -13,20 +14,19 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // 1. Check the writing allowance. ensurePeriod() inside creditBalance
-    // also refills a bucket left over from an earlier month.
-    if ((await creditBalance(userId, "writing")) <= 0) {
-        return NextResponse.json(
-            { error: "You're out of writing credits.", bucket: "writing", outOfCredits: true },
-            { status: 403 }
-        );
-    }
-
     const body = await req.json();
     const { jobDescription, masterProfile } = body;
     
     if (!jobDescription || !masterProfile) {
         return NextResponse.json({ error: "Missing jobDescription or masterProfile" }, { status: 400 });
+    }
+
+    // Reserved before the model runs and handed back below if nothing usable
+    // comes out. Checking the balance first and charging at the end let
+    // requests sent together all pass the check on the last credit.
+    const spent = await spendCredits(userId, "writing");
+    if (!spent.ok) {
+        return NextResponse.json(outOfCreditsBody("writing", spent.remaining), { status: 403 });
     }
 
     // Extract fields for prompts
@@ -38,7 +38,6 @@ export async function POST(req: Request) {
 
     const jdSnippet = jobDescription.substring(0, 3000);
 
-    const AI_BACKEND_URL = process.env.AI_BACKEND_URL || "http://localhost:8000";
     const OLLAMA_MODEL = process.env.OLLAMA_MODEL || "llama3.2";
 
     const emailPrompt = `Write a concise, professional application email for the following job.
@@ -70,41 +69,32 @@ INSTRUCTIONS:
 - Output ONLY the email, no extra commentary`;
 
     try {
-        const emailResult = await fetch(`${AI_BACKEND_URL}/api/generate-draft-email`, {
+        // callBackend sends the internal API key the backend now requires.
+        const result = await callBackend<{ response?: string }>("/api/generate-draft-email", {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ jobDescription, masterProfile })
+            body: { jobDescription, masterProfile },
         });
+        const draftEmail = result.ok ? result.data?.response?.trim() : null;
 
-        if (!emailResult.ok) {
-            throw new Error("Failed to generate email");
-        }
-
-        const emData = await emailResult.json();
-        const draftEmail = emData.response?.trim();
-
-        // An ok response with nothing in it is still a failure, and used
-        // to be charged for: the credit came off before anyone checked
-        // whether the model had actually written anything.
+        // A failed call and an ok response with nothing in it are both
+        // failures, and neither costs anything.
         if (!draftEmail) {
+            await refundCredits(userId, "writing", "application email generation failed");
+            console.error("[GENERATE_EMAIL] Backend returned", result.status, result.error);
             return NextResponse.json(
-                { error: "The email came back empty. No credit was used.", creditCharged: false },
+                { error: "The email could not be generated. No credit was used.", creditCharged: false },
                 { status: 502 }
             );
         }
 
-        // Charged last, and atomically: the balance is decided by the
-        // database rather than by arithmetic on a value read earlier.
-        const spent = await spendCredits(userId, "writing");
-
         return NextResponse.json({
             success: true,
             draftEmail,
-            credits_remaining: spent.ok ? spent.remaining : await creditBalance(userId, "writing")
+            credits_remaining: spent.remaining,
         });
-
     } catch (error) {
+        await refundCredits(userId, "writing", "application email generation threw");
         console.error("[GENERATE_EMAIL]", error);
-        return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+        return NextResponse.json({ error: "Internal server error. No credit was used." }, { status: 500 });
     }
 }
