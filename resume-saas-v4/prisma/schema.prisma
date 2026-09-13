@@ -39,6 +39,7 @@ model users {
   supportTickets          SupportTicket[]
   ticketMessages          TicketMessage[]
   notificationDismissals  UserNotificationDismissal[]
+  credit_buckets          credit_buckets[]
 }
 
 model Payment {
@@ -76,8 +77,12 @@ model subscriptions {
   user_id               String    @unique @db.Uuid
   plan_type             String    @default("FREE")
   billing_cycle         String    @default("MONTHLY")
+  /// Legacy single pool, superseded by credit_buckets. Kept so an in-flight
+  /// deploy and any unmigrated caller keep working; nothing new reads it.
   credits_remaining     Int       @default(3)
   credits_total         Int       @default(3)
+  /// Start of the current allowance period, advanced by ensurePeriod().
+  period_start          DateTime  @default(now())
   has_extension_access  Boolean   @default(false)
   has_multi_profile     Boolean   @default(false)
   has_unlimited_resumes Boolean   @default(false)
@@ -248,6 +253,42 @@ model plan_configs {
   updated_at                DateTime @updatedAt
   has_linkedin_optimization Boolean  @default(false)
   has_interview_prep        Boolean  @default(false)
+  /// Monthly allowance per bucket. -1 means unlimited (a fair-use ceiling is
+  /// applied in lib/planLimits.ts and never advertised).
+  tailoring_credits         Int      @default(3)
+  writing_credits           Int      @default(3)
+  interview_credits         Int      @default(1)
+  /// Stored master profiles allowed. -1 means unlimited.
+  max_profiles              Int      @default(1)
+}
+
+/// One metered allowance per user per feature family.
+///
+/// Replaces the single subscriptions.credits_remaining counter. Separate
+/// buckets are what let a cover letter be worth less than a tailored resume
+/// without fractional credits: each bucket is its own integer, so the atomic
+/// guarded decrement that stops two concurrent generations from spending one
+/// credit still works unchanged.
+///
+/// A row per (user, bucket) rather than columns on subscriptions, so adding or
+/// renaming a bucket later is a row and not a migration.
+model credit_buckets {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id      String   @db.Uuid
+  /// One of the BUCKETS values in lib/planLimits.ts: tailoring | writing | interview
+  bucket       String   @db.VarChar(32)
+  remaining    Int      @default(0)
+  total        Int      @default(0)
+  /// Start of the allowance period this row belongs to. Refills are lazy: a
+  /// read that finds this older than the current period tops the row up, so
+  /// there is no cron to forget to run.
+  period_start DateTime @default(now())
+  created_at   DateTime @default(now())
+  updated_at   DateTime @updatedAt
+  user         users    @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, bucket])
+  @@index([user_id])
 }
 
 model jobs {

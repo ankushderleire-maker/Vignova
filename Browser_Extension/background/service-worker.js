@@ -407,6 +407,37 @@ function routeMessage(message, sender, sendResponse, requestEpoch) {
         return true;
     }
 
+    // ─── API Proxy: Read tracked state for a posting ───
+    // The injected bar asks this on every render so the status dropdown and the
+    // Tailor/Cover Letter buttons reflect the tracker rather than
+    // chrome.storage.local, which clearUserData() wipes on every auth re-sync.
+    if (message.type === "API_GET_JOB_STATE") {
+        chrome.storage.local.get(["vignova_token"], async (result) => {
+            if (requestEpoch !== authEpoch || !result.vignova_token) {
+                sendResponse({ success: false, authenticated: false, error: "Please sign in to Vignova." });
+                return;
+            }
+            try {
+                let url = `${Vignova_API_BASE}/api/extension/job-status?jobUrl=` +
+                    encodeURIComponent(message.data?.jobUrl || "");
+                // "content" also brings back the cover letter and email text,
+                // for reopening existing work without leaving the page.
+                if (message.data?.include) url += `&include=${encodeURIComponent(message.data.include)}`;
+                const response = await fetch(url, {
+                    headers: { "Authorization": `Bearer ${result.vignova_token}` },
+                    cache: "no-store",
+                });
+                const data = await response.json();
+                sendResponse(response.ok
+                    ? { success: true, ...data }
+                    : apiFailure(data, "Could not read the job status."));
+            } catch (err) {
+                sendResponse({ success: false, error: "Cannot connect to Vignova server." });
+            }
+        });
+        return true;
+    }
+
     // ─── API Proxy: Set application status ───
     if (message.type === "API_SET_STATUS") {
         chrome.storage.local.get(["vignova_token"], async (result) => {

@@ -12,7 +12,9 @@ const VignovaIcons = (() => {
         back: '<path d="M20 12H4m6-6-6 6 6 6"/>',
         file: '<path d="M14 3H6v18h12V7zM14 3v5h4M9 12h6m-6 4h6"/>',
         letter: '<path d="M14 3H6v18h12V7zM14 3v5h4M9 12h6m-6 4h6"/>',
-        linkedin: '<path d="M5 10v10M5 5v.1M10 20V10h4v2c4-4 6-1 6 2v6M14 12v8"/>',
+        // Generic profile-card mark, not any network's logo. popup.js swaps in
+        // assets/linkedin.svg at runtime when that official asset is present.
+        linkedin: '<rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="9" cy="10" r="2"/><path d="M5.5 17c.6-1.8 2-2.7 3.5-2.7s2.9.9 3.5 2.7M15 9h3.5M15 13h3.5"/>',
         chat: '<path d="M5 3h14v14H9l-4 4z"/><path d="m9 9 2 2 4-4"/>',
         check: '<path d="m5 12 4 4L19 6"/>',
         checkCircle: '<circle cx="12" cy="12" r="9"/><path d="m8 12 3 3 5-6"/>',

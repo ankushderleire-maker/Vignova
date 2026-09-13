@@ -16,7 +16,7 @@ export async function POST(req: Request) {
 
         // The field planner calls a model on every page, so autofill is
         // Pro-and-up — the same gate the popup applies to the button.
-        const denied = checkAiAccess(auth.subscription, "Autofill");
+        const denied = await checkAiAccess(auth.subscription, "Autofill", "tailoring", auth.user!.id);
         if (denied) return denied;
 
         const body = await req.json();

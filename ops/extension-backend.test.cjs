@@ -6,7 +6,13 @@ const appRequire=require('node:module').createRequire(path.join(app,'package.jso
 const ts=appRequire('typescript');
 function load(file,overrides={}){const filename=path.join(app,file),module={exports:{}};const {outputText}=ts.transpileModule(fs.readFileSync(filename,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020,esModuleInterop:true}});vm.runInThisContext('(function(require,module,exports){'+outputText+'\n})',{filename})(name=>Object.hasOwn(overrides,name)?overrides[name]:appRequire(name),module,module.exports);return module.exports;}
 const cors=load('lib/extensionCors.ts');
-const plan=load('lib/extensionPlan.ts',{'@/lib/extensionCors':cors});
+const planLimits=load('lib/planLimits.ts',{'./db':{db:{plan_configs:{findUnique:async()=>null}}},'@/lib/db':{db:{plan_configs:{findUnique:async()=>null}}}});
+const plan=load('lib/extensionPlan.ts',{
+    '@/lib/extensionCors':cors,
+    '@/lib/planLimits':planLimits,
+    '@/lib/credits':{ensurePeriod:async()=>({plan_type:'PRO',tailoring:50,writing:100,interview:5,max_profiles:5,has_extension_access:true,has_multi_profile:true,has_unlimited_resumes:false,has_linkedin_optimization:true,has_interview_prep:true})},
+    '@/lib/db':{db:{credit_buckets:{findFirst:async()=>({remaining:1})}}},
+});
 const USER='00000000-0000-4000-8000-000000000001';
 const input={jobTitle:'Software Engineer',company:'Example',jobDescription:'Build reliable distributed applications with Python and SQL, collaborate with product teams and review code.'};
 function harness({planType='PRO',balance=4,error=null,existingJob=null}={}){
@@ -25,15 +31,25 @@ function harness({planType='PRO',balance=4,error=null,existingJob=null}={}){
     db.jobApplication.update=async args=>{calls.push(['updateJob',args]);return {id:'job1'};};
     const shared=load('lib/extensionDashboard.ts',{'@/lib/db':{db}});
     const overrides={'@/lib/db':{db},'@/components/resume-html-templates':{getTemplateGenerator:()=>()=>'<html>Resume</html>'},'@/lib/pdf/puppeteer':{generatePdfFromHtml:async()=>Buffer.from('%PDF-1.4 fixture')},'@/lib/extensionDuplicate':{findExistingWork:async()=>null,findJobByUrl:async()=>existingJob,duplicateResponse:()=>({duplicate:true})},'@/lib/tailoredResume':{toResumeData:data=>data},'@/lib/extensionCors':cors,'@/lib/extensionPlan':plan,'@/lib/extensionDashboard':shared,
-        '@/lib/extensionAuth':{getExtensionUser:async()=>error?{error,status:401}:{user:{id:USER,extensionSettings:settings},subscription:{plan_type:planType,credits_remaining:balance},status:200}},
-        '@/lib/credits':{spendCredit:async id=>{calls.push(['spend',id]);if(available<=0)return {ok:false,reason:'insufficient'};return {ok:true,remaining:--available};},refundCredit:async id=>{calls.push(['refund',id]);available++;}},
+        '@/lib/extensionAuth':{getExtensionUser:async()=>error?{error,status:401}:{user:{id:USER,extensionSettings:settings},subscription:{user_id:USER,plan_type:planType,credits_remaining:balance},status:200}},
+        '@/lib/credits':{
+            ensurePeriod:async()=>({plan_type:planType,tailoring:50,writing:100,interview:5,max_profiles:5,has_extension_access:true,has_multi_profile:true,has_unlimited_resumes:false,has_linkedin_optimization:true,has_interview_prep:true}),
+            creditBalance:async()=>available,
+            getBalances:async()=>({buckets:[{bucket:'tailoring',remaining:available,total:balance,unlimited:false},{bucket:'writing',remaining:available,total:balance,unlimited:false},{bucket:'interview',remaining:available,total:balance,unlimited:false}],resets_at:new Date().toISOString(),plan_type:planType}),
+            spendCredit:async id=>{calls.push(['spend',id]);if(available<=0)return {ok:false,reason:'insufficient',remaining:available};return {ok:true,remaining:--available};},
+            spendCredits:async (id,bucket)=>{calls.push(['spend',id,bucket]);if(available<=0)return {ok:false,reason:'insufficient',remaining:available};return {ok:true,remaining:--available};},
+            spendMany:async (id,costs)=>{calls.push(['spend',id,costs]);const amount=1;if(available<amount)return {ok:false,bucket:'tailoring',remaining:available};available-=amount;return {ok:true};},
+            refundCredit:async id=>{calls.push(['refund',id]);available++;},
+            refundCredits:async (id,bucket)=>{calls.push(['refund',id,bucket]);available++;},
+            refundMany:async (id,costs)=>{calls.push(['refund',id,costs]);available++;}
+        },
         '@/lib/career-ops':{callBackend:async(url,args)=>{calls.push(['model',url,args]);return failModel?{ok:false}:url==='/api/score-job'?{ok:true,data:{score:75,breakdown:{matching_keywords:['Python'],missing_keywords:['SQL']}}}:url==='/api/generate-tailored-resume'?{ok:true,data:{data:{fullName:'Example Person',summary:'Experienced engineer'}}}:url.includes('generate-')?{ok:true,data:{response:'Generated document content.'}}:{ok:true,data:{questions:[{question:'How would you monitor a deployed service?',tip:'Discuss metrics and alerting.'}]}};}}
     };
     return {calls,db,shared,route:name=>load('app/api/extension/'+name+'/route.ts',overrides),balance:()=>available,failModel:()=>failModel=true,failSave:()=>failSave=true,settings:()=>settings};
 }
 const request=(body=input)=>new Request('https://app.vignova.io/api/extension/interview-prep',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
 test('interview API rejects missing auth before database or AI work',async()=>{const h=harness({error:'Missing token'});assert.equal((await h.route('interview-prep').POST(request())).status,401);assert.equal(h.calls.length,0);});
-for(const [planType,balance] of [['FREE',20],['PRO',0],['PREMIUM',0]])test(planType+' with '+balance+' credits cannot bypass paid interview API',async()=>{const h=harness({planType,balance});const r=await h.route('interview-prep').POST(request());assert.equal(r.status,402);assert.equal((await r.json()).upgradeRequired,true);assert.equal(h.calls.length,0);});
+for(const [planType,balance] of [['FREE',0],['PRO',0],['PREMIUM',0]])test(planType+' with '+balance+' interview credits cannot invoke interview AI',async()=>{const h=harness({planType,balance});const r=await h.route('interview-prep').POST(request());assert.equal(r.status,402);assert.equal((await r.json()).upgradeRequired,true);assert.equal(h.calls.filter(c=>c[0]==='model').length,0);});
 test('interview validates input without spending a credit',async()=>{const h=harness();assert.equal((await h.route('interview-prep').POST(request({...input,jobDescription:'short'}))).status,400);assert.equal(h.balance(),4);assert.equal(h.calls.length,0);});
 test('interview reserves first and saves questions under the authenticated user',async()=>{const h=harness();const r=await h.route('interview-prep').POST(request({...input,userId:'attacker-supplied'}));assert.equal(r.status,200);const body=await r.json();assert.equal(body.credits_remaining,3);assert.equal(body.interviewId,'interview1');assert.ok(h.calls.findIndex(c=>c[0]==='spend')<h.calls.findIndex(c=>c[0]==='model'));assert.equal(h.calls.find(c=>c[0]==='save')[1].data.userId,USER);assert.equal(h.calls.find(c=>c[0]==='profile')[1].where.user_id,USER);});
 for(const failure of ['failModel','failSave'])test('interview refunds its reservation on '+failure,async()=>{const h=harness();h[failure]();assert.equal((await h.route('interview-prep').POST(request())).status,502);assert.equal(h.balance(),4);assert.equal(h.calls.filter(c=>c[0]==='refund').length,1);});
@@ -44,7 +60,7 @@ test('pasting a job without a URL creates a new record and saves the company log
 test('expired plans and inactive accounts cannot use stale paid entitlements',async()=>{let status='ACTIVE',expires=new Date(Date.now()-1000);const auth=load('lib/extensionAuth.ts',{'jsonwebtoken':{verify:()=>({type:'extension',userId:USER})},'@/lib/db':{db:{users:{findUnique:async()=>({id:USER,status})},subscriptions:{findFirst:async()=>({id:'sub1',user_id:USER,plan_type:'PREMIUM',credits_remaining:20,expires_at:expires})}}}});const old=process.env.EXTENSION_JWT_SECRET;process.env.EXTENSION_JWT_SECRET='test-only-secret';try{const req=new Request('https://app.vignova.io',{headers:{Authorization:'Bearer test'}});const expired=await auth.getExtensionUser(req);assert.equal(expired.subscription.plan_type,'FREE');assert.equal(expired.subscription.credits_remaining,0);expires=null;assert.equal((await auth.getExtensionUser(req)).subscription.plan_type,'PREMIUM');status='SUSPENDED';assert.equal((await auth.getExtensionUser(req)).status,403);}finally{if(old===undefined)delete process.env.EXTENSION_JWT_SECRET;else process.env.EXTENSION_JWT_SECRET=old;}});
 
 for(const name of ['generate','generate-all']){
- test(name+' blocks a free account before invoking AI',async()=>{const h=harness({planType:'FREE',balance:10});assert.equal((await h.route(name).POST(request(input))).status,402);assert.equal(h.calls.filter(c=>c[0]==='model').length,0);});
+ test(name+' blocks an empty bucket before invoking AI',async()=>{const h=harness({planType:'FREE',balance:0});assert.equal((await h.route(name).POST(request(input))).status,402);assert.equal(h.calls.filter(c=>c[0]==='model').length,0);});
  test(name+' reserves the final credit atomically and forwards candidate focus',async()=>{const h=harness({balance:1}),route=h.route(name);const r=await Promise.all([route.POST(request({...input,hint:'Emphasize Python projects'})),route.POST(request(input))]);assert.deepEqual(r.map(x=>x.status).sort(),[200,402]);assert.equal(h.balance(),0);const model=h.calls.find(c=>c[0]==='model');assert.ok(h.calls.findIndex(c=>c[0]==='spend')<h.calls.indexOf(model));assert.match(model[2].body.jobDescription,/Emphasize Python projects/);assert.equal(h.calls.filter(c=>c[0]==='saveResume').length,1);});
  test(name+' refunds on failed AI output',async()=>{const h=harness();h.failModel();assert.equal((await h.route(name).POST(request(input))).status,502);assert.equal(h.balance(),4);assert.equal(h.calls.filter(c=>c[0]==='refund').length,1);});
 }

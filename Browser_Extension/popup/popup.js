@@ -5,6 +5,30 @@
     const state = { paid: false, profile: null, profiles: [], jobs: [], stats: null, job: null, keywords: null, filter: 'match', expanded: {}, busy: false, revision: 0, agentRunning: false };
     let toastTimer, reloading = false, initialized = false;
     VignovaIcons.render();
+    /**
+     * Use the official LinkedIn asset for the LinkedIn Optimizer tile when it
+     * has been added to assets/, otherwise keep the generic profile glyph.
+     *
+     * Drop the file LinkedIn publishes on its brand resources page at
+     * Browser_Extension/assets/linkedin.svg and it appears here automatically;
+     * nothing else needs changing. A relative URL would resolve against the
+     * page, so it is built with chrome.runtime.getURL().
+     */
+    (async () => {
+        const slot = document.querySelector('#linkedinOptimizerBtn .icon[data-icon="linkedin"]');
+        if (!slot) return;
+        try {
+            const href = chrome.runtime.getURL('assets/linkedin.svg');
+            const response = await fetch(href);
+            if (!response.ok) return;
+            const img = document.createElement('img');
+            img.src = href;
+            img.alt = '';
+            img.width = 20;
+            img.height = 20;
+            slot.replaceChildren(img);
+        } catch (_) { /* asset not bundled - the generic glyph stays */ }
+    })();
     const node = (tag, cls, text) => {
         const el = document.createElement(tag);
         if (cls)
@@ -459,7 +483,13 @@
                 data.action = action === 'hr' ? 'hr-message' : 'email';
             let r = await api(type, data);
             if (r.duplicate) {
-                if (!window.confirm('You already have a generated document for this job. Generate another one using your current profile?'))
+                const goAhead = await askConfirm({
+                    title: 'Already generated',
+                    message: 'You already have a generated document for this job. Generate another one using your current profile?',
+                    confirmLabel: 'Generate Again',
+                    note: 'Generating again uses another credit and replaces what you have.',
+                });
+                if (!goAhead)
                     return;
                 r = await api(type, { ...data, force: true });
             }
@@ -467,6 +497,40 @@
             await Promise.allSettled([refreshCredits(), loadOverview(), loadDocuments()]);
         });
     }
+    /**
+     * In-extension replacement for window.confirm().
+     *
+     * A native confirm() renders as a browser-chrome alert ("The extension
+     * Vignova says..."), which looks like a security prompt rather than part
+     * of the product — and it blocks the whole page while it is up. This uses
+     * the same <dialog> styling as the rest of the panel.
+     *
+     * Resolves false on Cancel, on Esc, and on any other dismissal.
+     */
+    function askConfirm({ title, message, confirmLabel = 'Continue', note = '' } = {}) {
+        const dialog = $('confirmDialog');
+        $('confirmTitle').textContent = title || 'Are you sure?';
+        $('confirmMessage').textContent = message || '';
+        $('confirmOkLabel').textContent = confirmLabel;
+        $('confirmNote').textContent = note;
+        $('confirmNote').hidden = !note;
+        VignovaIcons.render(dialog);
+
+        return new Promise((resolve) => {
+            let done = false;
+            const finish = (value) => {
+                if (done) return;
+                done = true;
+                if (dialog.open) dialog.close();
+                resolve(value);
+            };
+            $('confirmOkBtn').onclick = () => finish(true);
+            $('confirmCancelBtn').onclick = () => finish(false);
+            dialog.addEventListener('close', () => finish(false), { once: true });
+            dialog.showModal();
+        });
+    }
+
     function downloadPdf(base64, filename) {
         if (!base64)
             throw new Error('The server did not return a PDF. Please try again.');

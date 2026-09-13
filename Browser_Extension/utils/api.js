@@ -1,3 +1,23 @@
+// ─── Geist webfont ───
+// Injected here rather than declared in button.css / overlay.css: a relative
+// url() inside a manifest-injected content-script stylesheet resolves against
+// the PAGE origin, not the extension, so it fired a request at
+// linkedin.com/jobs/assets/geist-latin.woff2 on every page. Verified in Chrome.
+(function injectVignovaFont() {
+    try {
+        if (!(typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.id)) return;
+        if (document.getElementById("vignova-font-face")) return;
+        const style = document.createElement("style");
+        style.id = "vignova-font-face";
+        style.textContent =
+            "@font-face{font-family:Geist;font-style:normal;font-weight:100 900;" +
+            "font-display:swap;src:url('" +
+            chrome.runtime.getURL("assets/geist-latin.woff2") +
+            "') format('woff2');}";
+        (document.head || document.documentElement).appendChild(style);
+    } catch (_) { /* orphaned content script - no font, no request */ }
+})();
+
 /**
  * Vignova Extension — Shared API Utility
  * All API calls go through this helper to attach the auth token.

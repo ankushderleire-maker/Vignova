@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { db } from "@/lib/db";
-import { spendCredit, creditBalance } from "@/lib/credits";
+import { spendCredits, creditBalance } from "@/lib/credits";
 
 export const maxDuration = 300;
 
@@ -13,10 +13,13 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // 1. Check credits
-    const sub = await db.subscriptions.findFirst({ where: { user_id: userId } });
-    if (!sub || sub.credits_remaining <= 0) {
-        return NextResponse.json({ error: "Insufficient Credits" }, { status: 403 });
+    // 1. Check the writing allowance. ensurePeriod() inside creditBalance
+    // also refills a bucket left over from an earlier month.
+    if ((await creditBalance(userId, "writing")) <= 0) {
+        return NextResponse.json(
+            { error: "You're out of writing credits.", bucket: "writing", outOfCredits: true },
+            { status: 403 }
+        );
     }
 
     const body = await req.json();
@@ -100,12 +103,12 @@ INSTRUCTIONS:
 
         // Charged last, and atomically: the balance is decided by the
         // database rather than by arithmetic on a value read earlier.
-        const spent = await spendCredit(userId);
+        const spent = await spendCredits(userId, "writing");
 
         return NextResponse.json({
             success: true,
             coverLetter,
-            credits_remaining: spent.ok ? spent.remaining : await creditBalance(userId)
+            credits_remaining: spent.ok ? spent.remaining : await creditBalance(userId, "writing")
         });
 
     } catch (error) {

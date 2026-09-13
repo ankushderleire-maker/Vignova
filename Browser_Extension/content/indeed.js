@@ -367,7 +367,6 @@
 
         // Check stored state
         // Canonical, because that is the key the generate handlers write under.
-        checkJobState(canonicalJobUrl(), tailorBtn, saveBtn);
 
         // Add Vignova Branding Logo
         const logoImg = document.createElement("img");
@@ -399,7 +398,7 @@
         statusSelect.className = "vignova-status-select";
         statusSelect.title = "Set application status";
         statusSelect.innerHTML = `
-            <option value="">Status…</option>
+            <option value="">Not saved</option>
             <option value="SAVED">Saved</option>
             <option value="APPLIED">Applied</option>
             <option value="INTERVIEW">Interviewing</option>
@@ -415,7 +414,7 @@
                 // is saved rather than refused — picking "Saved" on a job you
                 // have not tailored is the obvious way to add it.
                 let job = {};
-                try { job = (await scrapeIndeedJob()) || {}; } catch { job = {}; }
+                try { job = (await Vignova_Score.readJob(scrapeIndeedJob)) || {}; } catch { job = {}; }
                 const res = await chrome.runtime.sendMessage({
                     type: "API_SET_STATUS",
                     data: {
@@ -430,6 +429,15 @@
                 });
                 if (res?.success) {
                     statusSelect.dataset.current = status;
+                    // Cache it so a re-render restores the dropdown instead of
+                    // snapping back to "Not saved" — and so it survives at all
+                    // until GET /api/extension/job-status is deployed.
+                    const cacheUrl = canonicalJobUrl();
+                    chrome.storage.local.get([cacheUrl], (current) => {
+                        chrome.storage.local.set({
+                            [cacheUrl]: { ...(current[cacheUrl] || {}), saved: true, status },
+                        });
+                    });
                     flashStatusSaved(statusSelect, res.created);
                 } else {
                     Vignova_Overlay.showError(
@@ -449,6 +457,9 @@
         container.appendChild(tailorBtn);
         container.appendChild(saveBtn);
         container.appendChild(statusSelect);
+
+        // After the select exists, so the tracker can preselect it.
+        checkJobState(canonicalJobUrl(), tailorBtn, saveBtn, statusSelect);
 
         // Fetch Score
         fetchAndDisplayScore(scoreBadge);
@@ -474,100 +485,150 @@
     }
 
     // ─── Fetch & Display Score ───
-    async function fetchAndDisplayScore(badge) {
-        const jobData = scrapeIndeedJob();
-        if (!jobData.jobDescription) {
-            // Indeed sometimes lazy loads description
+    // Goes through Vignova_Score so this badge and the popup's Keywords tab
+    // are the same number: same text (jobExtractor), same engine
+    // (/api/extension/score), same dedup. It used to scrape its own DOM and
+    // score locally, which is why one said 16% and the other 25%.
+    let scoreToken = 0;
+    async function fetchAndDisplayScore(badge, retries = 3) {
+        const token = ++scoreToken;
+
+        let result = null;
+        try {
+            result = await Vignova_Score.forCurrentJob({
+                jobUrl: canonicalJobUrl(),
+                fallbackScrape: scrapeIndeedJob,
+            });
+        } catch (_) {
+            result = null;
+        }
+
+        // A newer render superseded us, or our badge was torn out of the DOM.
+        // Without this the old retry chains kept running against detached nodes.
+        if (token !== scoreToken || !badge.isConnected) return;
+
+        if (!result) {
+            // SPAs inject the container before the description finishes loading.
+            if (retries > 0) {
+                setTimeout(() => {
+                    if (token === scoreToken && badge.isConnected) {
+                        fetchAndDisplayScore(badge, retries - 1);
+                    }
+                }, 1000);
+                return;
+            }
             badge.textContent = "?";
-            badge.title = "Scroll down to load description";
+            badge.title = "Could not parse job description text";
             return;
         }
 
-        try {
-            const { vignova_agent_profile: profile } = await chrome.storage.local.get(['vignova_agent_profile']);
-            const response = VignovaLocalScorer.score(jobData.jobDescription, profile || null);
-            const jobMeta = extractJobMeta(jobData.jobDescription);
+        const { score, matched, missing, total } = result;
+        const jobMeta = extractJobMeta(result.text);
 
-            if (response && response.success) {
-                const matched = response.breakdown.matching_keywords || [];
-                const missing = response.breakdown.missing_keywords || [];
-                const total = matched.length + missing.length;
-                const score = total ? Math.round(100 * matched.length / total) : 0;
+        badge.classList.remove("high", "medium", "low", "very-high", "very-low");
+        if (score >= 75) badge.classList.add("very-high");
+        else if (score >= 55) badge.classList.add("high");
+        else if (score >= 35) badge.classList.add("medium");
+        else if (score >= 20) badge.classList.add("low");
+        else badge.classList.add("very-low");
 
-                // Categorical Mapping — realistic thresholds
-                let categoryText = "";
-                badge.classList.remove("high", "medium", "low", "very-high", "very-low");
+        badge.textContent = total ? `${score}% keywords` : "No keywords";
+        badge.title = total
+            ? `${matched.length} of ${total} keywords matched`
+            : "No keywords detected in this posting";
 
-                if (score >= 75) {
-                    categoryText = "Very High";
-                    badge.classList.add("very-high");
-                } else if (score >= 55) {
-                    categoryText = "High";
-                    badge.classList.add("high");
-                } else if (score >= 35) {
-                    categoryText = "Medium";
-                    badge.classList.add("medium");
-                } else if (score >= 20) {
-                    categoryText = "Low";
-                    badge.classList.add("low");
-                } else {
-                    categoryText = "Very Low";
-                    badge.classList.add("very-low");
-                }
-
-                badge.textContent = total ? `${score}% keywords` : "No keywords";
-
-                // The badge opens the Keyword Score panel on hover. Everything
-                // it shows comes from the local scorer that already ran.
-                VignovaMatchPanel.attach(
-                    badge,
-                    {
-                        score,
-                        matched,
-                        missing,
-                        salary: jobMeta.salary || "",
-                        deadline: jobMeta.deadline || "",
-                    },
-                    {
-                        onImprove: () => {
-                            const tailor = document.getElementById(BUTTON_ID) ||
-                                document.querySelector(".vignova-tailor-btn");
-                            if (tailor) tailor.click();
-                        },
-                        onSettings: () => {
-                            chrome.runtime.sendMessage({
-                                type: "OPEN_TAB",
-                                url: "https://app.vignova.io/dashboard/extension",
-                            });
-                        },
-                    }
-                );
-
-
-            } else {
-                badge.textContent = "!";
-                badge.title = "Failed to calculate score";
+        VignovaMatchPanel.attach(
+            badge,
+            {
+                score,
+                matched,
+                missing,
+                salary: jobMeta.salary || "",
+                deadline: jobMeta.deadline || "",
+            },
+            {
+                onImprove: () => {
+                    const tailor = document.getElementById(BUTTON_ID) ||
+                        document.querySelector(".vignova-tailor-btn");
+                    if (tailor) tailor.click();
+                },
+                onSettings: () => {
+                    chrome.runtime.sendMessage({
+                        type: "OPEN_TAB",
+                        url: "https://app.vignova.io/dashboard/extension",
+                    });
+                },
             }
-        } catch (e) {
-            console.error(e);
-            badge.textContent = "!";
-        }
+        );
     }
 
-    // ─── Check Stored State ───
-    function checkJobState(url, tailorBtn, saveBtn) {
-        chrome.storage.local.get([url], (result) => {
-            const data = result[url];
-            if (data?.tailored) {
+    // ─── Check Tracked State ───
+    /**
+     * Paints the bar from the job tracker.
+     *
+     * The server is the source of truth; chrome.storage.local is only a cache.
+     * clearUserData() drops every http* key on each auth re-sync, which is why
+     * "Resume Created" reverted to "Tailor Resume" whenever the tab was
+     * reopened even though the resume still existed. The cached row is kept
+     * for an instant first paint and as the offline answer.
+     */
+    async function checkJobState(url, tailorBtn, saveBtn, statusSelect) {
+        // `authoritative` lets the server clear a stale cached flag; the cached
+        // first paint must only ever add state, never take it away.
+        const paint = (state, authoritative) => {
+            if (state?.tailored) {
                 setBtnContent(tailorBtn, "vignova-btn-icon", "✅", "Resume Created");
                 tailorBtn.classList.add("success");
-                tailorBtn.title = "You have already tailored a resume for this job.";
+                tailorBtn.title = "You already tailored a resume for this job. Click to open it.";
+            } else if (authoritative) {
+                setBtnContent(tailorBtn, "vignova-btn-icon", "⚡", "Tailor Resume");
+                tailorBtn.classList.remove("success");
+                tailorBtn.title = "";
             }
 
-            if (data?.tailored) {
+            if (state?.coverLetter) {
+                setBtnContent(saveBtn, "vignova-btn-icon", "✅", "Letter Created");
+                saveBtn.classList.add("success");
+                saveBtn.title = "You already wrote a cover letter for this job.";
+            } else if (authoritative) {
                 setBtnContent(saveBtn, "vignova-btn-icon", "✉️", "Cover Letter");
+                saveBtn.classList.remove("success");
+                saveBtn.title = "";
             }
-        });
+
+            if (statusSelect && statusSelect.isConnected) {
+                const status = state?.status || "";
+                statusSelect.value = status;
+                if (status) statusSelect.dataset.current = status;
+                else delete statusSelect.dataset.current;
+            }
+        };
+
+        try {
+            const cached = await chrome.storage.local.get([url]);
+            paint(cached[url], false);
+        } catch (_) { /* storage unavailable — the server answer still lands */ }
+
+        const reply = await chrome.runtime
+            .sendMessage({ type: "API_GET_JOB_STATE", data: { jobUrl: url } })
+            .catch(() => null);
+
+        // Offline or signed out: keep whatever the cache painted rather than
+        // wrongly telling the user nothing exists.
+        if (!reply || !reply.success) return;
+
+        const state = {
+            saved: Boolean(reply.tracked),
+            tailored: Boolean(reply.resume),
+            coverLetter: Boolean(reply.coverLetter),
+            status: reply.status || "",
+        };
+        paint(state, true);
+
+        try {
+            if (reply.tracked) await chrome.storage.local.set({ [url]: state });
+            else await chrome.storage.local.remove([url]);
+        } catch (_) { /* cache is best effort */ }
     }
 
     // ─── Handle Cover Letter Click ───
@@ -582,7 +643,7 @@
         setBtnContent(btn, "vignova-btn-spinner", "", "Writing...");
         Vignova_Overlay.showLoading();
 
-        const jobData = await scrapeIndeedJob();
+        const jobData = await Vignova_Score.readJob(scrapeIndeedJob);
         if (!jobData.jobDescription) {
             Vignova_Overlay.showError("Could not find the job description. Refresh page.");
             setBtnContent(btn, "vignova-btn-icon", "✉️", "Cover Letter");
@@ -619,7 +680,8 @@
                     const existing = current[currentUrl] || {};
                     chrome.storage.local.set({ [currentUrl]: { ...existing, tailored: true } });
                 });
-            } else {
+            } else if (result.duplicate && result.existing) {
+                markExistingWork(currentUrl, result.existing);
                 if (!result.cancelled) Vignova_Overlay.showError(result.error || "Failed.");
             }
         } catch (err) {
@@ -678,7 +740,7 @@
         Vignova_Overlay.showLoading();
 
         // Scrape job data
-        const jobData = scrapeIndeedJob();
+        const jobData = await Vignova_Score.readJob(scrapeIndeedJob);
 
         if (!jobData.jobDescription) {
             Vignova_Overlay.showError("Could not find the job description. Please scroll down to load it and try again.");
@@ -712,6 +774,8 @@
                 );
                 setBtnContent(btn, "vignova-btn-icon", "✅", "Resume Created");
                 btn.classList.add("success");
+                btn.disabled = false;
+                isProcessing = false;
 
                 // Save state
                 chrome.storage.local.get([currentUrl], (current) => {
@@ -721,6 +785,11 @@
                     });
                 });
 
+            } else if (result.duplicate && result.existing) {
+                // Declined the prompt, or reopened the existing pack: either
+                // way work exists, so the buttons say so.
+                markExistingWork(currentUrl, result.existing);
+                resetButton();
             } else {
                 if (!result.cancelled) Vignova_Overlay.showError(
                     result.error || "Failed to generate resume.",
@@ -808,9 +877,50 @@
         return { jobTitle, company, jobDescription, location, companyLogo: scrapeCompanyLogo(), descriptionEl };
     }
 
+    /**
+     * Paints what the server says already exists for this posting.
+     *
+     * Reached when the duplicate prompt is declined: work exists, so the
+     * buttons must say so rather than snapping back to "Tailor Resume" — and
+     * certainly rather than sitting on "Generating...".
+     */
+    function markExistingWork(url, existing) {
+        const tailorBtn = document.getElementById(BUTTON_ID);
+        const letterBtn = document.getElementById(LETTER_BUTTON_ID);
+
+        if (existing?.resume && tailorBtn) {
+            setBtnContent(tailorBtn, "vignova-btn-icon", "\u2705", "Resume Created");
+            tailorBtn.classList.add("success");
+            tailorBtn.disabled = false;
+            tailorBtn.title = "You already tailored a resume for this job.";
+        }
+        if (existing?.coverLetter && letterBtn) {
+            setBtnContent(letterBtn, "vignova-btn-icon", "\u2705", "Letter Created");
+            letterBtn.classList.add("success");
+            letterBtn.disabled = false;
+            letterBtn.title = "You already wrote a cover letter for this job.";
+        }
+
+        chrome.storage.local.get([url], (current) => {
+            chrome.storage.local.set({
+                [url]: {
+                    ...(current[url] || {}),
+                    saved: true,
+                    tailored: Boolean(existing?.resume),
+                    coverLetter: Boolean(existing?.coverLetter),
+                },
+            }, () => stampJobListCards());
+        });
+    }
+
     // ─── Reset Button State ───
     function resetButton() {
         isProcessing = false;
+        if (pendingAccountRefresh) {
+            pendingAccountRefresh = false;
+            refreshAccountUI();
+            return;
+        }
         const btn = document.getElementById(BUTTON_ID);
         if (btn && !btn.classList.contains("success")) {
             btn.disabled = false;
@@ -820,11 +930,22 @@
     }
 
     // Clear visible account data before redrawing from the verified session.
+    let pendingAccountRefresh = false;
     function refreshAccountUI() {
+        // A generation in flight owns the overlay and the buttons. Finishing a
+        // generation writes credits_remaining into vignova_user, and the
+        // storage listener below turned that into a full redraw — tearing the
+        // "Already generated" prompt out of the DOM mid-await. Its promise
+        // never settled, so the button sat on "Generating..." forever and
+        // isProcessing stayed true, deadening every later click. Defer instead.
+        if (isProcessing) {
+            pendingAccountRefresh = true;
+            return;
+        }
         ++authRenderVersion;
-        isProcessing = false;
         document.getElementById("vignova-indeed-container")?.replaceChildren();
-        Vignova_Overlay.remove();
+        // Keep a pack the user is reading; only clear transient overlays.
+        if (!Vignova_Overlay._resultsOpen) Vignova_Overlay.remove();
         window.VignovaMatchPanel?.hide();
         document.querySelectorAll(".vignova-card-badge").forEach(el => el.remove());
         document.querySelectorAll("[data-vignova-badge]").forEach(el => el.removeAttribute("data-vignova-badge"));

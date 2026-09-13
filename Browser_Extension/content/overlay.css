@@ -11,14 +11,6 @@
 /* The landing page's typeface, so the extension reads as the same product.
    Relative URL: Chrome rewrites it to the extension origin when it injects
    this file, and assets/* is already web-accessible. */
-@font-face {
-    font-family: Geist;
-    font-style: normal;
-    font-weight: 100 900;
-    font-display: swap;
-    src: url('../assets/geist-latin.woff2') format('woff2');
-}
-
 .vignova-overlay-backdrop {
     position: fixed !important;
     top: 0 !important;

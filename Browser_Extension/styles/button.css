@@ -1,13 +1,6 @@
-/* The landing page typeface, so the injected bar matches the overlay.
-   Relative URL: Chrome rewrites it to the extension origin on injection. */
-@font-face {
-    font-family: Geist;
-    font-style: normal;
-    font-weight: 100 900;
-    font-display: swap;
-    src: url('../assets/geist-latin.woff2') format('woff2');
-}
-
+/* Geist @font-face is injected at runtime by utils/api.js with a real
+   chrome.runtime.getURL() origin. A relative url() here resolves against the
+   PAGE, not the extension, and fires a bogus request at linkedin.com. */
 /* ─── NEW CONTAINER STYLE ─── */
 /* Our own block on its own line, below LinkedIn's action row rather than inside
    it. `display: flex` (not inline-flex) with a full-width basis is what keeps it
