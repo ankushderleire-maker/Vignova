@@ -27,6 +27,9 @@ import LinkedInProfileView, { summarizeProfile } from "@/components/linkedin/Lin
 import OptimizationReport from "@/components/linkedin/OptimizationReport";
 import { cleanSkills, sanitizeLinkedInProfile } from "@/lib/linkedin-skills";
 import { CREDIT_COSTS, describeCost } from "@/lib/planCatalog";
+import { copyText } from "@/lib/clipboard";
+import LinkedInSideBySide from "@/components/linkedin/LinkedInSideBySide";
+import NoMasterProfileModal from "@/components/linkedin/NoMasterProfileModal";
 
 interface LinkedInAnalysisResult {
     id: string;
@@ -159,9 +162,13 @@ const normalizeLinkedInScores = (scores: any, profile: any, hasMasterProfile: bo
         ...(scores || {}),
         projects: typeof scores?.projects === "number" ? scores.projects : estimateProjectScore(profile),
     };
+    // Estimates only fill gaps. They used to overwrite the backend's numbers
+    // whenever this page decided no master profile was selected, which it can
+    // judge differently from the backend, so before and after could be
+    // measured two different ways and "after" come out lower.
     if (!hasMasterProfile) {
-        normalized.keyword = estimateKeywordScoreWithoutMaster(profile);
-        normalized.semantic = estimateSemanticScoreWithoutMaster(profile);
+        if (typeof scores?.keyword !== "number") normalized.keyword = estimateKeywordScoreWithoutMaster(profile);
+        if (typeof scores?.semantic !== "number") normalized.semantic = estimateSemanticScoreWithoutMaster(profile);
     }
     return normalized;
 };
@@ -222,20 +229,27 @@ function LinkedInOptimizerContent() {
     const [error, setError] = useState("");
     const [activeSection, setActiveSection] = useState("overview");
     const [viewMode, setViewMode] = useState<"current" | "optimized">("current");
+    const [compareMode, setCompareMode] = useState<"side" | "full">("side");
+    const [showNoMasterModal, setShowNoMasterModal] = useState(false);
 
     // Fetching animation state
     const [stageIndex, setStageIndex] = useState(0);
     const [elapsed, setElapsed] = useState(0);
 
     const [copiedText, setCopiedText] = useState("");
+    const [copyFailed, setCopyFailed] = useState(false);
+    // copyText falls back to a hidden textarea when the async clipboard API is
+    // missing or refused (an unfocused tab, a sandboxed frame, plain http),
+    // which is where these buttons used to fail.
     const handleCopy = async (text: string) => {
-        try {
-            await navigator.clipboard.writeText(text);
+        if (await copyText(text)) {
+            setCopyFailed(false);
             setCopiedText(text);
             setTimeout(() => setCopiedText(current => current === text ? "" : current), 2000);
-        } catch {
+        } else {
             setCopiedText("");
-            alert("Couldn't copy to the clipboard. Please select and copy the text manually.");
+            setCopyFailed(true);
+            setTimeout(() => setCopyFailed(false), 4000);
         }
     };
 
@@ -249,6 +263,7 @@ function LinkedInOptimizerContent() {
     const [selectedMasterProfile, setSelectedMasterProfile] = useState<string>("");
     const [selectedMasterProfileData, setSelectedMasterProfileData] = useState<any>(null);
     const [isMasterProfileLoading, setIsMasterProfileLoading] = useState(false);
+    const [masterProfilesLoaded, setMasterProfilesLoaded] = useState(false);
     
     // Timers for the in-flight scrape, cleared on unmount / cancel.
     // runTokenRef identifies the current attempt: bumping it makes every older
@@ -349,6 +364,7 @@ function LinkedInOptimizerContent() {
                 setSelectedMasterProfileData(null);
             }
         } catch (e) { console.error("Failed to fetch master profiles", e); }
+        finally { setMasterProfilesLoaded(true); }
     };
 
     const failScrape = (message: string) => {
@@ -362,11 +378,23 @@ function LinkedInOptimizerContent() {
      * credentials) and then polls it until the profile is back. The browser
      * never touches the provider directly, and never learns its name.
      */
-    const handleConnect = async () => {
+    const handleConnect = async (skipMasterCheck = false) => {
         setError("");
         if (!linkedinUrl.includes("linkedin.com/in/")) {
             setError("Please enter a valid LinkedIn profile URL, e.g. https://www.linkedin.com/in/your-name");
             return;
+        }
+        // The analysis scores LinkedIn against the Master Profile, so ask
+        // before scanning without one instead of quietly scoring LinkedIn alone.
+        if (!skipMasterCheck) {
+            if (!masterProfilesLoaded || isMasterProfileLoading) {
+                setError("Master Profile details are still loading. Please try again in a moment.");
+                return;
+            }
+            if (!hasUsableMasterProfileData(selectedMasterProfileData)) {
+                setShowNoMasterModal(true);
+                return;
+            }
         }
         let finalUrl = linkedinUrl.trim();
         if (!finalUrl.startsWith("http://") && !finalUrl.startsWith("https://")) {
@@ -513,6 +541,14 @@ function LinkedInOptimizerContent() {
 
     return (
         <>
+            <NoMasterProfileModal
+                open={showNoMasterModal}
+                hasProfiles={masterProfiles.length > 0}
+                onCreate={() => router.push("/dashboard/profile")}
+                onContinue={() => { setShowNoMasterModal(false); handleConnect(true); }}
+                onCancel={() => setShowNoMasterModal(false)}
+            />
+
             {showMissingMasterModal && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-200" style={{ position: 'fixed' }}>
                     <div className="bg-[var(--sidebar-bg)] border border-[var(--border-color)] rounded-xl shadow-2xl w-full max-w-md p-6 relative animate-in zoom-in-95 duration-200">
@@ -565,6 +601,11 @@ function LinkedInOptimizerContent() {
                     </div>
                 </div>
             )}
+            {copyFailed && (
+                <div role="status" className="fixed bottom-6 right-6 z-[120] max-w-xs rounded-xl border border-red-500/30 bg-[var(--sidebar-bg)] px-4 py-3 text-sm text-[var(--foreground)] shadow-2xl">
+                    Couldn&apos;t copy automatically. Select the text and press Ctrl+C.
+                </div>
+            )}
         <div className="w-full max-w-[1700px] mx-auto min-h-[calc(100vh-120px)] flex flex-col space-y-6 animate-slide-down">
             
             <div className="flex items-center justify-end shrink-0">
@@ -578,7 +619,7 @@ function LinkedInOptimizerContent() {
             </div>
 
             {step === "setup" && (
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div id="tour-linkedin" className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     <div className="bg-[var(--sidebar-bg)]/50 border border-[var(--border-color)] rounded-xl p-6 shadow-xl space-y-5">
                         <div>
                             <h2 className="text-sm font-bold text-[var(--foreground)] uppercase tracking-wider mb-1">1. Choose Master Profile</h2>
@@ -628,7 +669,7 @@ function LinkedInOptimizerContent() {
                             </div>
 
                             <div className="mt-auto pt-2">
-                                <button onClick={handleConnect} disabled={!linkedinUrl} className="w-full flex items-center justify-center gap-2 bg-[#0a66c2] hover:bg-[#004182] text-white px-5 py-3 rounded-xl transition shadow-lg shadow-blue-500/20 font-medium text-sm disabled:opacity-40 disabled:cursor-not-allowed">
+                                <button onClick={() => handleConnect()} disabled={!linkedinUrl}className="w-full flex items-center justify-center gap-2 bg-[#0a66c2] hover:bg-[#004182] text-white px-5 py-3 rounded-xl transition shadow-lg shadow-blue-500/20 font-medium text-sm disabled:opacity-40 disabled:cursor-not-allowed">
                                     <ScanLine className="h-4 w-4" /> Fetch &amp; Analyze Profile
                                 </button>
                             </div>
@@ -815,7 +856,12 @@ function LinkedInOptimizerContent() {
                     : currentProfile;
 
                 const hasMasterProfile = hasUsableMasterProfileData(selectedMasterProfileData);
-                const normalizedCurrentScores = normalizeLinkedInScores(result.sectionScores, currentProfile, hasMasterProfile);
+                // An optimization carries the current profile re-scored on the same
+                // inputs as the rewrite. Prefer it to the scan-time numbers so before
+                // and after are measured the same way.
+                const baseSectionScores = aiReport?.currentSectionScores || result.sectionScores;
+                const baseOverallScore = typeof aiReport?.currentScore === "number" ? aiReport.currentScore : result.overallScore;
+                const normalizedCurrentScores = normalizeLinkedInScores(baseSectionScores, currentProfile, hasMasterProfile);
                 const normalizedOptimizedScores = normalizeOptimizedScores(
                     normalizeLinkedInScores(aiReport?.optimizedSectionScores, optimizedProfile || currentProfile, hasMasterProfile),
                     normalizedCurrentScores,
@@ -824,9 +870,17 @@ function LinkedInOptimizerContent() {
                 );
                 const optimizedBaseScore = typeof aiReport?.optimizedScore === "number"
                     ? aiReport.optimizedScore
-                    : result.overallScore;
-                const currentScore = calculateDisplayScoreFromSections(result.overallScore, normalizedCurrentScores);
-                const optimizedScore = calculateDisplayScoreFromSections(optimizedBaseScore, normalizedOptimizedScores);
+                    : baseOverallScore;
+                // The backend's overall numbers are authoritative when it sent both:
+                // re-deriving them here from rounded, gap-filled sections is what let
+                // "after" drift below "before".
+                const backendScored = typeof aiReport?.currentScore === "number" && typeof aiReport?.optimizedScore === "number";
+                const currentScore = backendScored
+                    ? aiReport.currentScore
+                    : calculateDisplayScoreFromSections(baseOverallScore, normalizedCurrentScores);
+                const optimizedScore = backendScored
+                    ? aiReport.optimizedScore
+                    : calculateDisplayScoreFromSections(optimizedBaseScore, normalizedOptimizedScores);
                 const displayScore = viewMode === "optimized" ? Math.round(optimizedScore) : currentScore;
                 const displayedSectionScores =
                     viewMode === "optimized" && aiReport?.optimizedSectionScores
@@ -938,6 +992,31 @@ function LinkedInOptimizerContent() {
                                 profileUrl={linkedinUrl}
                             />
 
+                            <div className="flex flex-wrap items-center justify-between gap-3">
+                                <p className="text-xs text-[var(--text-secondary)]">Compare each section, then copy the new version into LinkedIn.</p>
+                                <div className="inline-flex rounded-lg border border-[var(--border-color)] bg-[var(--sidebar-bg)] p-1">
+                                    {([["side", "Side by side"], ["full", "Full profiles"]] as const).map(([mode, label]) => (
+                                        <button
+                                            key={mode}
+                                            type="button"
+                                            onClick={() => setCompareMode(mode)}
+                                            className={`px-3 py-1.5 rounded-md text-xs font-bold transition ${compareMode === mode ? "bg-[var(--background)] text-[var(--foreground)] shadow-sm" : "text-[var(--text-secondary)] hover:text-[var(--foreground)]"}`}
+                                        >
+                                            {label}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {compareMode === "side" ? (
+                                <LinkedInSideBySide
+                                    current={currentProfile}
+                                    optimized={optimizedProfile}
+                                    optimizedSkills={aiReport?.skills || null}
+                                    copiedText={copiedText}
+                                    onCopy={handleCopy}
+                                />
+                            ) : (
                             <div className="relative grid grid-cols-1 xl:grid-cols-2 gap-5 items-start">
                                 <div className="space-y-3 min-w-0 rounded-xl bg-[var(--background)] p-3">
                                     <div className="sticky top-0 z-10 rounded-xl border border-[var(--border-color)] bg-[var(--background)]/95 backdrop-blur px-4 py-3 shadow-sm">
@@ -978,6 +1057,7 @@ function LinkedInOptimizerContent() {
                                     />
                                 </div>
                             </div>
+                            )}
                         </div>
                     );
                 }

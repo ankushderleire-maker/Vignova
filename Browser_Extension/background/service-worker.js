@@ -525,6 +525,38 @@ function routeMessage(message, sender, sendResponse, requestEpoch) {
         return true;
     }
 
+    // ─── API Proxy: Add a skill to the active Master Profile ───
+    if (message.type === "API_ADD_PROFILE_SKILL") {
+        chrome.storage.local.get(["vignova_token"], async (result) => {
+            if (requestEpoch !== authEpoch || !result.vignova_token) {
+                sendResponse({ success: false, authenticated: false, error: "Please sign in to Vignova." });
+                return;
+            }
+            try {
+                const response = await fetch(`${Vignova_API_BASE}/api/extension/profile-skills`, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "Authorization": `Bearer ${result.vignova_token}`,
+                    },
+                    body: JSON.stringify(message.data || {}),
+                });
+                const data = await response.json().catch(() => ({}));
+                if (response.ok) {
+                    // The local scorer reads the cached profile; refresh it.
+                    ++profileCacheVersion;
+                    await warmExtensionCache(result.vignova_token, requestEpoch);
+                    sendResponse({ success: true, ...data });
+                } else {
+                    sendResponse(apiFailure(data, "Could not add this skill"));
+                }
+            } catch (err) {
+                sendResponse({ success: false, error: "Cannot connect to Vignova server." });
+            }
+        });
+        return true;
+    }
+
     // ─── API Proxy: Login ───
     if (message.type === "API_LOGIN") {
         (async () => {

@@ -7,6 +7,7 @@ import {
   Mail, Phone, MapPin, Globe, Layout, X, ChevronDown, Check, Crown, FileText,
   FolderGit2, Award, Languages, Upload, AlertTriangle, CheckCircle2, AlertCircle, Linkedin, Trophy
 } from "lucide-react";
+import { X as CloseIcon } from "lucide-react";
 import { DotLottieReact } from '@lottiefiles/dotlottie-react';
 import { linkedInToProfile, type ImportSummary } from "@/lib/linkedin-to-profile";
 
@@ -125,6 +126,14 @@ function ProfileProvider({ children }: { children: React.ReactNode }) {
     });
   };
   const hideFeedback = () => setFeedback(prev => ({ ...prev, isOpen: false }));
+
+  // A success note closes itself. There is nothing to decide, so making the
+  // user dismiss it only got in the way of the next edit.
+  useEffect(() => {
+    if (!feedback.isOpen || feedback.type !== "success") return;
+    const timer = setTimeout(() => setFeedback(prev => ({ ...prev, isOpen: false })), 2400);
+    return () => clearTimeout(timer);
+  }, [feedback.isOpen, feedback.type, feedback.title]);
 
   useEffect(() => {
     dataRef.current = data;
@@ -371,7 +380,17 @@ function ProfileProvider({ children }: { children: React.ReactNode }) {
       {feedback.isOpen && (
         <div className="fixed inset-0 z-[300] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={feedback.type === 'loading' || feedback.type === 'analyzing' ? undefined : hideFeedback} />
-          <div className="relative bg-[var(--sidebar-bg)] border border-[var(--border-color)] rounded-3xl w-full max-w-sm p-8 shadow-2xl animate-scale-in flex flex-col items-center text-center">
+          <div className="relative bg-[var(--sidebar-bg)] border border-[var(--border-color)] rounded-3xl w-full max-w-sm p-8 shadow-2xl animate-scale-in flex flex-col items-center text-center overflow-hidden">
+            {feedback.type !== "loading" && feedback.type !== "analyzing" && (
+              <button
+                type="button"
+                onClick={hideFeedback}
+                aria-label="Close"
+                className="absolute top-4 right-4 w-8 h-8 rounded-full flex items-center justify-center text-[var(--text-secondary)] hover:text-[var(--foreground)] hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
+              >
+                <CloseIcon className="w-4 h-4" />
+              </button>
+            )}
 
             {/* Animated Icon Container */}
             <div className={`rounded-full flex items-center justify-center ${feedback.type === 'analyzing' ? 'w-64 h-64 -mt-8 -mb-12' : 'w-16 h-16 mb-6'}`}>
@@ -386,8 +405,12 @@ function ProfileProvider({ children }: { children: React.ReactNode }) {
                 </div>
               )}
               {feedback.type === "success" && (
-                <div className="bg-green-500/10 text-green-500 w-full h-full rounded-full flex items-center justify-center animate-bounce">
-                  <CheckCircle2 className="w-8 h-8" />
+                <div className="vg-success-mark relative w-full h-full" aria-hidden="true">
+                  <span className="vg-success-ring absolute inset-0 rounded-full bg-green-500/25" />
+                  <svg viewBox="0 0 52 52" className="relative w-full h-full">
+                    <circle className="vg-success-circle" cx="26" cy="26" r="24" fill="none" stroke="currentColor" strokeWidth="3" />
+                    <path className="vg-success-check" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" d="M15 27 l7 7 l15 -16" />
+                  </svg>
                 </div>
               )}
               {feedback.type === "error" && (
@@ -400,7 +423,7 @@ function ProfileProvider({ children }: { children: React.ReactNode }) {
                   <AlertTriangle className="w-8 h-8" />
                 </div>
               )}
-              {(feedback.iconType || feedback.type) === "success" && (
+              {feedback.type === "confirm" && feedback.iconType === "success" && (
                 <div className="bg-green-500/10 text-green-500 w-full h-full rounded-full flex items-center justify-center">
                   <CheckCircle2 className="w-8 h-8" />
                 </div>
@@ -427,13 +450,10 @@ function ProfileProvider({ children }: { children: React.ReactNode }) {
               </div>
             )}
 
-            {(feedback.type === "success" || feedback.type === "error") && (
-              <button
-                onClick={hideFeedback}
-                className="w-full py-3.5 bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/20 border border-[var(--border-color)] rounded-xl text-[var(--foreground)] text-xs tracking-wider uppercase font-bold transition-all"
-              >
-                Dismiss
-              </button>
+            {feedback.type === "success" && (
+              <div className="absolute bottom-0 left-0 right-0 h-1 bg-green-500/15" aria-hidden="true">
+                <div className="vg-countdown h-full bg-green-500" />
+              </div>
             )}
           </div>
         </div>
@@ -562,12 +582,12 @@ function ExperienceForm() {
               <div className="space-y-1 group/textarea">
                 <div className="flex justify-between items-center mb-1">
                   <label className="text-[10px] uppercase font-bold text-gray-500 transition-colors group-focus-within/textarea:text-[var(--primary)] tracking-wider">Description</label>
-                  <span className={`text-[10px] font-bold ${(exp.description?.length || 0) >= 1000 ? 'text-red-500' : 'text-gray-400'}`}>
-                    {exp.description?.length || 0} / 1000
+                  <span className={`text-[10px] font-bold ${(exp.description?.length || 0) >= 2600 ? 'text-red-500' : 'text-gray-400'}`}>
+                    {exp.description?.length || 0} / 2600
                   </span>
                 </div>
                 <textarea
-                  maxLength={1000}
+                  maxLength={2600}
                   className="w-full bg-transparent border border-[var(--border-color)] rounded-lg px-3 py-2.5 text-sm font-medium text-[var(--foreground)]/90 focus:border-[var(--primary)] focus:ring-1 focus:ring-[var(--primary)]/20 outline-none min-h-[90px] resize-y placeholder:text-[var(--text-secondary)]/50 transition-all hover:border-gray-400 dark:hover:border-gray-600"
                   placeholder="Describe your responsibilities and achievements..."
                   value={exp.description || ""} onChange={e => updateListItem("experience", i, "description", e.target.value)}
@@ -724,12 +744,12 @@ function ProjectsForm() {
               <div className="md:col-span-2 space-y-1 group/textarea">
                 <div className="flex justify-between items-center mb-1">
                   <label className="text-[10px] uppercase font-bold text-gray-500 transition-colors group-focus-within/textarea:text-[var(--primary)] tracking-wider">Description</label>
-                  <span className={`text-[10px] font-bold ${(proj.description?.length || 0) >= 1000 ? 'text-red-500' : 'text-gray-400'}`}>
-                    {proj.description?.length || 0} / 1000
+                  <span className={`text-[10px] font-bold ${(proj.description?.length || 0) >= 2600 ? 'text-red-500' : 'text-gray-400'}`}>
+                    {proj.description?.length || 0} / 2600
                   </span>
                 </div>
                 <textarea
-                  maxLength={1000}
+                  maxLength={2600}
                   className="w-full bg-transparent border border-[var(--border-color)] rounded-lg px-3 py-2.5 text-sm font-medium text-[var(--foreground)]/90 focus:border-[var(--primary)] focus:ring-1 focus:ring-[var(--primary)]/20 outline-none min-h-[90px] resize-y placeholder:text-[var(--text-secondary)]/50 transition-all hover:border-gray-400 dark:hover:border-gray-600"
                   placeholder="Describe the project, challenges faced, and your specific contributions..."
                   value={proj.description || ""} onChange={e => updateListItem("projects", i, "description", e.target.value)}

@@ -19,8 +19,12 @@ def resume_data_to_text(data: Dict[str, Any]) -> str:
     """Flatten structured resume JSON into ATS-friendly plain text."""
     parts: List[str] = []
 
+    # Contact details sit under "contact" once the dashboard has shaped the
+    # resume, and at the top level straight from the model. Reading only the
+    # top level lost the email and LinkedIn, and the format score with them.
+    contact = data.get("contact") if isinstance(data.get("contact"), dict) else {}
     for key in ("fullName", "jobTitle", "email", "phone", "location", "linkedin", "website", "github"):
-        value = data.get(key)
+        value = data.get(key) or contact.get(key)
         if value:
             parts.append(str(value).strip())
 

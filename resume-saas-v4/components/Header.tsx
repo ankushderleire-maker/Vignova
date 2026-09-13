@@ -26,11 +26,13 @@ import {
   MessageSquareQuote,
   Mic,
   Gauge,
+  Sparkles,
   Menu,
   Bell,
   type LucideIcon
 } from "lucide-react";
 import { BUCKETS, type Bucket } from "@/lib/planCatalog";
+import { START_TOUR_EVENT } from "@/components/OnboardingTour";
 import { useTheme } from "@/components/providers/ThemeContext";
 
 // Map routes to page info with icons and descriptions
@@ -446,6 +448,18 @@ export function Header({ onMenuClick }: HeaderProps) {
                   <div className={`w-8 h-4 rounded-full p-0.5 transition-colors ${theme === 'dark' ? 'bg-[var(--primary)]' : 'bg-gray-300'}`}>
                     <div className={`w-3 h-3 rounded-full bg-white transition-transform ${theme === 'dark' ? 'translate-x-4' : 'translate-x-0'}`} />
                   </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsDropdownOpen(false);
+                    window.dispatchEvent(new Event(START_TOUR_EVENT));
+                  }}
+                  className="flex w-full items-center gap-3 px-3 py-2 text-sm text-[var(--text-secondary)] rounded-lg hover:bg-black/5 dark:hover:bg-white/5 hover:text-[var(--foreground)] transition-colors text-left"
+                >
+                  <Sparkles className="h-4 w-4" />
+                  Take the product tour
                 </button>
 
                 <Link
