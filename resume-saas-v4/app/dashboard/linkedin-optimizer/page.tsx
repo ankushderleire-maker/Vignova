@@ -26,6 +26,7 @@ import { useSession } from "next-auth/react";
 import LinkedInProfileView, { summarizeProfile } from "@/components/linkedin/LinkedInProfileView";
 import OptimizationReport from "@/components/linkedin/OptimizationReport";
 import { cleanSkills, sanitizeLinkedInProfile } from "@/lib/linkedin-skills";
+import { CREDIT_COSTS, describeCost } from "@/lib/planCatalog";
 
 interface LinkedInAnalysisResult {
     id: string;
@@ -479,17 +480,11 @@ function LinkedInOptimizerContent() {
         if (!result) return;
         setShowCreditModal(false);
         setIsOptimizing(true);
-        // Reserved before the rewrite so an empty balance cannot start it, and
-        // handed back below if the rewrite fails.
-        let creditTaken = false;
         try {
-            const creditRes = await fetch("/api/credits/deduct", { method: "POST" });
-            if (!creditRes.ok) {
-                if (creditRes.status === 403) throw new Error("Insufficient Credits to perform this action.");
-                throw new Error("Failed to deduct credit.");
-            }
-            creditTaken = true;
-
+            // /api/linkedin/optimize checks the plan, reserves the writing credit
+            // and refunds it if the rewrite fails. This page used to reserve one
+            // too, through /api/credits/deduct with no bucket, so every rewrite
+            // also cost a tailoring credit.
             const res = await fetch("/api/linkedin/optimize", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -502,19 +497,12 @@ function LinkedInOptimizerContent() {
             });
             if (!res.ok) {
                 const errData = await res.json().catch(() => ({}));
-                throw new Error(errData?.error || "AI Optimization failed.");
+                throw new Error(errData?.message || errData?.error || "AI Optimization failed.");
             }
             setAiReport(await res.json());
             setViewMode("optimized");
         } catch (err: any) {
-            if (creditTaken) {
-                await fetch("/api/credits/refund", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ reason: "linkedin-optimize: " + (err?.message || "failed") }),
-                }).catch(() => { /* the server logs a failed refund */ });
-            }
-            setError((err?.message || "Optimisation failed.") + " Your credit has not been used.");
+            setError(err?.message || "Optimisation failed.");
         } finally {
             setIsOptimizing(false);
         }
@@ -561,9 +549,9 @@ function LinkedInOptimizerContent() {
                             <div className="w-12 h-12 rounded-full bg-[var(--primary)]/10 flex items-center justify-center text-[var(--primary)]">
                                 <Sparkles className="w-6 h-6" />
                             </div>
-                            <h3 className="text-xl font-bold text-[var(--foreground)]">Use 1 Credit?</h3>
+                            <h3 className="text-xl font-bold text-[var(--foreground)]">Use {describeCost(CREDIT_COSTS.linkedinOptimization)}?</h3>
                             <p className="text-sm text-[var(--text-secondary)]">
-                                LinkedIn Profile Optimization requires 1 credit to proceed. Do you want to continue?
+                                LinkedIn profile optimization uses {describeCost(CREDIT_COSTS.linkedinOptimization)}. If the rewrite fails, it is returned automatically.
                             </p>
                             <div className="flex items-center gap-3 w-full pt-2">
                                 <button onClick={() => setShowCreditModal(false)} className="flex-1 py-2.5 px-4 rounded-lg font-medium text-[var(--foreground)] bg-[var(--card-border-bg)] hover:bg-[var(--border-color)] transition">

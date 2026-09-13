@@ -1,8 +1,12 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
-import { db } from "@/lib/db";
-import { spendMany, creditBalance } from "@/lib/credits";
+import { callBackend } from "@/lib/career-ops";
+import { creditBalance, outOfCreditsBody, refundCredits, refundMany, spendMany } from "@/lib/credits";
+import { CREDIT_COSTS } from "@/lib/planCatalog";
+
+/** Same price as the extension's pack; see CREDIT_COSTS.applicationPack. */
+const PACK_COST = CREDIT_COSTS.applicationPack;
 
 export const maxDuration = 300;
 
@@ -13,22 +17,22 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // 1. Check the tailoring allowance
-    // ensurePeriod() inside creditBalance also refills a bucket left over from
-    // an earlier month.
-    if ((await creditBalance(userId, "tailoring")) <= 0) {
-        return NextResponse.json(
-            { error: "You're out of tailoring credits.", bucket: "tailoring", outOfCredits: true },
-            { status: 403 }
-        );
-    }
-
     const body = await req.json();
     const { jobDescription, masterProfile, atsReport } = body;
     
     if (!jobDescription || !masterProfile) {
         return NextResponse.json({ error: "Missing jobDescription or masterProfile" }, { status: 400 });
     }
+
+    // Both credits are reserved up front, in one transaction. This used to
+    // check only the tailoring balance, generate everything, and then charge
+    // the pack without reading the result, so an account with no writing
+    // credits failed that charge and got every pack for free.
+    const spent = await spendMany(userId, PACK_COST);
+    if (!spent.ok) {
+        return NextResponse.json(outOfCreditsBody(spent.bucket, spent.remaining), { status: 403 });
+    }
+    let reservationOpen = true;
 
     // Extract fields for prompts
     const fullName = `${masterProfile.first_name || masterProfile.fullName || ""} ${masterProfile.last_name || ""}`.trim();
@@ -54,9 +58,6 @@ export async function POST(req: Request) {
         : "";
 
     const jdSnippet = jobDescription.substring(0, 3000);
-
-    
-    const AI_BACKEND_URL = process.env.AI_BACKEND_URL || "http://localhost:8000";
 
     const coverLetterPrompt = `Write a professional, compelling cover letter for the following job application.
 
@@ -109,66 +110,54 @@ INSTRUCTIONS:
 - Output ONLY the email, no extra commentary`;
 
     try {
-        const [resumeResult, coverLetterResult, emailResult] = await Promise.allSettled([
-            fetch(`${AI_BACKEND_URL}/api/generate-tailored-resume`, {
+        // callBackend sends the internal API key the backend now requires.
+        const [resumeResult, coverLetterResult, emailResult] = await Promise.all([
+            callBackend<{ data?: unknown }>("/api/generate-tailored-resume", {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ jobDescription, masterProfile, atsReport }),
-                // @ts-ignore
-                signal: AbortSignal.timeout(280_000),
+                body: { jobDescription, masterProfile, atsReport },
+                timeoutMs: 280_000,
             }),
-            fetch(`${AI_BACKEND_URL}/api/generate-cover-letter`, {
+            callBackend<{ response?: string }>("/api/generate-cover-letter", {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ jobDescription, masterProfile }),
+                body: { jobDescription, masterProfile },
             }),
-            fetch(`${AI_BACKEND_URL}/api/generate-draft-email`, {
+            callBackend<{ response?: string }>("/api/generate-draft-email", {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ jobDescription, masterProfile }),
-            })
+                body: { jobDescription, masterProfile },
+            }),
         ]);
 
-        let resumeData = null;
-        let coverLetter = null;
-        let draftEmail = null;
+        const resumeData = resumeResult.ok ? resumeResult.data?.data ?? null : null;
+        const coverLetter = coverLetterResult.ok ? coverLetterResult.data?.response?.trim() || null : null;
+        const draftEmail = emailResult.ok ? emailResult.data?.response?.trim() || null : null;
 
-        if (resumeResult.status === "fulfilled" && resumeResult.value.ok) {
-            const aiResult = await resumeResult.value.json();
-            resumeData = aiResult.data;
-        } else {
-            console.error("[GENERATE_ALL] Resume failed:", resumeResult.status === "rejected" ? resumeResult.reason : "HTTP Error");
+        // Pay for what arrived. The reservation covered a resume and the
+        // writing that goes with it; whichever half failed is handed back.
+        reservationOpen = false;
+        if (!resumeData) {
+            console.error("[GENERATE_ALL] Resume failed:", resumeResult.status, resumeResult.error);
+            await refundCredits(userId, "tailoring", "application pack: resume failed");
         }
-
-        if (coverLetterResult.status === "fulfilled" && coverLetterResult.value.ok) {
-            const clData = await coverLetterResult.value.json();
-            coverLetter = clData.response?.trim() || null;
-        }
-
-        if (emailResult.status === "fulfilled" && emailResult.value.ok) {
-            const emData = await emailResult.value.json();
-            draftEmail = emData.response?.trim() || null;
+        if (!coverLetter && !draftEmail) {
+            await refundCredits(userId, "writing", "application pack: cover letter and email failed");
         }
 
         if (!resumeData && !coverLetter && !draftEmail) {
-            return NextResponse.json({ error: "All generation tasks failed." }, { status: 502 });
+            return NextResponse.json(
+                { error: "All generation tasks failed. No credits were used." },
+                { status: 502 }
+            );
         }
-
-        // Charged last, and atomically: the balance is decided by the
-        // database rather than by arithmetic on a value read earlier.
-        // Same price as the extension's pack: a resume and the writing that
-        // goes with it, taken together or not at all.
-        const spent = await spendMany(userId, { tailoring: 1, writing: 1 });
 
         return NextResponse.json({
             success: true,
             data: resumeData,
             coverLetter,
             draftEmail,
-            credits_remaining: await creditBalance(userId, "tailoring")
+            credits_remaining: await creditBalance(userId, "tailoring"),
         });
-
     } catch (error) {
+        if (reservationOpen) await refundMany(userId, PACK_COST, "application pack failed");
         console.error("[GENERATE_ALL]", error);
         return NextResponse.json({ error: "Internal server error" }, { status: 500 });
     }

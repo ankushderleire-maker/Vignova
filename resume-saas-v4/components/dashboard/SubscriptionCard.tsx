@@ -5,23 +5,33 @@ import { Crown, Zap } from "lucide-react";
 import { useRouter } from "next/navigation";
 import styles from "./DashboardCard.module.css";
 
-interface SubscriptionCardProps {
-    plan: string;
-    creditsRemaining: number;
-    /** From /api/subscription; falls back to the plan's published allowance. */
-    creditsTotal?: number;
+export interface SubscriptionBucket {
+    bucket: "tailoring" | "writing" | "interview";
+    label: string;
+    remaining: number;
+    total: number;
+    unlimited: boolean;
 }
 
-export function SubscriptionCard({ plan, creditsRemaining, creditsTotal }: SubscriptionCardProps) {
+interface SubscriptionCardProps {
+    plan: string;
+    /** From /api/subscription: one entry per credit bucket. */
+    buckets?: SubscriptionBucket[];
+}
+
+/**
+ * The plan, and what is left of each allowance this month.
+ *
+ * This used to show one "credits left" number read from the legacy single
+ * pool, which nothing spends from any more, so it could sit at 1 while every
+ * bucket was full. Each bucket is its own balance and gets its own row.
+ */
+export function SubscriptionCard({ plan, buckets = [] }: SubscriptionCardProps) {
     const router = useRouter();
     const isPremium = plan?.toUpperCase() === "PREMIUM";
     const isPro = plan?.toUpperCase() === "PRO";
     const isPaid = isPremium || isPro;
     const color = isPremium ? "#F59E0B" : isPro ? "#3B82F6" : "#6B7280"; // Amber for Premium, Blue for Pro, Gray for Free
-
-    const total = creditsTotal ?? (isPremium ? 150 : isPro ? 40 : 3);
-    const remainingPercent = total > 0 ? Math.min(Math.max((creditsRemaining / total) * 100, 0), 100) : 0;
-    const usedPercent = Math.round(100 - remainingPercent);
 
     return (
         <div className={styles.cardWrapper} style={{ "--border-color": color } as React.CSSProperties}>
@@ -43,21 +53,37 @@ export function SubscriptionCard({ plan, creditsRemaining, creditsTotal }: Subsc
                     </span>
                 </div>
 
-                {/* Credits Info */}
+                {/* Credits, one bar per bucket */}
                 <div className="mt-auto">
-                    <div className="flex justify-between items-end mb-2">
-                        <span className="text-3xl font-bold text-[var(--foreground)]">{creditsRemaining}</span>
-                        <span className="text-[var(--text-secondary)] text-sm mb-1">credits left</span>
-                    </div>
-
-                    <div className="flex items-center gap-2 mb-4">
-                        <div className="flex-1 bg-[var(--foreground)]/10 rounded-full h-1.5 overflow-hidden">
-                            <div
-                                className="h-full transition-all duration-500"
-                                style={{ width: `${remainingPercent}%`, backgroundColor: color }}
-                            />
-                        </div>
-                        <span className="shrink-0 text-[10px] text-[var(--text-secondary)]">{usedPercent}% used</span>
+                    <div className="space-y-2.5 mb-4">
+                        {buckets.length === 0 ? (
+                            <p className="text-xs text-[var(--text-secondary)]">Loading credits...</p>
+                        ) : (
+                            buckets.map((bucket) => {
+                                const percent = bucket.unlimited
+                                    ? 100
+                                    : bucket.total > 0
+                                      ? Math.min(Math.max((bucket.remaining / bucket.total) * 100, 0), 100)
+                                      : 0;
+                                const empty = !bucket.unlimited && bucket.remaining <= 0;
+                                return (
+                                    <div key={bucket.bucket}>
+                                        <div className="flex items-baseline justify-between gap-2 text-xs mb-1">
+                                            <span className="text-[var(--text-secondary)]">{bucket.label}</span>
+                                            <span className={`font-semibold tabular-nums ${empty ? "text-rose-500" : "text-[var(--foreground)]"}`}>
+                                                {bucket.unlimited ? "Unlimited" : `${bucket.remaining} / ${bucket.total}`}
+                                            </span>
+                                        </div>
+                                        <div className="bg-[var(--foreground)]/10 rounded-full h-1.5 overflow-hidden">
+                                            <div
+                                                className="h-full transition-all duration-500"
+                                                style={{ width: `${percent}%`, backgroundColor: empty ? "#F43F5E" : color }}
+                                            />
+                                        </div>
+                                    </div>
+                                );
+                            })
+                        )}
                     </div>
 
                     <button

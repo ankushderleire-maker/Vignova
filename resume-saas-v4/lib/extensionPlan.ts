@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import {
     BUCKET_LABELS,
     Bucket,
+    PlanLimits,
     allowanceFor,
     nextPeriodStart,
     normalizePlan,
@@ -48,6 +49,14 @@ type PlanLike = { user_id?: string | null; plan_type?: string | null } | null | 
  * from rather than reading about it.
  */
 const PAID_ONLY = new Set(["Autofill", "ATS Analysis"]);
+
+/**
+ * Features a plan switches on or off in /admin/plans rather than by price. The
+ * pricing page shows these flags, so the routes have to honour them as well.
+ */
+const FEATURE_FLAGS: Record<string, keyof PlanLimits> = {
+    "Interview Prep": "has_interview_prep",
+};
 
 function upgradeResponse(plan: string, feature: string) {
     return withCors(
@@ -121,6 +130,11 @@ export async function checkAiAccess(
     }
 
     const limits = await ensurePeriod(owner, plan);
+    const flag = FEATURE_FLAGS[feature];
+    if (flag && !limits[flag]) {
+        return upgradeResponse(plan, feature);
+    }
+
     const wanted = Array.isArray(buckets) ? buckets : [buckets];
 
     for (const bucket of wanted) {

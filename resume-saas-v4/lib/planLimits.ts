@@ -1,4 +1,5 @@
 import { db } from "./db";
+import { DEFAULT_PLANS, UNLIMITED, type Bucket, type PlanConfig } from "./planCatalog";
 
 /**
  * The one place plan numbers come from.
@@ -14,26 +15,11 @@ import { db } from "./db";
  * it is never used to override a configured plan.
  */
 
-export const BUCKETS = ["tailoring", "writing", "interview"] as const;
-export type Bucket = (typeof BUCKETS)[number];
-
-export function isBucket(value: string): value is Bucket {
-    return (BUCKETS as readonly string[]).includes(value);
-}
-
-/** What each bucket is called where a user can see it. */
-export const BUCKET_LABELS: Record<Bucket, string> = {
-    tailoring: "Tailoring credits",
-    writing: "Writing credits",
-    interview: "Interview credits",
-};
-
-/** What spends from each bucket, for the usage screen and upgrade prompts. */
-export const BUCKET_DESCRIPTIONS: Record<Bucket, string> = {
-    tailoring: "Resume generation for one posting",
-    writing: "Cover letters, application emails and LinkedIn optimization",
-    interview: "AI-written interview questions",
-};
+// Bucket names, labels and prices live in lib/planCatalog.ts, which has no
+// server imports so client pages can read them too. Re-exported here so the
+// server code that already imports them from this module keeps working.
+export { BUCKETS, BUCKET_DESCRIPTIONS, BUCKET_LABELS, UNLIMITED, isBucket } from "./planCatalog";
+export type { Bucket } from "./planCatalog";
 
 /**
  * Unlimited is stored as -1 and spent against this ceiling.
@@ -43,7 +29,6 @@ export const BUCKET_DESCRIPTIONS: Record<Bucket, string> = {
  * enough that no honest user reaches it, and it is never shown in the UI —
  * never advertise a number you would not defend.
  */
-export const UNLIMITED = -1;
 export const FAIR_USE_CEILING = 1000;
 
 export type PlanLimits = {
@@ -59,26 +44,37 @@ export type PlanLimits = {
     has_interview_prep: boolean;
 };
 
-const FALLBACK: Record<string, PlanLimits> = {
-    FREE: {
-        plan_type: "FREE",
-        tailoring: 3, writing: 3, interview: 1, max_profiles: 1,
-        has_extension_access: true, has_multi_profile: false, has_unlimited_resumes: false,
-        has_linkedin_optimization: false, has_interview_prep: true,
-    },
-    PRO: {
-        plan_type: "PRO",
-        tailoring: 50, writing: 100, interview: 5, max_profiles: 5,
-        has_extension_access: true, has_multi_profile: true, has_unlimited_resumes: false,
-        has_linkedin_optimization: true, has_interview_prep: true,
-    },
-    PREMIUM: {
-        plan_type: "PREMIUM",
-        tailoring: UNLIMITED, writing: UNLIMITED, interview: UNLIMITED, max_profiles: UNLIMITED,
-        has_extension_access: true, has_multi_profile: true, has_unlimited_resumes: true,
-        has_linkedin_optimization: true, has_interview_prep: true,
-    },
-};
+type PlanRow = Pick<
+    PlanConfig,
+    | "tailoring_credits"
+    | "writing_credits"
+    | "interview_credits"
+    | "max_profiles"
+    | "has_extension_access"
+    | "has_multi_profile"
+    | "has_unlimited_resumes"
+    | "has_linkedin_optimization"
+    | "has_interview_prep"
+>;
+
+function toLimits(plan: string, row: PlanRow): PlanLimits {
+    return {
+        plan_type: plan,
+        tailoring: row.tailoring_credits,
+        writing: row.writing_credits,
+        interview: row.interview_credits,
+        max_profiles: row.max_profiles,
+        has_extension_access: row.has_extension_access,
+        has_multi_profile: row.has_multi_profile,
+        has_unlimited_resumes: row.has_unlimited_resumes,
+        has_linkedin_optimization: row.has_linkedin_optimization,
+        has_interview_prep: row.has_interview_prep,
+    };
+}
+
+const FALLBACK: Record<string, PlanLimits> = Object.fromEntries(
+    DEFAULT_PLANS.map((plan) => [plan.plan_type, toLimits(plan.plan_type, plan)])
+);
 
 export function normalizePlan(planType?: string | null): string {
     const plan = String(planType || "FREE").toUpperCase();
@@ -90,19 +86,7 @@ export async function planLimits(planType?: string | null): Promise<PlanLimits> 
     const plan = normalizePlan(planType);
     try {
         const row = await db.plan_configs.findUnique({ where: { plan_type: plan } });
-        if (!row) return FALLBACK[plan];
-        return {
-            plan_type: plan,
-            tailoring: row.tailoring_credits,
-            writing: row.writing_credits,
-            interview: row.interview_credits,
-            max_profiles: row.max_profiles,
-            has_extension_access: row.has_extension_access,
-            has_multi_profile: row.has_multi_profile,
-            has_unlimited_resumes: row.has_unlimited_resumes,
-            has_linkedin_optimization: row.has_linkedin_optimization,
-            has_interview_prep: row.has_interview_prep,
-        };
+        return row ? toLimits(plan, row) : FALLBACK[plan];
     } catch {
         // A database that is briefly unreachable must not silently hand out a
         // different allowance than the one the user paid for, but it must also

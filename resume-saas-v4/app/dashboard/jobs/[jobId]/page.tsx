@@ -16,6 +16,7 @@ import { AIPreparationAnimation } from "@/components/resume-engine/AIPreparation
 // --- TYPES ---
 import { ResumeData, type CustomSection } from "@/types/resume";
 import { toResumeData, reconcileSkillGroups } from "@/lib/tailoredResume";
+import { CREDIT_COSTS, describeCost } from "@/lib/planCatalog";
 import SaveDialog from "@/components/resume-engine/SaveDialog";
 
 // --- TEMPLATES ---
@@ -305,6 +306,23 @@ function ResumeStudioPageContent() {
         if (params.jobId) fetchData();
     }, [params.jobId, searchParams]);
 
+    /**
+     * The out-of-credits dialog, worded from the route's answer. Each document
+     * spends a different bucket, so "You have 0 credits remaining" was wrong
+     * whenever the other allowances still had credits left.
+     */
+    const showOutOfCredits = async (response: Response) => {
+        const body = await response.json().catch(() => ({}));
+        setDialogConfig({
+            isOpen: true,
+            type: 'alert',
+            title: body.upgradeRequired && !body.outOfCredits ? 'Upgrade required' : 'Out of credits',
+            description: body.message || body.error || 'You have no credits left for this.',
+            variant: 'destructive',
+            confirmText: 'Got it',
+        });
+    };
+
         const handleGenerateCoverLetter = async () => {
         if (!masterProfile || !job) return;
         setGeneratingType("cover-letter");
@@ -316,7 +334,7 @@ function ResumeStudioPageContent() {
                 body: JSON.stringify({ jobDescription: job.description, masterProfile: masterProfile })
             });
             if (response.status === 403) {
-                setDialogConfig({ isOpen: true, type: 'alert', title: 'Out of Credits', description: 'You have 0 credits remaining!', variant: 'destructive', confirmText: 'Got it' });
+                await showOutOfCredits(response);
                 setIsGenerating(false);
                 return;
             }
@@ -352,7 +370,7 @@ function ResumeStudioPageContent() {
                 body: JSON.stringify({ jobDescription: job.description, masterProfile: masterProfile })
             });
             if (response.status === 403) {
-                setDialogConfig({ isOpen: true, type: 'alert', title: 'Out of Credits', description: 'You have 0 credits remaining!', variant: 'destructive', confirmText: 'Got it' });
+                await showOutOfCredits(response);
                 setIsGenerating(false);
                 return;
             }
@@ -380,7 +398,7 @@ function ResumeStudioPageContent() {
                 body: JSON.stringify({ jobDescription: job.description, masterProfile: masterProfile })
             });
             if (response.status === 403) {
-                setDialogConfig({ isOpen: true, type: 'alert', title: 'Out of Credits', description: 'You have 0 credits remaining!', variant: 'destructive', confirmText: 'Got it' });
+                await showOutOfCredits(response);
                 setIsGenerating(false);
                 return;
             }
@@ -406,7 +424,7 @@ function ResumeStudioPageContent() {
         setIsGenerating(true);
 
         try {
-            // Single atomic call: checks credits, calls backend, deducts only on success
+            // One call: reserves a tailoring and a writing credit, generates all three, refunds whatever failed
             const response = await fetch("/api/resume/generate-all", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -418,14 +436,7 @@ function ResumeStudioPageContent() {
             });
 
             if (response.status === 403) {
-                setDialogConfig({
-                    isOpen: true,
-                    type: 'alert',
-                    title: 'Out of Credits',
-                    description: 'You have 0 credits remaining! Please upgrade your plan to continue generating tailored resumes.',
-                    variant: 'destructive',
-                    confirmText: 'Got it'
-                });
+                await showOutOfCredits(response);
                 setIsGenerating(false);
                 return;
             }
@@ -1729,7 +1740,7 @@ function ResumeStudioPageContent() {
                                 </div>
 
                                 <p className="w-full text-[11px] text-[var(--text-secondary)] mt-3 text-center">
-                                    1 credit is used per generation.
+                                    Resume: {describeCost(CREDIT_COSTS.tailoredResume)}{" \u00B7 "}Cover letter: {describeCost(CREDIT_COSTS.coverLetter)}{" \u00B7 "}Email: {describeCost(CREDIT_COSTS.applicationEmail)}{" \u00B7 "}Pack: {describeCost(CREDIT_COSTS.applicationPack)}
                                 </p>
                             </div>
                         </div>

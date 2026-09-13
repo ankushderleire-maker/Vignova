@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { db } from "@/lib/db";
-import { getUserSubscription, canCreateProfile } from "@/lib/subscription";
+import { getUserSubscription } from "@/lib/subscription";
+import { UNLIMITED, planLimits } from "@/lib/planLimits";
 
 /**
  * GET /api/profiles
@@ -69,11 +70,17 @@ export async function POST(req: Request) {
             where: { user_id: userId },
         });
 
-        if (!canCreateProfile(subscription, existingProfiles)) {
+        // The cap is the plan's max_profiles, which the pricing and usage pages
+        // both show. This used to allow one profile on Free and unlimited on
+        // any paid plan, whatever the plan was configured to include.
+        const limits = await planLimits(subscription?.plan_type);
+        if (limits.max_profiles !== UNLIMITED && existingProfiles >= limits.max_profiles) {
+            const plan = limits.plan_type.charAt(0) + limits.plan_type.slice(1).toLowerCase();
+            const cap = limits.max_profiles;
             return NextResponse.json(
                 {
                     error: "Profile limit reached",
-                    message: "Free users can only create 1 profile. Upgrade to Pro for unlimited profiles.",
+                    message: `Your ${plan} plan includes ${cap} master profile${cap === 1 ? "" : "s"}. Delete one or upgrade for more.`,
                     upgrade_required: true,
                 },
                 { status: 403 }

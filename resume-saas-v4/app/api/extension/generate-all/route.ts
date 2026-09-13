@@ -7,7 +7,7 @@ import { generatePdfFromHtml } from "@/lib/pdf/puppeteer";
 import { withCors, handleCorsOptions } from "@/lib/extensionCors";
 import { findExistingWork, findJobByUrl, duplicateResponse } from "@/lib/extensionDuplicate";
 import { spendMany, refundMany, getBalances } from "@/lib/credits";
-import type { Bucket } from "@/lib/planLimits";
+import { CREDIT_COSTS } from "@/lib/planCatalog";
 
 /**
  * What one application pack costs.
@@ -17,7 +17,7 @@ import type { Bucket } from "@/lib/planLimits";
  * everything. spendMany takes both inside a transaction: taking the first and
  * failing on the second would charge for a pack that was never delivered.
  */
-const PACK_COST: Partial<Record<Bucket, number>> = { tailoring: 1, writing: 1 };
+const PACK_COST = CREDIT_COSTS.applicationPack;
 import { checkAiAccess } from "@/lib/extensionPlan";
 import { callBackend } from "@/lib/career-ops";
 import { jsonObject } from "@/lib/extensionDashboard";
@@ -31,7 +31,7 @@ export async function OPTIONS() {
 /**
  * POST /api/extension/generate-all
  * Generates Resume PDF + Cover Letter + Draft Email in a single request.
- * Costs 1 credit.
+ * Costs one tailoring and one writing credit (PACK_COST).
  *
  * Body: { jobDescription, jobTitle, company, jobUrl?, hint?, source? }
  * Returns: { pdfBase64, coverLetter, draftEmail, credits_remaining, ... }

@@ -12,6 +12,11 @@ export type BackendCallOpts = {
     method?: "GET" | "POST" | "PATCH" | "DELETE";
     body?: any;
     query?: Record<string, string | number | undefined | null>;
+    /**
+     * Send these fields form-encoded instead of `body` as JSON, for backend
+     * routes that read FastAPI `Form(...)` parameters.
+     */
+    form?: Record<string, string>;
     /** Extra headers to merge on. */
     headers?: Record<string, string>;
     /** Milliseconds to wait. Defaults to 120_000. */
@@ -40,10 +45,11 @@ export async function callBackend<T = any>(
     );
 
     try {
+        const form = opts.form ? new URLSearchParams(opts.form).toString() : null;
         const res = await fetch(url.toString(), {
             method,
             headers: {
-                "Content-Type": "application/json",
+                "Content-Type": form !== null ? "application/x-www-form-urlencoded" : "application/json",
                 "X-API-Key": INTERNAL_API_KEY,
                 "x-internal-key": INTERNAL_API_KEY,
                 ...(opts.headers || {}),
@@ -51,7 +57,7 @@ export async function callBackend<T = any>(
             body:
                 method === "GET" || method === "DELETE"
                     ? undefined
-                    : JSON.stringify(opts.body ?? {}),
+                    : form ?? JSON.stringify(opts.body ?? {}),
             signal: controller.signal,
         });
 

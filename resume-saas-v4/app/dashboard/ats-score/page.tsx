@@ -38,6 +38,7 @@ import {
 import { useRouter, useSearchParams } from "next/navigation";
 import { CustomDialog } from "@/components/ui/CustomDialog";
 import { CompanyLogo } from "@/components/jobs/CompanyLogo";
+import { CREDIT_COSTS, describeCost } from "@/lib/planCatalog";
 
 const SectionHeader = ({ number, title, description }: { number: number, title: string, description?: string }) => (
     <div className="mb-6 mt-10">
@@ -457,30 +458,31 @@ function AtsScoreContent() {
     };
 
     const isPremium = subscription && subscription.plan_type !== "FREE";
-    const hasCredits = subscription && subscription.credits_remaining > 0;
+    // AI insights spend a tailoring credit, so that bucket decides. The legacy
+    // credits_remaining pool is no longer spent from.
+    const tailoringCredits = Array.isArray(subscription?.buckets)
+        ? subscription.buckets.find((b: { bucket: string }) => b.bucket === "tailoring")
+        : null;
+    const hasCredits = !!tailoringCredits && (tailoringCredits.unlimited || tailoringCredits.remaining > 0);
 
     const fetchAiReport = async (atsResult: any) => {
         if (!isPremium || !hasCredits) return;
         setIsLoadingAi(true);
         setAiError("");
-        // Reserved before the work so an empty balance cannot start it, and
-        // handed back below if the report never arrives.
-        let creditTaken = false;
         try {
-            // Deduct credit
-            const creditRes = await fetch("/api/credits/deduct", { method: "POST" });
-            if (!creditRes.ok) { setAiError("No credits remaining."); setIsLoadingAi(false); return; }
-            creditTaken = true;
+            // The route checks the plan, reserves a tailoring credit and gives it
+            // back if the model fails. The page used to reserve the credit itself
+            // and then call the model through the generic proxy, which made the
+            // charge optional.
+            const res = await fetch("/api/ats/insights", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ jdText: lastJdText, resumeText: lastResumeText, atsScores: atsResult }),
+            });
+            const payload = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(payload.message || payload.error || "Failed to generate AI report.");
 
-            const formData = new FormData();
-            formData.append("jd_text", lastJdText);
-            formData.append("resume_text", lastResumeText);
-            formData.append("ats_scores", JSON.stringify(atsResult));
-
-            const res = await fetch("/api/python/enhance-ats-report", { method: "POST", body: formData });
-            if (!res.ok) throw new Error(await res.text());
-            
-            const aiData = await res.json();
+            const aiData = payload.report;
             setAiReport(aiData);
             
             // Save AI Report to DB
@@ -502,18 +504,8 @@ function AtsScoreContent() {
             fetchSubscription();
         } catch (e: any) {
             console.error(e);
-            if (creditTaken) {
-                await fetch("/api/credits/refund", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ reason: "ats-report: " + (e?.message || "failed") }),
-                }).catch(() => { /* the server logs a failed refund */ });
-                fetchSubscription();
-            }
-            setAiError(
-                (e.message || "Failed to generate AI report.") +
-                " Your credit has not been used."
-            );
+            fetchSubscription();
+            setAiError(e.message || "Failed to generate AI report.");
         } finally { setIsLoadingAi(false); }
     };
 
@@ -576,7 +568,7 @@ function AtsScoreContent() {
             isOpen: true,
             type: 'confirm',
             title: 'Use AI Refinement',
-            description: 'Refining your resume with AI will cost 1 credit. Do you want to continue?',
+            description: `Refining with AI generates a new application pack (resume, cover letter and email) and uses ${describeCost(CREDIT_COSTS.applicationPack)}. Do you want to continue?`,
             variant: 'default',
             confirmText: 'Refine Resume',
             onConfirm: () => {
@@ -609,7 +601,7 @@ function AtsScoreContent() {
                     )}
                     {subscription && (
                         <span className="text-xs text-[var(--text-secondary)] bg-[var(--sidebar-bg)] border border-[var(--border-color)] px-3 py-1.5 rounded-lg">
-                            <Crown className="w-3 h-3 inline mr-1 text-amber-600 dark:text-amber-400" />{subscription.credits_remaining} credits
+                            <Crown className="w-3 h-3 inline mr-1 text-amber-600 dark:text-amber-400" />{tailoringCredits?.unlimited ? "Unlimited" : tailoringCredits?.remaining ?? 0} tailoring credits
                         </span>
                     )}
                 </div>
@@ -1354,7 +1346,7 @@ function AtsScoreContent() {
                                                     </div>
                                                     {isPremium ? (
                                                         <button onClick={() => fetchAiReport(result)} disabled={!hasCredits || isLoadingAi} className="flex items-center gap-2 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white px-5 py-2.5 rounded-xl transition shadow-lg font-medium text-sm disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap">
-                                                            <Sparkles className="h-4 w-4" /> Generate AI Insights <span className="text-[10px] opacity-70">(1 credit)</span>
+                                                            <Sparkles className="h-4 w-4" /> Generate AI Insights <span className="text-[10px] opacity-70">({describeCost(CREDIT_COSTS.atsInsights)})</span>
                                                         </button>
                                                     ) : (
                                                         <a href="/dashboard/billing" className="flex items-center gap-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white px-5 py-2.5 rounded-xl shadow-lg font-medium text-sm whitespace-nowrap">

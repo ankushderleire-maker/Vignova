@@ -19,6 +19,8 @@ interface User {
         credits_total: number;
         expires_at: string | null;
     } | null;
+    /** This month's balance per bucket, from /api/admin/users. */
+    credits?: { bucket: string; remaining: number; total: number }[];
     counts: {
         resumes: number;
         jobs: number;
@@ -86,7 +88,8 @@ export default function AdminUsersPage() {
         role?: string;
         status?: string;
         plan_type?: string;
-        credits_remaining?: number;
+        buckets?: Record<string, number>;
+        reset_buckets?: boolean;
     }) => {
         if (!selectedUser) return;
         const res = await fetch(`/api/admin/users/${selectedUser.id}`, {
@@ -176,10 +179,18 @@ export default function AdminUsersPage() {
         },
         {
             key: "credits",
-            label: "Credits",
+            label: "Credits (T / W / I)",
             render: (u: User) => (
-                <span className="text-gray-300 text-xs">
-                    {u.subscription?.credits_remaining ?? 0} / {u.subscription?.credits_total ?? 3}
+                <span
+                    className="text-gray-300 text-xs tabular-nums whitespace-nowrap"
+                    title="Tailoring / writing / interview credits left this month"
+                >
+                    {u.credits && u.credits.length > 0
+                        ? ["tailoring", "writing", "interview"]
+                              .map((name) => u.credits!.find((c) => c.bucket === name))
+                              .map((c) => (c ? `${c.remaining}/${c.total}` : "-"))
+                              .join(" \u00B7 ")
+                        : "Not used yet"}
                 </span>
             ),
         },

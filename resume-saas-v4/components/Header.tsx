@@ -23,10 +23,14 @@ import {
   Chrome,
   Linkedin,
   MessageSquare,
+  MessageSquareQuote,
+  Mic,
+  Gauge,
   Menu,
   Bell,
   type LucideIcon
 } from "lucide-react";
+import { BUCKETS, type Bucket } from "@/lib/planCatalog";
 import { useTheme } from "@/components/providers/ThemeContext";
 
 // Map routes to page info with icons and descriptions
@@ -43,7 +47,7 @@ const pageInfo: Record<string, { title: string; description: string; icon: Lucid
   },
   "/dashboard/generator": {
     title: "Resume Generator",
-    description: "Choose a saved job description and launch AI Studio to create a tailored resume from your Master Profile. Uses 1 credit per generation",
+    description: "Choose a saved job description and launch AI Studio to create a tailored resume from your Master Profile. Each resume uses 1 tailoring credit",
     icon: Zap,
   },
   "/dashboard/resumes": {
@@ -63,7 +67,7 @@ const pageInfo: Record<string, { title: string; description: string; icon: Lucid
   },
   "/dashboard/cover-letter": {
     title: "Cover Letter",
-    description: "Generate tailored cover letters for your job applications",
+    description: "Generate tailored cover letters for your job applications. Each one uses 1 writing credit",
     icon: FileText,
   },
   "/dashboard/ats-score": {
@@ -83,14 +87,32 @@ const pageInfo: Record<string, { title: string; description: string; icon: Lucid
   },
   "/dashboard/linkedin-optimizer": {
     title: "LinkedIn Optimizer",
-    description: "Connect your profile to maximize your visibility and keyword alignment",
+    description: "Connect your profile to maximize your visibility and keyword alignment. AI optimization uses 1 writing credit",
     icon: Linkedin,
   },
   "/dashboard/interview-prep": {
     title: "Interview Prep",
-    description: "Generate 15+ tailored interview questions and best-answer hints",
+    description: "Generate 15+ tailored interview questions and best-answer hints. Each set uses 1 interview credit",
     icon: MessageSquare,
   },
+  "/dashboard/billing": {
+    title: "Plans & Billing",
+    description: "Compare plans and see exactly what each type of credit pays for",
+    icon: CreditCard,
+  },
+  "/dashboard/usage": {
+    title: "Usage",
+    description: "Credits left this month in each allowance",
+    icon: Gauge,
+  },
+};
+
+type HeaderBucket = { bucket: Bucket; label: string; remaining: number; total: number; unlimited: boolean };
+
+const BUCKET_ICONS: Record<Bucket, LucideIcon> = {
+  tailoring: FileText,
+  writing: MessageSquareQuote,
+  interview: Mic,
 };
 
 interface HeaderProps {
@@ -141,23 +163,23 @@ export function Header({ onMenuClick }: HeaderProps) {
     }
   };
 
-  // Fetch live subscription data
-  const [sub, setSub] = useState<{ plan_type: string; credits_remaining: number; has_unlimited_resumes: boolean } | null>(null);
+  // Fetch live subscription data. One balance per credit bucket: a spare
+  // writing credit cannot pay for a resume, so a single total would mislead.
+  // Refetched on navigation, since the header outlives the pages that spend.
+  const [sub, setSub] = useState<{ plan_type: string; buckets: HeaderBucket[] } | null>(null);
   useEffect(() => {
     fetch("/api/subscription")
       .then((r) => r.json())
       .then((data) => setSub({
         plan_type: data.plan_type || "FREE",
-        credits_remaining: data.credits_remaining ?? 3,
-        has_unlimited_resumes: data.has_unlimited_resumes || false,
+        buckets: Array.isArray(data.buckets) ? data.buckets : [],
       }))
-      .catch(() => setSub({ plan_type: "FREE", credits_remaining: 3, has_unlimited_resumes: false }));
-  }, []);
+      .catch(() => setSub({ plan_type: "FREE", buckets: [] }));
+  }, [pathname]);
 
   const planName = sub?.plan_type === "PREMIUM" ? "Premium" : sub?.plan_type === "PRO" ? "Pro" : "Free";
   const planColor = sub?.plan_type === "PREMIUM" ? "text-amber-600 dark:text-amber-400 bg-amber-500/10 border-amber-500/30" : sub?.plan_type === "PRO" ? "text-blue-600 dark:text-blue-400 bg-blue-500/10 border-blue-500/30" : "text-gray-600 dark:text-gray-400 bg-gray-500/10 border-gray-500/30";
-  const credits = sub?.credits_remaining ?? 3;
-  const isUnlimited = sub?.has_unlimited_resumes || false;
+  const headerBuckets = sub?.buckets ?? [];
   const badgeBg = sub?.plan_type === "PREMIUM" ? "bg-amber-500/10 border-amber-500/30" : sub?.plan_type === "PRO" ? "bg-blue-500/10 border-blue-500/30" : "bg-[var(--primary)]/10 border-[var(--primary)]/25";
   const badgeText = sub?.plan_type === "PREMIUM" ? "text-amber-500 dark:text-amber-400" : sub?.plan_type === "PRO" ? "text-blue-600 dark:text-blue-400" : "text-[var(--primary)]";
   const planLabelColor = badgeText;
@@ -286,14 +308,38 @@ export function Header({ onMenuClick }: HeaderProps) {
           )}
         </div>
 
-        {/* Credits Counter */}
-        <div id="tour-credits" className={`flex items-center gap-1.5 rounded-full px-2.5 md:px-4 py-1.5 border ${badgeBg}`}>
-          <Zap className={`h-3.5 w-3.5 md:h-4 md:w-4 ${badgeText} fill-current`} />
-          <span className={`text-xs md:text-sm font-semibold ${badgeText}`}>
-            {isUnlimited ? "∞" : credits}
-            <span className="hidden sm:inline"> Credits</span>
-          </span>
-        </div>
+        {/* Credits: one count per bucket, linking to the usage page */}
+        <Link
+          href="/dashboard/usage"
+          id="tour-credits"
+          title="Credits left this month. Click for details."
+          className={`flex items-center gap-2 md:gap-3 rounded-full px-2.5 md:px-4 py-1.5 border ${badgeBg} hover:opacity-90 transition-opacity`}
+        >
+          {headerBuckets.length === 0 ? (
+            <>
+              <Zap className={`h-3.5 w-3.5 md:h-4 md:w-4 ${badgeText} fill-current`} />
+              <span className={`text-xs md:text-sm font-semibold ${badgeText}`}>Credits</span>
+            </>
+          ) : (
+            BUCKETS.map((bucket) => {
+              const state = headerBuckets.find((b) => b.bucket === bucket);
+              if (!state) return null;
+              const Icon = BUCKET_ICONS[bucket];
+              const empty = !state.unlimited && state.remaining <= 0;
+              return (
+                <span
+                  key={bucket}
+                  title={`${state.label} left`}
+                  className={`${bucket === "tailoring" ? "flex" : "hidden sm:flex"} items-center gap-1 text-xs md:text-sm font-semibold tabular-nums ${empty ? "text-rose-500" : badgeText}`}
+                >
+                  <Icon className="h-3.5 w-3.5 md:h-4 md:w-4" aria-hidden="true" />
+                  {state.unlimited ? "\u221E" : state.remaining}
+                  <span className="sr-only"> {state.label.toLowerCase()} left</span>
+                </span>
+              );
+            })
+          )}
+        </Link>
 
         {/* User Profile Dropdown */}
         <div className="relative" ref={dropdownRef}>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { X, KeyRound, Ban, CheckCircle2 } from "lucide-react";
 
 interface UserModalProps {
@@ -12,7 +12,6 @@ interface UserModalProps {
         status?: string;
         subscription: {
             plan_type: string;
-            credits_remaining: number;
         } | null;
     };
     onClose: () => void;
@@ -20,18 +19,55 @@ interface UserModalProps {
         role?: string;
         status?: string;
         plan_type?: string;
-        credits_remaining?: number;
+        buckets?: Partial<Record<BucketName, number>>;
+        reset_buckets?: boolean;
     }) => Promise<void> | void;
     onDelete: () => void;
 }
 
 const MAX_CREDITS = 100000;
 
+const BUCKET_FIELDS = [
+    { bucket: "tailoring", label: "Tailoring" },
+    { bucket: "writing", label: "Writing" },
+    { bucket: "interview", label: "Interview" },
+] as const;
+
+type BucketName = (typeof BUCKET_FIELDS)[number]["bucket"];
+type Balance = { remaining: number; total: number; unlimited: boolean };
+
 export function UserModal({ user, onClose, onSave, onDelete }: UserModalProps) {
     const [role, setRole] = useState(user.role);
     const [status, setStatus] = useState(user.status || "ACTIVE");
     const [planType, setPlanType] = useState(user.subscription?.plan_type || "FREE");
-    const [credits, setCredits] = useState(user.subscription?.credits_remaining ?? 3);
+    // Credits are per bucket. This field used to edit the legacy
+    // credits_remaining pool, which nothing spends from any more, so a saved
+    // number changed nothing the user could see.
+    const [balances, setBalances] = useState<Partial<Record<BucketName, Balance>>>({});
+    const [edits, setEdits] = useState<Partial<Record<BucketName, number>>>({});
+    const [refill, setRefill] = useState(false);
+    const [creditsError, setCreditsError] = useState<string | null>(null);
+
+    useEffect(() => {
+        let cancelled = false;
+        fetch(`/api/admin/users/${user.id}`)
+            .then((res) => (res.ok ? res.json() : Promise.reject(new Error("Could not load credit balances"))))
+            .then((data) => {
+                if (cancelled) return;
+                const next: Partial<Record<BucketName, Balance>> = {};
+                for (const row of data?.credits?.buckets ?? []) {
+                    const field = BUCKET_FIELDS.find((f) => f.bucket === row.bucket);
+                    if (field) next[field.bucket] = { remaining: row.remaining, total: row.total, unlimited: row.unlimited };
+                }
+                setBalances(next);
+            })
+            .catch((err: Error) => {
+                if (!cancelled) setCreditsError(err.message);
+            });
+        return () => {
+            cancelled = true;
+        };
+    }, [user.id]);
     const [saving, setSaving] = useState(false);
     const [confirmDelete, setConfirmDelete] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -40,9 +76,15 @@ export function UserModal({ user, onClose, onSave, onDelete }: UserModalProps) {
 
     const handleSave = async () => {
         setError(null);
-        if (!Number.isInteger(credits) || credits < 0 || credits > MAX_CREDITS) {
-            setError(`Credits must be a whole number between 0 and ${MAX_CREDITS}`);
-            return;
+        const changed: Partial<Record<BucketName, number>> = {};
+        for (const { bucket, label } of BUCKET_FIELDS) {
+            const value = edits[bucket];
+            if (value === undefined || value === balances[bucket]?.remaining) continue;
+            if (!Number.isInteger(value) || value < 0 || value > MAX_CREDITS) {
+                setError(`${label} credits must be a whole number between 0 and ${MAX_CREDITS}`);
+                return;
+            }
+            changed[bucket] = value;
         }
         setSaving(true);
         try {
@@ -50,7 +92,11 @@ export function UserModal({ user, onClose, onSave, onDelete }: UserModalProps) {
                 role,
                 status,
                 plan_type: planType,
-                credits_remaining: credits,
+                ...(refill
+                    ? { reset_buckets: true }
+                    : Object.keys(changed).length > 0
+                      ? { buckets: changed }
+                      : {}),
             });
         } catch (err) {
             setError(err instanceof Error ? err.message : "Failed to save changes");
@@ -154,17 +200,42 @@ export function UserModal({ user, onClose, onSave, onDelete }: UserModalProps) {
                         </select>
                     </div>
 
-                    {/* Credits */}
+                    {/* Credits, one balance per bucket */}
                     <div>
-                        <label className="text-xs text-gray-400 font-medium uppercase tracking-wider">Credits Remaining</label>
-                        <input
-                            type="number"
-                            value={credits}
-                            onChange={(e) => setCredits(parseInt(e.target.value) || 0)}
-                            min={0}
-                            max={MAX_CREDITS}
-                            className="mt-1 w-full bg-zinc-800 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-red-500/50"
-                        />
+                        <label className="text-xs text-gray-400 font-medium uppercase tracking-wider">Credits Left This Month</label>
+                        {creditsError ? (
+                            <p className="mt-1 text-xs text-red-400">{creditsError}</p>
+                        ) : (
+                            <div className="mt-1 grid grid-cols-3 gap-2">
+                                {BUCKET_FIELDS.map(({ bucket, label }) => {
+                                    const balance = balances[bucket];
+                                    return (
+                                        <div key={bucket}>
+                                            <span className="block text-[11px] text-gray-500 mb-1">{label}</span>
+                                            <input
+                                                type="number"
+                                                value={edits[bucket] ?? balance?.remaining ?? ""}
+                                                onChange={(e) => setEdits((prev) => ({ ...prev, [bucket]: parseInt(e.target.value, 10) || 0 }))}
+                                                min={0}
+                                                max={balance?.total ?? MAX_CREDITS}
+                                                disabled={!balance || refill}
+                                                className="w-full bg-zinc-800 border border-white/10 rounded-lg px-2 py-2 text-sm text-white focus:outline-none focus:border-red-500/50 disabled:opacity-50"
+                                            />
+                                            <span className="block text-[11px] text-gray-500 mt-1">
+                                                {balance ? (balance.unlimited ? "unlimited plan" : `of ${balance.total}`) : "loading..."}
+                                            </span>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
+                        <label className="mt-2 flex items-center gap-2 text-xs text-gray-300">
+                            <input type="checkbox" checked={refill} onChange={(e) => setRefill(e.target.checked)} />
+                            Refill every bucket to the plan allowance
+                        </label>
+                        <p className="mt-1 text-[11px] text-gray-500">
+                            A balance cannot go above the plan allowance. Changing the plan adjusts the allowance first.
+                        </p>
                     </div>
 
                     {/* Password reset */}

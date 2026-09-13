@@ -8,6 +8,7 @@ POST /api/interview/analyze    — analyse user answers and return detailed feed
 import asyncio
 import json
 import logging
+import os
 from functools import partial
 from typing import List, Optional
 
@@ -225,9 +226,26 @@ def _friendly_error(exc: Exception) -> tuple[int, str]:
 
 # ── Endpoints ──────────────────────────────────────────────────────────
 
+INTERNAL_API_KEY = os.environ.get("INTERNAL_API_KEY", "")
+
+
+def _require_internal_auth(request: Request) -> None:
+    """
+    Only the Next.js server may generate interview questions.
+
+    The backend is publicly reachable and this route calls the model. The
+    dashboard and extension routes in front of it check the plan and spend an
+    interview credit; calling here directly used to skip both.
+    """
+    key = request.headers.get("X-API-Key") or request.headers.get("x-internal-key")
+    if not INTERNAL_API_KEY or key != INTERNAL_API_KEY:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+
 @router.post("/api/interview/questions")
 @limiter.limit("15/minute")
 async def generate_questions(request: Request, data: QuestionsRequest):
+    _require_internal_auth(request)
     num_q = data.num_questions or 7
 
     # Cache key: title + company + first 600 chars of JD (profile excluded —

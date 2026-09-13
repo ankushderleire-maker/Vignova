@@ -319,9 +319,27 @@ async def parse_resume(request: Request, file: UploadFile = File(...)):
         return {"data": ResumeSchema().model_dump()}
 
 
+INTERNAL_API_KEY = os.environ.get("INTERNAL_API_KEY", "")
+
+
+def _require_internal_auth(request: Request) -> None:
+    """
+    Only the Next.js server may call the generation endpoints below.
+
+    The backend is reachable directly on the public internet and these routes
+    call the model without knowing who is asking. Without this check anyone
+    could generate resumes, cover letters and emails for free, skipping the
+    Next.js routes that check the plan and spend a credit.
+    """
+    key = request.headers.get("X-API-Key") or request.headers.get("x-internal-key")
+    if not INTERNAL_API_KEY or key != INTERNAL_API_KEY:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+
 @router.post("/api/generate-tailored-resume")
 @limiter.limit("50/minute")
 async def generate_tailored_resume(request: Request, payload: TailorRequest):
+    _require_internal_auth(request)
     job_description    = payload.jobDescription
     master_profile_str = json.dumps(payload.masterProfile, indent=2)
 
@@ -412,6 +430,7 @@ async def generate_tailored_resume(request: Request, payload: TailorRequest):
 @router.post("/api/generate-cover-letter")
 @limiter.limit("50/minute")
 async def generate_cover_letter(request: Request, payload: TailorRequest):
+    _require_internal_auth(request)
     job_description = payload.jobDescription
     master_profile_str = json.dumps(payload.masterProfile, indent=2)
 
@@ -445,6 +464,7 @@ INSTRUCTIONS:
 @router.post("/api/generate-draft-email")
 @limiter.limit("50/minute")
 async def generate_draft_email(request: Request, payload: TailorRequest):
+    _require_internal_auth(request)
     job_description = payload.jobDescription
     master_profile_str = json.dumps(payload.masterProfile, indent=2)
 

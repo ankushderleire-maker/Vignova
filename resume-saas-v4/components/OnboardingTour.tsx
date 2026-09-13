@@ -79,7 +79,7 @@ const TOUR_STEPS: TourStep[] = [
     href: "/dashboard",
     title: "Your Credits",
     description:
-      "Each resume generation uses 1 credit. Track your remaining credits here. Upgrade your plan anytime for more credits.",
+      "Credits come in three allowances: tailoring for resumes, writing for cover letters, emails and LinkedIn, and interview for question sets. Each count here is what is left this month. Click it for details.",
     placement: "bottom",
   },
 ];

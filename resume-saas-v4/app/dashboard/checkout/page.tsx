@@ -6,6 +6,7 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import { Loader2, ArrowLeft, ShieldCheck, CheckCircle } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
+import { planAllowances, planFeatures } from '@/lib/planCatalog';
 
 // Dynamically import PayPal button to avoid SSR issues
 const PayPalCheckoutButton = dynamic(() => import('@/components/billing/PayPalCheckoutButton'), { ssr: false });
@@ -215,53 +216,18 @@ function CheckoutContent() {
                             ) : null}
                         </div>
 
+                        {/* The same rows as the pricing cards, from the plan's credit
+                            columns rather than free-text labels that fell out of date. */}
                         <ul className="mt-4 space-y-2">
-                            <li className="text-sm text-gray-600 dark:text-gray-400 flex items-center">
-                                <CheckCircle className="w-3 h-3 text-[var(--primary)] mr-2" />
-                                {plan.resume_creation_label || `${plan.credits} resumes/month`}
-                            </li>
-                            <li className="text-sm text-gray-600 dark:text-gray-400 flex items-center">
-                                <CheckCircle className="w-3 h-3 text-[var(--primary)] mr-2" />
-                                {plan.ai_optimization_label || "Basic AI Optimization"}
-                            </li>
-                            <li className="text-sm text-gray-600 dark:text-gray-400 flex items-center">
-                                <CheckCircle className="w-3 h-3 text-[var(--primary)] mr-2" />
-                                {plan.templates_label || "Standard Templates"}
-                            </li>
-                            <li className="text-sm text-gray-600 dark:text-gray-400 flex items-center">
-                                <CheckCircle className="w-3 h-3 text-[var(--primary)] mr-2" />
-                                {plan.support_label || "Standard Support"}
-                            </li>
-                            {plan.has_extension_access && (
-                                <li className="text-sm text-gray-600 dark:text-gray-400 flex items-center">
-                                    <CheckCircle className="w-3 h-3 text-[var(--primary)] mr-2" />
-                                    Chrome Extension Access
+                            {[
+                                ...planAllowances(plan).filter((row) => row.included).map((row) => row.text),
+                                ...planFeatures(plan).filter((feature) => feature.included).map((feature) => feature.label),
+                            ].map((line) => (
+                                <li key={line} className="text-sm text-gray-600 dark:text-gray-400 flex items-center">
+                                    <CheckCircle className="w-3 h-3 text-[var(--primary)] mr-2 shrink-0" />
+                                    {line}
                                 </li>
-                            )}
-                            {plan.has_multi_profile && (
-                                <li className="text-sm text-gray-600 dark:text-gray-400 flex items-center">
-                                    <CheckCircle className="w-3 h-3 text-[var(--primary)] mr-2" />
-                                    Multiple Profiles
-                                </li>
-                            )}
-                            {plan.has_unlimited_resumes && (
-                                <li className="text-sm text-gray-600 dark:text-gray-400 flex items-center">
-                                    <CheckCircle className="w-3 h-3 text-[var(--primary)] mr-2" />
-                                    Unlimited Resumes
-                                </li>
-                            )}
-                            {plan.has_linkedin_optimization && (
-                                <li className="text-sm text-gray-600 dark:text-gray-400 flex items-center">
-                                    <CheckCircle className="w-3 h-3 text-[var(--primary)] mr-2" />
-                                    LinkedIn Optimization
-                                </li>
-                            )}
-                            {plan.has_interview_prep && (
-                                <li className="text-sm text-gray-600 dark:text-gray-400 flex items-center">
-                                    <CheckCircle className="w-3 h-3 text-[var(--primary)] mr-2" />
-                                    Interview Prep
-                                </li>
-                            )}
+                            ))}
                         </ul>
                     </div>
                 </div>
