@@ -8,6 +8,8 @@ import {
     MAX_CREDITS,
 } from "@/lib/admin-guard";
 import { db } from "@/lib/db";
+import { getBalances, ensurePeriod, refundCredits, spendCredits } from "@/lib/credits";
+import { BUCKETS, isBucket, type Bucket } from "@/lib/planLimits";
 
 interface RouteParams {
     params: Promise<{ userId: string }>;
@@ -55,7 +57,12 @@ export async function GET(req: Request, { params }: RouteParams) {
             return NextResponse.json({ error: "User not found" }, { status: 404 });
         }
 
+        // Live balances rather than the legacy single number — support needs
+        // to see which bucket a complaint is actually about.
+        const credits = await getBalances(userId, user.subscriptions?.plan_type);
+
         return NextResponse.json({
+            credits,
             id: user.id,
             email: user.email,
             fullName: user.full_name,
@@ -84,7 +91,7 @@ export async function PATCH(req: Request, { params }: RouteParams) {
 
     try {
         const body = await req.json();
-        const { role, status, plan_type, credits_remaining } = body;
+        const { role, status, plan_type, credits_remaining, buckets, reset_buckets } = body;
 
         // ── Validate everything before touching the DB ──
         if (role !== undefined && !VALID_ROLES.includes(role)) {
@@ -179,6 +186,56 @@ export async function PATCH(req: Request, { params }: RouteParams) {
             }
         }
 
+        // ── Per-bucket adjustments ───────────────────────────────────────
+        // The support case this exists for: a generation failed and the refund
+        // did not land, or a user is owed credits after an outage. Setting a
+        // balance is deliberately an absolute value, not a delta, so two
+        // admins acting on the same ticket cannot double-grant.
+        const bucketChanges: Record<string, number> = {};
+
+        if (reset_buckets === true) {
+            // Refills every bucket to the plan allowance by advancing nothing:
+            // ensurePeriod repairs totals, then each bucket is topped to total.
+            await ensurePeriod(userId, plan_type);
+            const current = await db.credit_buckets.findMany({ where: { user_id: userId } });
+            for (const row of current) {
+                await db.credit_buckets.updateMany({
+                    where: { user_id: userId, bucket: row.bucket },
+                    data: { remaining: row.total },
+                });
+                bucketChanges[row.bucket] = row.total;
+            }
+        } else if (buckets && typeof buckets === "object") {
+            await ensurePeriod(userId, plan_type);
+            for (const name of Object.keys(buckets)) {
+                if (!isBucket(name)) {
+                    return NextResponse.json(
+                        { error: `Unknown bucket: ${name}. Expected one of ${BUCKETS.join(", ")}` },
+                        { status: 400 }
+                    );
+                }
+                const value = Number(buckets[name]);
+                if (!Number.isInteger(value) || value < 0 || value > MAX_CREDITS) {
+                    return NextResponse.json(
+                        { error: `${name} must be an integer between 0 and ${MAX_CREDITS}` },
+                        { status: 400 }
+                    );
+                }
+                const row = await db.credit_buckets.findFirst({
+                    where: { user_id: userId, bucket: name as Bucket },
+                    select: { total: true },
+                });
+                await db.credit_buckets.updateMany({
+                    where: { user_id: userId, bucket: name as Bucket },
+                    // Never above the plan's own ceiling, or the usage bar
+                    // reads over 100% — the bug visible in a competitor's
+                    // dashboard as "25 / 20, 125% remaining".
+                    data: { remaining: Math.min(value, row?.total ?? value) },
+                });
+                bucketChanges[name] = value;
+            }
+        }
+
         await logAdminAction({
             admin: auth.user,
             action: "USER_UPDATE",
@@ -187,7 +244,14 @@ export async function PATCH(req: Request, { params }: RouteParams) {
             details: {
                 targetEmail: target.email,
                 before: { role: target.role, status: target.status },
-                changes: { role, status, plan_type, credits_remaining: credits },
+                changes: {
+                    role,
+                    status,
+                    plan_type,
+                    credits_remaining: credits,
+                    buckets: Object.keys(bucketChanges).length ? bucketChanges : undefined,
+                    reset_buckets: reset_buckets === true || undefined,
+                },
             },
             req,
         });

@@ -81,15 +81,28 @@ export async function PATCH(req: NextRequest) {
             updates.monthly_price = price;
         }
 
-        if (body.credits !== undefined) {
-            const credits = Number(body.credits);
-            if (!Number.isInteger(credits) || credits < 0 || credits > 100000) {
+        // Per-bucket allowances, plus the legacy single pool. -1 means
+        // unlimited and is spent against the fair-use ceiling in
+        // lib/planLimits.ts, so it is allowed here where 0 would mean "this
+        // plan does not include the feature at all".
+        const ALLOWANCE_FIELDS = [
+            "credits",
+            "tailoring_credits",
+            "writing_credits",
+            "interview_credits",
+            "max_profiles",
+        ] as const;
+
+        for (const field of ALLOWANCE_FIELDS) {
+            if (body[field] === undefined) continue;
+            const value = Number(body[field]);
+            if (!Number.isInteger(value) || value < -1 || value > 100000) {
                 return NextResponse.json(
-                    { error: "credits must be an integer between 0 and 100000" },
+                    { error: `${field} must be an integer between -1 (unlimited) and 100000` },
                     { status: 400 }
                 );
             }
-            updates.credits = credits;
+            updates[field] = value;
         }
 
         if (Object.keys(updates).length === 0) {

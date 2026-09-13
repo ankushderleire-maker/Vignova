@@ -280,3 +280,20 @@ dialog .helper{font-size:10px;margin-top:12px}
 
 
 .save-job-tool{grid-column:1/-1;min-height:58px;display:flex;flex-direction:row;justify-content:center;gap:12px}.save-job-tool small{font-size:10px}
+
+/* ── Usage ──────────────────────────────────────────────────────────────
+   Three metered buckets rather than one pool, so the panel has to say which
+   one is running low: "out of credits" stopped being the whole story once a
+   user could have plenty of writing credits and no tailoring ones. */
+.usage-block{border:1px solid var(--line);border-radius:12px;padding:12px 13px;margin:10px 0 0;display:grid;gap:9px}
+.usage-head{display:flex;align-items:baseline;justify-content:space-between;gap:8px;font-size:12px}
+.usage-resets{color:var(--muted);font-size:11px}
+.usage-row{display:grid;gap:4px}
+.usage-row-top{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
+.usage-name{font-size:11.5px;color:var(--ink)}
+.usage-count{font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums}
+.usage-track{height:4px;border-radius:999px;background:var(--line);overflow:hidden}
+.usage-fill{height:100%;border-radius:999px;background:#16a34a;transition:width .25s ease}
+.usage-fill.low{background:#d97706}
+.usage-fill.empty{background:#dc2626}
+.usage-fill.unlimited{background:#6c4bea}

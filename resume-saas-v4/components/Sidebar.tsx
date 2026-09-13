@@ -5,6 +5,7 @@ import { BrandLockup } from "@/components/BrandLockup";
 import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
 import {
+  Gauge,
   LayoutDashboard,
   Briefcase,
   Search,
@@ -58,6 +59,7 @@ const navigationGroups = [
     label: "Apps & Tools",
     items: [
       { name: "Extension", href: "/dashboard/extension", icon: Chrome },
+      { name: "Usage", href: "/dashboard/usage", icon: Gauge },
     ],
   },
 ];

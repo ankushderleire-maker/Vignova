@@ -155,13 +155,61 @@
         state.user = r.user;
         state.paid = ['PRO', 'PREMIUM'].includes(r.plan_type);
         $('planBadge').textContent = r.plan_type || 'FREE';
+        // The tailoring bucket is what the footer number means now; the full
+        // per-bucket picture is in the usage block below it.
         $('creditBalance').textContent = (r.credits_remaining ?? 0) + ' credits';
+        renderUsage(r.credits);
         document.querySelectorAll('[data-paid]').forEach(b => {
             b.querySelector('.paid-badge')?.remove();
             if (!state.paid)
                 b.append(node('span', 'paid-badge', 'PRO'));
         });
     }
+    /**
+     * Renders the three metered allowances.
+     *
+     * The status route returns `credits` with every bucket plus the reset
+     * date. An extension talking to a backend from before buckets gets no
+     * `credits` object, so the block stays hidden and the footer falls back to
+     * the legacy single number rather than showing zeros.
+     */
+    function renderUsage(credits) {
+        const block = $('usageBlock');
+        const buckets = credits?.buckets;
+        if (!Array.isArray(buckets) || buckets.length === 0) {
+            block.hidden = true;
+            return;
+        }
+        block.hidden = false;
+
+        const names = { tailoring: 'Tailoring', writing: 'Writing', interview: 'Interview' };
+        $('usageResets').textContent = credits.resets_at
+            ? 'Resets ' + new Date(credits.resets_at).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })
+            : '';
+
+        const rows = buckets.map(b => {
+            const row = node('div', 'usage-row');
+            const top = node('div', 'usage-row-top');
+            top.append(node('span', 'usage-name', names[b.bucket] || b.bucket));
+            top.append(node('span', 'usage-count',
+                b.unlimited ? 'Unlimited' : `${b.remaining} of ${b.total}`));
+            row.append(top);
+
+            const track = node('div', 'usage-track');
+            const fill = node('div', 'usage-fill');
+            // Colour follows what is about to run out, not which bucket it is.
+            const pct = b.unlimited ? 100 : (b.total > 0 ? Math.round((b.remaining / b.total) * 100) : 0);
+            if (b.unlimited) fill.classList.add('unlimited');
+            else if (b.remaining === 0) fill.classList.add('empty');
+            else if (pct <= 20) fill.classList.add('low');
+            fill.style.width = Math.max(0, Math.min(100, pct)) + '%';
+            track.append(fill);
+            row.append(track);
+            return row;
+        });
+        $('usageBars').replaceChildren(...rows);
+    }
+
     async function refreshCredits() {
         const r = await msg('API_GET_STATUS');
         if (r?.authenticated)
@@ -782,6 +830,7 @@
         }
     };
     $('resultTrackerBtn').onclick = () => openApp('/dashboard/jobs/' + encodeURIComponent(state.result.jobId));
+    $('openUsageBtn').onclick = () => openApp('/dashboard/usage');
     $('upgradeCloseBtn').onclick = () => $('upgradeDialog').close();
     $('upgradePlansBtn').onclick = () => openApp('/dashboard/billing');
     $('openSelectedJobBtn').onclick = () => { const url = safeUrl(state.selectedJobUrl); if (url) chrome.tabs.create({ url }); $('changeJobDialog').close(); };
