@@ -81,18 +81,37 @@ export function normalizePlan(planType?: string | null): string {
     return plan in FALLBACK ? plan : "FREE";
 }
 
-/** The configured limits for a plan, from plan_configs, falling back in memory. */
+async function readPlanLimits(plan: string): Promise<PlanLimits> {
+    const row = await db.plan_configs.findUnique({ where: { plan_type: plan } });
+    // No row only happens on a database that has not been seeded, where there
+    // is no admin-set number to honour yet.
+    return row ? toLimits(plan, row) : FALLBACK[plan];
+}
+
+/**
+ * The configured limits, for display. Falls back to the defaults when
+ * plan_configs cannot be read, so a page that only shows numbers still renders.
+ */
 export async function planLimits(planType?: string | null): Promise<PlanLimits> {
     const plan = normalizePlan(planType);
     try {
-        const row = await db.plan_configs.findUnique({ where: { plan_type: plan } });
-        return row ? toLimits(plan, row) : FALLBACK[plan];
+        return await readPlanLimits(plan);
     } catch {
-        // A database that is briefly unreachable must not silently hand out a
-        // different allowance than the one the user paid for, but it must also
-        // not take the whole app down. The free fallback is the safe direction.
         return FALLBACK[plan];
     }
+}
+
+/**
+ * The configured limits, for anything that meters or enforces. Throws instead
+ * of falling back.
+ *
+ * When plan_configs cannot be read (an outage, or a column missing because a
+ * migration did not run), the defaults are not the number an admin set: Pro's
+ * default of 50 would replace an admin's 3. So metering fails closed and the
+ * request that needed it errors instead of generating.
+ */
+export async function enforcedPlanLimits(planType?: string | null): Promise<PlanLimits> {
+    return readPlanLimits(normalizePlan(planType));
 }
 
 /** The allowance for one bucket, with unlimited resolved to its real ceiling. */

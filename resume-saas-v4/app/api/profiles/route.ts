@@ -3,7 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { db } from "@/lib/db";
 import { getUserSubscription } from "@/lib/subscription";
-import { UNLIMITED, planLimits } from "@/lib/planLimits";
+import { UNLIMITED, enforcedPlanLimits } from "@/lib/planLimits";
 
 /**
  * GET /api/profiles
@@ -73,7 +73,7 @@ export async function POST(req: Request) {
         // The cap is the plan's max_profiles, which the pricing and usage pages
         // both show. This used to allow one profile on Free and unlimited on
         // any paid plan, whatever the plan was configured to include.
-        const limits = await planLimits(subscription?.plan_type);
+        const limits = await enforcedPlanLimits(subscription?.plan_type);
         if (limits.max_profiles !== UNLIMITED && existingProfiles >= limits.max_profiles) {
             const plan = limits.plan_type.charAt(0) + limits.plan_type.slice(1).toLowerCase();
             const cap = limits.max_profiles;

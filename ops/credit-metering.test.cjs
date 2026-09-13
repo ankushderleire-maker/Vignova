@@ -155,7 +155,7 @@ test('creating a master profile stops at the plan max_profiles',async()=>{
     const route=load('app/api/profiles/route.ts',{'next-auth':session,'@/app/api/auth/[...nextauth]/route':auth,
         '@/lib/db':{db:{master_profiles:{count:async()=>5,findFirst:async()=>null,create:async args=>{created.push(args);return {id:'profile6'};}}}},
         '@/lib/subscription':{getUserSubscription:async()=>({plan_type:'PRO'})},
-        '@/lib/planLimits':{UNLIMITED:-1,planLimits:async()=>({plan_type:'PRO',max_profiles:5})}});
+        '@/lib/planLimits':{UNLIMITED:-1,enforcedPlanLimits:async()=>({plan_type:'PRO',max_profiles:5})}});
     const r=await route.POST(post({name:'Sixth profile',parsed_data:{}}));
     assert.equal(r.status,403);assert.match((await r.json()).message,/5 master profiles/);assert.equal(created.length,0);
 });

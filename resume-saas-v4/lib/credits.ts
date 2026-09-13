@@ -6,9 +6,9 @@ import {
     PlanLimits,
     allowanceFor,
     currentPeriodStart,
+    enforcedPlanLimits,
     isUnlimited,
     nextPeriodStart,
-    planLimits,
 } from "@/lib/planLimits";
 
 /**
@@ -63,27 +63,30 @@ export async function ensurePeriod(userId: string, plan?: string | null): Promis
             })
         )?.plan_type;
 
-    const limits = await planLimits(planType);
+    // Throws when plan_configs cannot be read. Metering must not fall back to
+    // the built-in defaults, which are not the number an admin set.
+    const limits = await enforcedPlanLimits(planType);
     const period = currentPeriodStart();
     const rows = await db.credit_buckets.findMany({ where: { user_id: userId } });
     const byName = new Map(rows.map((row) => [row.bucket, row]));
 
+    // Missing rows are created together. skipDuplicates turns two first
+    // requests racing each other into a no-op instead of a unique-key error.
+    const missing = BUCKETS.filter((bucket) => !byName.has(bucket));
+    if (missing.length > 0) {
+        await db.credit_buckets.createMany({
+            data: missing.map((bucket) => {
+                const allowance = allowanceFor(limits, bucket);
+                return { user_id: userId, bucket, remaining: allowance, total: allowance, period_start: period };
+            }),
+            skipDuplicates: true,
+        });
+    }
+
     for (const bucket of BUCKETS) {
         const allowance = allowanceFor(limits, bucket);
         const row = byName.get(bucket);
-
-        if (!row) {
-            await db.credit_buckets.create({
-                data: {
-                    user_id: userId,
-                    bucket,
-                    remaining: allowance,
-                    total: allowance,
-                    period_start: period,
-                },
-            });
-            continue;
-        }
+        if (!row) continue;
 
         // A row from an earlier month refills. The guard on period_start makes
         // two concurrent requests idempotent: the second updates nothing.
@@ -97,12 +100,24 @@ export async function ensurePeriod(userId: string, plan?: string | null): Promis
 
         // Same period, but the plan's allowance changed under them — an admin
         // edit, or an upgrade. Raise the ceiling without wiping what they spent.
+        //
+        // One statement moves the ceiling and the balance by the same amount,
+        // from the row as it is at that moment, so what was spent is kept
+        // exactly. This used to read the row, work out "spent" in JavaScript and
+        // write absolute numbers back: a spend landing in between was erased,
+        // and clamping the balance at zero on a cut forgot how much had been
+        // used, so lowering an allowance and raising it again handed spent
+        // credits back. The balance can now sit below zero after a cut;
+        // spending still needs a positive balance, and readers clamp it.
         if (row.total !== allowance) {
-            const spent = Math.max(0, row.total - row.remaining);
-            await db.credit_buckets.updateMany({
-                where: { user_id: userId, bucket, period_start: period },
-                data: { total: allowance, remaining: Math.max(0, allowance - spent) },
-            });
+            await db.$executeRaw`
+                UPDATE credit_buckets
+                SET remaining = remaining + (${allowance} - total),
+                    total = ${allowance},
+                    updated_at = NOW()
+                WHERE user_id = CAST(${userId} AS uuid)
+                  AND bucket = ${bucket}
+                  AND total <> ${allowance}`;
         }
     }
 
@@ -136,10 +151,10 @@ export async function spendCredits(
         return {
             ok: false,
             reason: row ? "insufficient" : "no_subscription",
-            remaining: row?.remaining ?? 0,
+            remaining: Math.max(0, row?.remaining ?? 0),
         };
     }
-    return { ok: true, remaining: row?.remaining ?? 0 };
+    return { ok: true, remaining: Math.max(0, row?.remaining ?? 0) };
 }
 
 /**
@@ -183,7 +198,7 @@ export async function spendMany(
             where: { user_id: userId, bucket },
             select: { remaining: true },
         });
-        return { ok: false, bucket, remaining: row?.remaining ?? 0 };
+        return { ok: false, bucket, remaining: Math.max(0, row?.remaining ?? 0) };
     }
 }
 
@@ -202,16 +217,17 @@ export async function refundCredits(
     amount = 1
 ): Promise<void> {
     try {
-        const row = await db.credit_buckets.findFirst({
-            where: { user_id: userId, bucket },
-            select: { remaining: true, total: true },
-        });
-        if (!row) return;
-        const restored = Math.min(row.total, row.remaining + amount);
-        await db.credit_buckets.updateMany({
-            where: { user_id: userId, bucket },
-            data: { remaining: restored },
-        });
+        // One statement, from the balance as it is now. This used to read the
+        // balance and write an absolute number back, so a spend landing in
+        // between was erased and the refund minted a credit: failed generations
+        // racing successful ones could push a user past the admin's allowance.
+        const updated = await db.$executeRaw`
+            UPDATE credit_buckets
+            SET remaining = LEAST(total, remaining + ${amount}),
+                updated_at = NOW()
+            WHERE user_id = CAST(${userId} AS uuid)
+              AND bucket = ${bucket}`;
+        if (updated === 0) return;
         console.info("[CREDITS] refunded %d %s to %s after: %s", amount, bucket, userId, reason);
     } catch (err) {
         // Worth knowing about — the user has been charged for nothing.
@@ -242,7 +258,9 @@ export async function getBalances(
     const buckets: BucketState[] = BUCKETS.map((bucket) => {
         const row = byName.get(bucket);
         const total = row?.total ?? allowanceFor(limits, bucket);
-        const remaining = row?.remaining ?? total;
+        // Below zero only after an allowance was cut under what was already
+        // spent; shown as nothing left rather than as a debt.
+        const remaining = Math.max(0, row?.remaining ?? total);
         return {
             bucket,
             remaining,
@@ -266,7 +284,7 @@ export async function creditBalance(userId: string, bucket: Bucket = "tailoring"
         where: { user_id: userId, bucket },
         select: { remaining: true },
     });
-    return row?.remaining ?? 0;
+    return Math.max(0, row?.remaining ?? 0);
 }
 
 /**

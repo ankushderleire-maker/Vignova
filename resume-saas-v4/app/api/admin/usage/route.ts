@@ -56,7 +56,8 @@ export async function GET() {
             if (!spend.has(plan)) spend.set(plan, new Map());
             if (!exhausted.has(plan)) exhausted.set(plan, new Map());
 
-            const used = Math.max(0, row.total - row.remaining);
+            // A cut allowance can leave the balance below zero; count at most the allowance.
+            const used = Math.min(row.total, Math.max(0, row.total - row.remaining));
             const byBucket = spend.get(plan)!;
             byBucket.set(row.bucket, [...(byBucket.get(row.bucket) || []), used]);
 

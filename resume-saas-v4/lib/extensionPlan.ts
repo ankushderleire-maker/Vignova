@@ -149,7 +149,7 @@ export async function checkAiAccess(
             select: { remaining: true },
         });
         if ((row?.remaining ?? 0) <= 0) {
-            return outOfCreditsResponse(plan, feature, bucket, row?.remaining ?? 0);
+            return outOfCreditsResponse(plan, feature, bucket, Math.max(0, row?.remaining ?? 0));
         }
     }
 
