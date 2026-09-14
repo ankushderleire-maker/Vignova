@@ -12,6 +12,7 @@ from sentence_transformers import util
 import google.generativeai as genai
 
 from app.config import model as _gemini_model
+from app.services import openai_client
 from app.services.ml_models import semantic_model
 
 logger = logging.getLogger("ats_helpers")
@@ -78,10 +79,8 @@ def _cache_key_for_jd(jd_text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 def _parse_keyword_response(text: str) -> list:
-    """The keyword list in a model reply, or [] when there is none."""
-    # sarvam-m reasons in <think> tags before it answers, and the reasoning can
-    # contain brackets of its own.
-    cleaned = re.sub(r"<think>[\s\S]*?</think>", "", text or "", flags=re.I).strip()
+    """The keyword list in a Gemini reply, or [] when there is none."""
+    cleaned = (text or "").strip()
     fenced = re.search(r"```(?:json)?\s*([\s\S]*?)```", cleaned)
     if fenced:
         cleaned = fenced.group(1).strip()
@@ -100,38 +99,50 @@ def _parse_keyword_response(text: str) -> list:
     return []
 
 
-def _ask_sarvam(prompt: str) -> str:
-    from sarvamai import SarvamAI
-    client = SarvamAI(api_subscription_key=os.getenv("SARVAM_API_KEY"))
-    response = client.chat.completions(messages=[{"content": prompt, "role": "user"}], temperature=0)
-    if hasattr(response, "choices"):
-        return response.choices[0].message.content or ""
-    return response["choices"][0]["message"]["content"] or ""
+_KEYWORD_SCHEMA = {
+    "type": "object",
+    "properties": {"keywords": {"type": "array", "items": {"type": "string"}}},
+    "required": ["keywords"],
+    "additionalProperties": False,
+}
 
 
-def _ask_gemini(prompt: str) -> str:
+def _ask_openai(prompt: str) -> list:
+    """Keywords from gpt-5-nano, shaped by a strict schema rather than parsed out of prose."""
+    result, _ = openai_client.structured_completion_sync(
+        system="You extract the keywords an applicant tracking system screens for. Return them in keywords.",
+        user=prompt,
+        schema=_KEYWORD_SCHEMA,
+        schema_name="ats_keywords",
+        max_tokens=2000,
+        timeout_secs=20,
+    )
+    return result.get("keywords") or []
+
+
+def _ask_gemini(prompt: str) -> list:
     response = _gemini_model.generate_content(
         prompt,
         generation_config=genai.GenerationConfig(temperature=0, response_mime_type="application/json"),
     )
-    return response.text or ""
+    return _parse_keyword_response(response.text or "")
 
 
 def _extract_keywords_with_models(prompt: str, normalize) -> list[str]:
     """
-    Keywords from the configured model, then from Gemini when that fails.
+    Keywords from gpt-5-nano, then from Gemini when OpenAI fails.
 
-    A Sarvam failure used to go straight to the local fallback, whose keywords
+    A model failure used to go straight to the local fallback, whose keywords
     are mostly words from the posting's prose, so resumes were scored against
     terms no resume would contain. The reason is logged now, too.
     """
     providers = []
-    if os.getenv("ATS_SCORE_MODEL", "GEMINI").upper() == "SARVAM" and os.getenv("SARVAM_API_KEY"):
-        providers.append(("Sarvam", _ask_sarvam))
+    if openai_client.is_configured():
+        providers.append((openai_client.DEFAULT_MODEL, _ask_openai))
     providers.append(("Gemini", _ask_gemini))
     for name, ask in providers:
         try:
-            keywords = normalize(_parse_keyword_response(ask(prompt)))
+            keywords = normalize(ask(prompt))
         except Exception as exc:
             logger.warning("ATS keyword extraction with %s failed: %s", name, exc)
             continue
@@ -273,13 +284,13 @@ def calculate_semantic_score(jd_text: str, resume_text: str) -> float:
 
 def calculate_keyword_score(jd_text: str, resume_text: str) -> dict:
     """
-    Extract meaningful skills, technologies, and qualifications from JD using either Sarvam AI or Gemini.
+    Extract meaningful skills, technologies, and qualifications from JD with gpt-5-nano, or Gemini when OpenAI fails.
     This guarantees clean, atomic skills (e.g., 'Python', 'Agile') instead of long NLP chunks.
     """
     lemmatizer = WordNetLemmatizer()
     jd_text = clean_job_description(jd_text)
 
-    # ── Step 1: Extract keywords using Sarvam AI or Gemini ──
+    # ── Step 1: Extract keywords with gpt-5-nano, falling back to Gemini ──
     prompt = f"""
     You are an expert ATS (Applicant Tracking System) keyword extractor.
     Analyze the following Job Description (JD) and extract the exact keywords an ATS would look for.

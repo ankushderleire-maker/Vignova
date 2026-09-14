@@ -13,7 +13,7 @@ How the tailored resume is written:
     minute, so a generation attempt does not fail outright.
 
 Production fixes applied:
-  - All synchronous LLM calls (Gemini / Sarvam) run in run_in_executor so
+  - All synchronous Gemini calls run in run_in_executor so
     the event loop is never blocked (each call can take 3–15 seconds).
   - _TAILORING_SEMAPHORE(3) caps concurrent tailoring requests so at most 3
     × 4 Gemini calls run simultaneously — prevents CPU saturation and
@@ -117,28 +117,10 @@ _JD_MAX_CHARS = resume_writer.JD_MAX_CHARS
 # ── Sync LLM + ATS workers (run via run_in_executor) ──────────────────
 
 def _generate_resume_content_sync(prompt: str) -> dict:
-    """Calls Gemini/Sarvam synchronously — must be run in a thread."""
-    resume_gen_model = os.getenv("RESUME_GENERATION_MODEL", "GEMINI").upper()
-    sarvam_api_key   = os.getenv("SARVAM_API_KEY")
-
-    if resume_gen_model == "SARVAM" and sarvam_api_key:
-        logger.info("Using Sarvam AI for resume generation")
-        from sarvamai import SarvamAI
-        client = SarvamAI(api_subscription_key=sarvam_api_key)
-        response = client.chat.completions(
-            messages=[{"content": prompt, "role": "user"}],
-            temperature=0.3,
-            max_tokens=4000,
-            n=1,
-        )
-        if hasattr(response, "choices"):
-            response_text = response.choices[0].message.content.strip()
-        else:
-            response_text = response["choices"][0]["message"]["content"].strip()
-    else:
-        logger.info("Using Gemini for resume generation")
-        response      = model.generate_content(prompt)
-        response_text = response.text
+    """Calls Gemini synchronously — must be run in a thread."""
+    logger.info("Using Gemini for resume generation")
+    response      = model.generate_content(prompt)
+    response_text = response.text
 
     parsed_json = extract_json_from_response(response_text)
     if not parsed_json:

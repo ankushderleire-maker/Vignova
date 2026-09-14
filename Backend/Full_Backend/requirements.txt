@@ -12,7 +12,6 @@ keybert
 PyMuPDF
 nltk
 python-multipart
-sarvamai
 psycopg2-binary
 requests
 aiohttp
