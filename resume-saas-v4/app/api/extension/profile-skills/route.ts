@@ -5,7 +5,7 @@ import { getExtensionUser } from "@/lib/extensionAuth";
 import { withCors, handleCorsOptions } from "@/lib/extensionCors";
 import { activeExtensionProfile, jsonObject } from "@/lib/extensionDashboard";
 import { cleanSkillName } from "@/lib/linkedin-skills";
-import { withSkill } from "@/lib/profileSkills";
+import { MAX_PROFILE_SKILLS, withSkill } from "@/lib/profileSkills";
 
 const MAX_SKILL_LENGTH = 60;
 
@@ -43,7 +43,18 @@ export async function POST(req: Request) {
         }
 
         const data = jsonObject(profile.parsed_data);
-        const { skills, added } = withSkill(data.skills, skill);
+        const { skills, added, full } = withSkill(data.skills, skill);
+        if (full) {
+            return withCors(
+                NextResponse.json(
+                    {
+                        error: `Your Master Profile already has ${MAX_PROFILE_SKILLS} skills, the most it holds. Remove one on Vignova to add ${skill}.`,
+                        limit: MAX_PROFILE_SKILLS,
+                    },
+                    { status: 409 }
+                )
+            );
+        }
         if (added) {
             await db.master_profiles.update({
                 where: { id: profile.id },

@@ -491,3 +491,7 @@
     25% { transform: translateX(-3px); }
     75% { transform: translateX(3px); }
 }
+
+.vg-match-panel .vg-mp-hint-error {
+    color: #fca5a5;
+}

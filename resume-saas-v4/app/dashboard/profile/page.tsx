@@ -8,6 +8,7 @@ import {
   FolderGit2, Award, Languages, Upload, AlertTriangle, CheckCircle2, AlertCircle, Linkedin, Trophy
 } from "lucide-react";
 import { X as CloseIcon } from "lucide-react";
+import { MAX_PROFILE_SKILLS } from "@/lib/profileSkills";
 import { DotLottieReact } from '@lottiefiles/dotlottie-react';
 import { linkedInToProfile, type ImportSummary } from "@/lib/linkedin-to-profile";
 
@@ -655,8 +656,10 @@ function SkillsForm() {
 
   const skillsList = data.skills.technical ? data.skills.technical.split(",").map(s => s.trim()).filter(Boolean) : [];
 
+  const full = skillsList.length >= MAX_PROFILE_SKILLS;
+
   const addSkill = () => {
-    if (!inputValue.trim()) return;
+    if (!inputValue.trim() || full) return;
     const newSkills = [...skillsList, inputValue.trim()].join(", ");
     updateNested("skills", "technical", newSkills);
     setInputValue("");
@@ -676,12 +679,20 @@ function SkillsForm() {
           value={inputValue}
           onChange={e => setInputValue(e.target.value)}
           onKeyDown={e => e.key === "Enter" && (e.preventDefault(), addSkill())}
-          placeholder="e.g. React, Node.js, AWS... (Press Enter to add)"
+          disabled={full}
+          placeholder={full ? `All ${MAX_PROFILE_SKILLS} skill slots are used. Remove one to add another.` : "e.g. React, Node.js, AWS... (Press Enter to add)"}
         />
         <button onClick={addSkill} className="bg-black/10 dark:bg-white/10 text-[var(--foreground)] px-5 py-2.5 rounded-lg font-bold hover:bg-black/20 dark:hover:bg-white/20 transition-colors uppercase tracking-wider text-[11px] whitespace-nowrap hidden sm:block">
           Add Skill
         </button>
       </div>
+
+      <p className={`-mt-4 text-[11px] font-bold ${skillsList.length > MAX_PROFILE_SKILLS ? "text-red-500" : full ? "text-yellow-600 dark:text-yellow-400" : "text-[var(--text-secondary)]"}`}>
+        {skillsList.length} / {MAX_PROFILE_SKILLS} skills
+        {skillsList.length > MAX_PROFILE_SKILLS
+          ? ` · Only the first ${MAX_PROFILE_SKILLS} are kept when you save. Remove the ones that matter least.`
+          : full ? " · Remove a skill to add another." : ""}
+      </p>
 
       {skillsList.length === 0 ? (
         <div className="border border-dashed border-[var(--border-color)] rounded-xl p-8 text-center">

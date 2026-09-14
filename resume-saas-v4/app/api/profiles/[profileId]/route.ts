@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { db } from "@/lib/db";
+import { capProfileSkills } from "@/lib/profileSkills";
 
 /**
  * GET /api/profiles/[profileId]
@@ -92,7 +93,9 @@ export async function PATCH(
             where: { id: profileId },
             data: {
                 ...(name && { name }),
-                ...(parsed_data && { parsed_data }),
+                // The Skills section holds MAX_PROFILE_SKILLS; the editor warns
+                // before a save that would cut it.
+                ...(parsed_data && { parsed_data: capProfileSkills(parsed_data) }),
             },
         });
 

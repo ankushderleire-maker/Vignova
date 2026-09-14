@@ -229,7 +229,7 @@ function LinkedInOptimizerContent() {
     const [error, setError] = useState("");
     const [activeSection, setActiveSection] = useState("overview");
     const [viewMode, setViewMode] = useState<"current" | "optimized">("current");
-    const [compareMode, setCompareMode] = useState<"side" | "full">("side");
+    const [compareMode, setCompareMode] = useState<"side" | "full">("full");
     const [showNoMasterModal, setShowNoMasterModal] = useState(false);
 
     // Fetching animation state
@@ -992,10 +992,9 @@ function LinkedInOptimizerContent() {
                                 profileUrl={linkedinUrl}
                             />
 
-                            <div className="flex flex-wrap items-center justify-between gap-3">
-                                <p className="text-xs text-[var(--text-secondary)]">Compare each section, then copy the new version into LinkedIn.</p>
+                            <div className="flex flex-col items-center gap-1.5 text-center">
                                 <div className="inline-flex rounded-lg border border-[var(--border-color)] bg-[var(--sidebar-bg)] p-1">
-                                    {([["side", "Side by side"], ["full", "Full profiles"]] as const).map(([mode, label]) => (
+                                    {([["full", "Full profiles"], ["side", "Side by side"]] as const).map(([mode, label]) => (
                                         <button
                                             key={mode}
                                             type="button"
@@ -1006,6 +1005,7 @@ function LinkedInOptimizerContent() {
                                         </button>
                                     ))}
                                 </div>
+                                <p className="text-xs text-[var(--text-secondary)]">Compare each section, then copy the new version into LinkedIn.</p>
                             </div>
 
                             {compareMode === "side" ? (
