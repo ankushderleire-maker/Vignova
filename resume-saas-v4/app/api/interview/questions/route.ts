@@ -8,6 +8,9 @@ import { ensurePeriod, notOnPlanBody, outOfCreditsBody, refundCredits, spendCred
 
 export const maxDuration = 60;
 
+/** The most questions one interview credit can ask the model for. */
+const MAX_QUESTIONS_PER_CREDIT = 15;
+
 export async function POST(req: NextRequest) {
     const session = await getServerSession(authOptions);
     const userId = (session?.user as any)?.id as string | undefined;
@@ -50,6 +53,13 @@ export async function POST(req: NextRequest) {
     // already charged a credit while this one — the same generation, reached
     // from the dashboard — was free, so anyone could route around the charge.
     // One credit buys a whole set of questions for one job.
+    // One credit buys one set. The size of the set came straight from the
+    // request body, so a single credit could ask the model for any number of
+    // questions; it is capped at what the dashboard asks for.
+    const requested = Number(body?.num_questions);
+    const questionCount =
+        Number.isInteger(requested) && requested > 0 ? Math.min(requested, MAX_QUESTIONS_PER_CREDIT) : 7;
+
     const spent = await spendCredits(userId, "interview");
     if (!spent.ok) {
         return NextResponse.json(outOfCreditsBody("interview", spent.remaining), { status: 403 });
@@ -58,7 +68,7 @@ export async function POST(req: NextRequest) {
     // callBackend sends the internal API key the backend now requires.
     const result = await callBackend<{ questions?: Prisma.InputJsonValue[] }>("/api/interview/questions", {
         method: "POST",
-        body: { ...body, user_profile: userProfile },
+        body: { ...body, num_questions: questionCount, user_profile: userProfile },
         timeoutMs: 55_000,
         headers: { "X-Client-Id": userId },
     });

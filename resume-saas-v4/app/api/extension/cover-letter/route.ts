@@ -102,7 +102,7 @@ export async function POST(req: Request) {
                     jobTitle: jobTitle || "Untitled Position",
                     company: company || "Unknown Company",
                     jobUrl,
-                    description: description.substring(0, 5000),
+                    description: description.slice(0, 20000),
                     coverLetter,
                     source: "extension",
                     sourceUrl: jobUrl,

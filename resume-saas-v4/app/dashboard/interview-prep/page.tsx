@@ -234,7 +234,7 @@ export default function InterviewPrepPage() {
         </div>
       )}
     <div className="min-h-full">
-      <div className="max-w-4xl mx-auto pb-10">
+      <div id="tour-interview" className="max-w-4xl mx-auto pb-10">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-8 gap-4">
           <div>
             <h1 className="text-2xl font-bold text-[var(--foreground)] flex items-center gap-3">

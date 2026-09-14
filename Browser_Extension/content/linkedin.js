@@ -674,6 +674,22 @@
                         document.querySelector(".vignova-tailor-btn");
                     if (tailor) tailor.click();
                 },
+                onAddSkill: async (skill) => {
+                    const reply = await chrome.runtime.sendMessage({
+                        type: "API_ADD_PROFILE_SKILL",
+                        data: { skill },
+                    }).catch(() => null);
+                    if (!reply || !reply.success) {
+                        throw new Error((reply && (reply.message || reply.error)) || "Could not add this skill.");
+                    }
+                    // Scores are cached per posting; drop the cache so the badge
+                    // counts the skill that was just added.
+                    Vignova_Score.invalidate();
+                    setTimeout(() => {
+                        if (badge.isConnected) fetchAndDisplayScore(badge);
+                    }, 600);
+                    return reply;
+                },
                 onSettings: () => {
                     chrome.runtime.sendMessage({
                         type: "OPEN_TAB",

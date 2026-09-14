@@ -78,7 +78,7 @@ lint_results.txt,output.html,test-output.txt,test-pdf.js,test-simple.js,tsconfig
 ### 5. Rotate every credential that was in the old `.env` files
 Anything that was ever committed should be assumed public.
 - Gemini API key  (console.cloud.google.com → APIs → Credentials)
-- Sarvam API key
+- OpenAI API key  (platform.openai.com → API keys)
 - Adzuna App ID + Key  (developer.adzuna.com)
 - Apify API token  (console.apify.com → Settings → Integrations) — powers the
   LinkedIn Optimizer profile fetch; goes in `Backend/Full_Backend/.env` only

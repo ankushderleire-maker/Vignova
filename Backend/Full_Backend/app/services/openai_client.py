@@ -13,6 +13,7 @@ so the fields are enforced by the decoder rather than requested in the prompt.
 from __future__ import annotations
 
 import asyncio
+import concurrent.futures
 import json
 import logging
 import os
@@ -104,6 +105,7 @@ async def structured_completion(
     schema_name: str,
     model: str | None = None,
     max_tokens: int | None = None,
+    timeout_secs: int | None = None,
 ) -> tuple[dict[str, Any], str]:
     """
     Returns (parsed_json, model_used).
@@ -128,7 +130,7 @@ async def structured_completion(
         },
     }
     headers = {"Authorization": f"Bearer {OPENAI_API_KEY}", "Content-Type": "application/json"}
-    timeout = aiohttp.ClientTimeout(total=HTTP_TIMEOUT)
+    timeout = aiohttp.ClientTimeout(total=timeout_secs or HTTP_TIMEOUT)
 
     last_error = "The model did not return a result."
 
@@ -189,3 +191,18 @@ async def structured_completion(
             raise OpenAiError(last_error)
 
     raise OpenAiError(last_error)
+
+
+def structured_completion_sync(**kwargs: Any) -> tuple[dict[str, Any], str]:
+    """
+    structured_completion for synchronous code, such as the ATS scorers that
+    run in worker threads. Takes the same keyword arguments.
+    """
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        return asyncio.run(structured_completion(**kwargs))
+    # asyncio.run refuses to start inside a running loop, so the request gets a
+    # thread and a loop of its own. The caller waits either way.
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+        return pool.submit(lambda: asyncio.run(structured_completion(**kwargs))).result()

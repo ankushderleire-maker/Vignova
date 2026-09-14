@@ -1,3 +1,4 @@
+import html
 import os
 import re
 import json
@@ -11,6 +12,7 @@ from sentence_transformers import util
 import google.generativeai as genai
 
 from app.config import model as _gemini_model
+from app.services import openai_client
 from app.services.ml_models import semantic_model
 
 logger = logging.getLogger("ats_helpers")
@@ -34,12 +36,120 @@ def chunk_text(text: str, max_words: int = 200, overlap: int = 50) -> list:
     return chunks
 
 
+# Lines a job board wraps around the posting. They carry no requirement, and
+# pasted as-is they became "keywords" ("skip", "nbsp", "job") and pulled the
+# semantic comparison towards page chrome.
+_JOB_BOARD_CHROME = {
+    "skip to main content", "skip to content", "about the job", "show more", "show less",
+    "see more", "apply", "easy apply", "save", "report this job", "job details",
+    "full job description", "job description",
+}
+
+
+def clean_job_description(text: str) -> str:
+    """The posting without HTML entities and job-board chrome lines."""
+    cleaned = html.unescape(text or "").replace("\xa0", " ")
+    cleaned = re.sub(r"\bnbsp;?", " ", cleaned, flags=re.I)
+    lines = []
+    for line in cleaned.splitlines():
+        line = re.sub(r"[ \t]+", " ", line).strip()
+        if not line or line.lower().rstrip(":") in _JOB_BOARD_CHROME:
+            continue
+        # Our own steering note, appended when a resume is generated with a
+        # focus. Scoring it gave the generator and the ATS checker different
+        # keywords for the same job.
+        if line.lower().startswith("candidate focus:"):
+            continue
+        lines.append(line)
+    return "\n".join(lines)
+
+
 def _normalize_jd_for_cache(jd_text: str) -> str:
     return re.sub(r"\s+", " ", (jd_text or "").strip().lower())
 
 
+# Bumped when entries written before it can't be trusted. v2: older code cached
+# the local fallback's keywords, mostly words from the posting's prose, and
+# kept scoring every resume for that posting against them.
+_KEYWORD_CACHE_VERSION = "v2"
+
+
 def _cache_key_for_jd(jd_text: str) -> str:
-    return hashlib.sha256(_normalize_jd_for_cache(jd_text).encode("utf-8")).hexdigest()
+    text = f"{_KEYWORD_CACHE_VERSION}|{_normalize_jd_for_cache(jd_text)}"
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+def _parse_keyword_response(text: str) -> list:
+    """The keyword list in a Gemini reply, or [] when there is none."""
+    cleaned = (text or "").strip()
+    fenced = re.search(r"```(?:json)?\s*([\s\S]*?)```", cleaned)
+    if fenced:
+        cleaned = fenced.group(1).strip()
+    for candidate in [cleaned, *reversed(re.findall(r"\[[^\[\]]*\]", cleaned))]:
+        try:
+            items = json.loads(candidate)
+        except (json.JSONDecodeError, TypeError):
+            continue
+        if isinstance(items, list) and items and all(isinstance(item, str) for item in items):
+            return items
+    # A bare "Python, AWS, Docker" list is usable; a sentence split on commas is not.
+    parts = [part.strip(" \t\"'-*\u2022[]") for part in re.split(r"[,\n]", cleaned)]
+    parts = [part for part in parts if part]
+    if len(parts) >= 3 and all(len(part.split()) <= 4 for part in parts):
+        return parts
+    return []
+
+
+_KEYWORD_SCHEMA = {
+    "type": "object",
+    "properties": {"keywords": {"type": "array", "items": {"type": "string"}}},
+    "required": ["keywords"],
+    "additionalProperties": False,
+}
+
+
+def _ask_openai(prompt: str) -> list:
+    """Keywords from gpt-5-nano, shaped by a strict schema rather than parsed out of prose."""
+    result, _ = openai_client.structured_completion_sync(
+        system="You extract the keywords an applicant tracking system screens for. Return them in keywords.",
+        user=prompt,
+        schema=_KEYWORD_SCHEMA,
+        schema_name="ats_keywords",
+        max_tokens=2000,
+        timeout_secs=20,
+    )
+    return result.get("keywords") or []
+
+
+def _ask_gemini(prompt: str) -> list:
+    response = _gemini_model.generate_content(
+        prompt,
+        generation_config=genai.GenerationConfig(temperature=0, response_mime_type="application/json"),
+    )
+    return _parse_keyword_response(response.text or "")
+
+
+def _extract_keywords_with_models(prompt: str, normalize) -> list[str]:
+    """
+    Keywords from gpt-5-nano, then from Gemini when OpenAI fails.
+
+    A model failure used to go straight to the local fallback, whose keywords
+    are mostly words from the posting's prose, so resumes were scored against
+    terms no resume would contain. The reason is logged now, too.
+    """
+    providers = []
+    if openai_client.is_configured():
+        providers.append((openai_client.DEFAULT_MODEL, _ask_openai))
+    providers.append(("Gemini", _ask_gemini))
+    for name, ask in providers:
+        try:
+            keywords = normalize(ask(prompt))
+        except Exception as exc:
+            logger.warning("ATS keyword extraction with %s failed: %s", name, exc)
+            continue
+        if keywords:
+            return keywords
+        logger.warning("ATS keyword extraction with %s returned no usable keywords.", name)
+    return []
 
 
 def _load_keyword_cache() -> dict:
@@ -113,10 +223,23 @@ def _extract_keywords_locally(jd_text: str) -> list[str]:
         "doesn", "hadn", "hasn", "haven", "isn", "ma", "mightn", "mustn", "needn", "shan",
         "shouldn", "wasn", "weren", "won", "wouldn", "rolewhat", "what", "your", "expertise",
         "world", "about", "could", "directly", "within", "must", "make", "sure", "like", "such",
-        "good", "well", "new", "throughout", "across"
+        "good", "well", "new", "throughout", "across",
+        # Words every posting uses about itself. None is a skill, and each one
+        # counted against a resume that could never contain it.
+        "job", "jobs", "hire", "hiring", "details", "type", "location", "locations",
+        "description", "overview", "career", "careers", "content", "skip", "search",
+        "life", "application", "applications", "apply", "want", "upon", "pivotal",
+        "leader", "leaders", "innovators", "global", "organization", "organisation",
+        "delivers", "deliver", "was", "were", "two", "hosts", "county", "full",
+        "full-time", "part-time", "benefits", "salary", "join", "looking", "seeking",
+        "responsibilities", "requirements", "qualifications", "position", "positions",
+        "employer", "equal", "remote", "hybrid", "office", "days", "week", "month",
     }
 
     for term in single_terms:
+        # The pattern keeps "." for terms like node.js, so the word ending a
+        # sentence arrives as "technology."; trim it before judging the word.
+        term = term.rstrip(".-/")
         if term in stop_terms:
             continue
         if term in seen:
@@ -133,7 +256,7 @@ def _extract_keywords_locally(jd_text: str) -> list[str]:
 
 def calculate_semantic_score(jd_text: str, resume_text: str) -> float:
     """Chunked semantic similarity using SentenceTransformer."""
-    jd_chunks = chunk_text(jd_text)
+    jd_chunks = chunk_text(clean_job_description(jd_text))
     resume_chunks = chunk_text(resume_text)
 
     jd_embeddings = semantic_model.encode(jd_chunks, convert_to_tensor=True)
@@ -142,9 +265,13 @@ def calculate_semantic_score(jd_text: str, resume_text: str) -> float:
     # Compute all-pairs cosine similarity and take the mean of max similarities
     cos_scores = util.cos_sim(jd_embeddings, resume_embeddings)  # shape: (jd_n, res_n)
 
-    # For each JD chunk, find the best matching resume chunk
-    max_per_jd = cos_scores.max(dim=1).values  # best match for each JD chunk
-    avg_similarity = max_per_jd.mean().item()
+    # For each JD chunk, its best matching resume chunk. Only the strongest 70%
+    # of JD chunks are averaged: a posting's company blurb, benefits and legal
+    # text have no resume counterpart, and averaging them in lowered every
+    # resume's score by the same amount without saying anything about fit.
+    best = sorted(cos_scores.max(dim=1).values.tolist(), reverse=True)
+    keep = max(1, round(len(best) * 0.7))
+    avg_similarity = sum(best[:keep]) / keep
 
     # Map raw cosine similarity [0.15, 0.75] -> [0, 100]
     if avg_similarity <= 0.15:
@@ -157,12 +284,13 @@ def calculate_semantic_score(jd_text: str, resume_text: str) -> float:
 
 def calculate_keyword_score(jd_text: str, resume_text: str) -> dict:
     """
-    Extract meaningful skills, technologies, and qualifications from JD using either Sarvam AI or Gemini.
+    Extract meaningful skills, technologies, and qualifications from JD with gpt-5-nano, or Gemini when OpenAI fails.
     This guarantees clean, atomic skills (e.g., 'Python', 'Agile') instead of long NLP chunks.
     """
     lemmatizer = WordNetLemmatizer()
-    
-    # ── Step 1: Extract keywords using Sarvam AI or Gemini ──
+    jd_text = clean_job_description(jd_text)
+
+    # ── Step 1: Extract keywords with gpt-5-nano, falling back to Gemini ──
     prompt = f"""
     You are an expert ATS (Applicant Tracking System) keyword extractor.
     Analyze the following Job Description (JD) and extract the exact keywords an ATS would look for.
@@ -205,71 +333,22 @@ def calculate_keyword_score(jd_text: str, resume_text: str) -> dict:
         return normalized
     
     cached_keywords = cache.get(cache_key)
+    source = "cache"
     if isinstance(cached_keywords, list) and cached_keywords:
         extracted_keywords = normalize_keyword_list(cached_keywords)
     else:
-        try:
-            ats_score_model = os.getenv("ATS_SCORE_MODEL", "GEMINI").upper()
-            sarvam_api_key = os.getenv("SARVAM_API_KEY")
+        source = "ai"
+        extracted_keywords = _extract_keywords_with_models(prompt, normalize_keyword_list)
 
-            if ats_score_model == "SARVAM" and sarvam_api_key:
-                logger.info("Using Sarvam AI for ATS keyword extraction")
-                from sarvamai import SarvamAI
-                client = SarvamAI(api_subscription_key=sarvam_api_key)
-
-                response = client.chat.completions(
-                    messages=[{"content": prompt, "role": "user"}],
-                    temperature=0,
-                )
-
-                if hasattr(response, 'choices'):
-                    text_response = response.choices[0].message.content.strip()
-                else:
-                    text_response = response['choices'][0]['message']['content'].strip()
-            else:
-                logger.info("Using Gemini for ATS keyword extraction")
-                response = _gemini_model.generate_content(
-                    prompt,
-                    generation_config=genai.GenerationConfig(
-                        temperature=0,
-                        response_mime_type="application/json",
-                    ),
-                )
-                text_response = response.text.strip()
-
-            cleaned_response = text_response.strip()
-            if cleaned_response.startswith('```json'):
-                cleaned_response = cleaned_response[7:]
-            if cleaned_response.startswith('```'):
-                cleaned_response = cleaned_response[3:]
-            if cleaned_response.endswith('```'):
-                cleaned_response = cleaned_response[:-3]
-            cleaned_response = cleaned_response.strip()
-
-            if not cleaned_response.startswith("["):
-                array_match = re.search(r"\[[\s\S]*\]", cleaned_response)
-                if array_match:
-                    cleaned_response = array_match.group(0)
-
-            try:
-                extracted_keywords = normalize_keyword_list(json.loads(cleaned_response))
-            except json.JSONDecodeError:
-                # Fallback if it's comma separated or just lines
-                if ',' in cleaned_response and not cleaned_response.startswith('['):
-                    items = [x.strip(' "\'[]') for x in cleaned_response.split(',')]
-                    extracted_keywords = normalize_keyword_list(items)
-                else:
-                    items = [x.strip(' "\'-*•') for x in cleaned_response.split('\n')]
-                    extracted_keywords = normalize_keyword_list(items)
-        except Exception:
-            logger.warning("ATS keyword extraction returned invalid AI output. Falling back to local extraction.")
+        if extracted_keywords:
+            cache[cache_key] = extracted_keywords
+            _save_keyword_cache(cache)
+        else:
+            # Never cached. Caching the fallback pinned its rough keywords to
+            # the posting for every later check, long after the model was
+            # reachable again, and the resume kept scoring against them.
+            source = "local"
             extracted_keywords = _extract_keywords_locally(jd_text)
-
-        if not extracted_keywords:
-            extracted_keywords = _extract_keywords_locally(jd_text)
-
-        cache[cache_key] = extracted_keywords
-        _save_keyword_cache(cache)
 
     # Format into expected list of dicts with calculated relevance
     jd_keywords = []
@@ -350,6 +429,8 @@ def calculate_keyword_score(jd_text: str, resume_text: str) -> dict:
         "missing": missing,
         "found_keywords": [f["keyword"] for f in found],
         "missing_keywords": [m["keyword"] for m in missing],
+        # "ai" or "cache" for model-extracted keywords, "local" for the fallback.
+        "source": source,
     }
 
 
@@ -419,7 +500,14 @@ def calculate_impact_score(resume_text: str) -> dict:
 
 def calculate_readability_score(resume_text: str) -> dict:
     """Analyze sentence length, bullet density, and word count."""
-    sentences = nltk.sent_tokenize(resume_text)
+    # A resume line is a sentence. Bullets rarely end in a full stop, and
+    # tokenizing the whole text at once merged every bullet under a heading
+    # into one "sentence" of dozens of words, marking tight bullet-point
+    # writing as hard to read.
+    lines = [line.strip() for line in resume_text.split("\n") if line.strip()]
+    sentences = []
+    for line in lines:
+        sentences.extend([s for s in nltk.sent_tokenize(line) if s.strip()] or [line])
     words = resume_text.split()
     word_count = len(words)
     sentence_count = len(sentences) if sentences else 1
@@ -434,9 +522,11 @@ def calculate_readability_score(resume_text: str) -> dict:
         sentence_len_score = max(0, 100 - (avg_sentence_len - 22) * 5)
 
     # Bullet density: count lines starting with bullets/dashes
-    lines = resume_text.strip().split('\n')
-    total_lines = len(lines) if lines else 1
-    bullet_lines = sum(1 for line in lines if re.match(r'^\s*[\-•\*▸▹►]', line.strip()))
+    # Measured over lines with some content, so a name, contact details and
+    # section headings do not dilute the ratio of a resume that is all bullets.
+    content_lines = [line for line in lines if len(line.split()) >= 4]
+    total_lines = len(content_lines) if content_lines else 1
+    bullet_lines = sum(1 for line in content_lines if re.match(r'^\s*[\-•\*▸▹►]', line))
     bullet_ratio = bullet_lines / total_lines
     bullet_score = min(bullet_ratio / 0.3, 1.0) * 100  # 30%+ bullet lines = perfect
 

@@ -707,6 +707,120 @@ def filter_skill_groups(groups: list[dict], master_profile: dict, job_descriptio
     return kept
 
 
+# Words that make a posting term a soft skill rather than a technical one.
+_SOFT_SKILL_WORDS = {
+    "communication", "stakeholder", "collaboration", "teamwork", "leadership",
+    "interpersonal", "management", "mentoring", "presentation", "negotiation",
+    "adaptability", "ownership", "customer", "client",
+}
+
+# Terms a posting uses about itself. The keyword extractor can return them, and
+# none belongs in anyone's skills section.
+_POSTING_WORDS = {
+    "job", "hire", "hiring", "detail", "type", "location", "description", "overview",
+    "career", "content", "skip", "search", "life", "application", "apply", "want",
+    "upon", "leader", "global", "organization", "organisation", "company", "role",
+    "position", "benefit", "salary", "remote", "hybrid", "experience", "skill",
+}
+
+# Job-title words. Inside a skill phrase they are fine ("software engineering");
+# on their own they are the title talking, not a skill.
+_TITLE_WORDS = {
+    "software", "engineer", "developer", "senior", "junior", "lead", "principal",
+    "staff", "intern", "manager", "associate", "specialist", "analyst", "consultant",
+    "architect", "head", "director", "officer",
+}
+
+
+def _display_case(keyword: str, source_text: str) -> str:
+    """The keyword as the profile writes it, or a sensible casing if it does not."""
+    found = re.search(r"(?<![A-Za-z0-9])" + re.escape(keyword) + r"(?![A-Za-z0-9])", source_text, re.I)
+    if found:
+        return found.group(0)
+    return " ".join(w.upper() if len(w) <= 3 else w[:1].upper() + w[1:] for w in keyword.split())
+
+
+def supported_keywords(keywords: Any, master_profile: dict) -> list[str]:
+    """
+    Posting keywords the profile gives evidence for, in the posting's order.
+
+    A term is supported when the profile contains it, or every distinctive word
+    of it, which is the test filter_skill_groups holds the model's skills to. A
+    keyword the candidate never mentions is not added, however much it would
+    lift the score.
+    """
+    source_text = json.dumps(master_profile or {}, ensure_ascii=False)
+    profile_text = source_text.lower()
+    profile_tokens = set(_tokens(profile_text))
+    out: list[str] = []
+    seen: set[str] = set()
+    for raw in keywords or []:
+        keyword = " ".join(str(raw).split()).strip(" .,:;")
+        key = keyword.lower()
+        if not keyword or key in seen or len(keyword.split()) > 4:
+            continue
+        seen.add(key)
+        words = _tokens(keyword)
+        if not words or any(word in _POSTING_WORDS for word in words):
+            continue
+        if len(words) == 1 and words[0] in _TITLE_WORDS:
+            continue
+        phrase = re.search(r"(?<![a-z0-9])" + re.escape(key) + r"(?![a-z0-9])", profile_text)
+        distinctive = [word for word in words if len(word) >= 3 and word not in _GENERIC_WORDS]
+        if phrase or (distinctive and all(word in profile_tokens for word in distinctive)):
+            out.append(_display_case(keyword, source_text))
+    return out
+
+
+def add_supported_keywords(resume_data: dict, master_profile: dict, missing_keywords: Any, limit: int = 12) -> list[str]:
+    """
+    Puts supported posting keywords the draft left out into its skills.
+
+    The writer tailors the prose and picks skills, and regularly leaves out a
+    term the ATS screens for even when the profile lists it. That cost resumes
+    the keyword score they were entitled to, so the gap is closed here, without
+    another model call and only with terms supported_keywords accepts.
+    Returns the keywords added.
+    """
+    groups = resume_data.get("skillGroups") if isinstance(resume_data.get("skillGroups"), list) else []
+    skills = resume_data.get("skills")
+    if isinstance(skills, dict):
+        flat = [s.strip() for s in str(skills.get("technical") or "").split(",") if s.strip()]
+    elif isinstance(skills, list):
+        flat = [str(s).strip() for s in skills if str(s).strip()]
+    else:
+        flat = [s.strip() for s in str(skills or "").split(",") if s.strip()]
+    present = {s.lower() for s in flat} | {
+        str(s).lower() for g in groups if isinstance(g, dict) for s in (g.get("skills") or [])
+    }
+
+    additions = [k for k in supported_keywords(missing_keywords, master_profile) if k.lower() not in present][:limit]
+    if not additions:
+        return []
+
+    soft = [k for k in additions if set(_tokens(k)) & _SOFT_SKILL_WORDS]
+    technical = [k for k in additions if k not in soft]
+    if groups:
+        for label, items in (("Additional Skills", technical), ("Professional Skills", soft)):
+            if not items:
+                continue
+            group = next((g for g in groups if isinstance(g, dict) and g.get("label") == label), None)
+            if group is None:
+                groups.append({"label": label, "skills": list(items)})
+            else:
+                group["skills"] = [*(group.get("skills") or []), *items]
+        resume_data["skillGroups"] = groups
+
+    flat = [*flat, *additions]
+    if isinstance(skills, dict):
+        resume_data["skills"] = {**skills, "technical": ", ".join(flat)}
+    elif isinstance(skills, list):
+        resume_data["skills"] = flat
+    else:
+        resume_data["skills"] = ", ".join(flat)
+    return additions
+
+
 # ── Reading the draft back ────────────────────────────────────────────────
 #
 # The checks an editor would run, written down so a model can act on them.

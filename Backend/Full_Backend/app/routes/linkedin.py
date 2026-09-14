@@ -420,8 +420,10 @@ def _as_clean_text(value) -> str:
         return json.dumps(value, ensure_ascii=False)
     return str(value).replace("\x00", "").strip()
 
-def _coerce_skill_list(value) -> list[str]:
-    return coerce_skill_list(value)
+def _coerce_skill_list(value, limit: int | None = None) -> list[str]:
+    if limit is None:
+        return coerce_skill_list(value)
+    return coerce_skill_list(value, limit)
 
 def _normalize_linkedin_profile(raw_profile_data: dict) -> dict:
     raw_data = _remove_null_bytes(raw_profile_data or {})
@@ -482,7 +484,7 @@ def _normalize_linkedin_profile(raw_profile_data: dict) -> dict:
         "experience": normalized_experience,
         "education": normalized_education,
         "projects": normalized_projects,
-        "skills": _coerce_skill_list(raw_data.get("skills")),
+        "skills": _coerce_skill_list(raw_data.get("skills"), 100),
         "skillDetails": clean_skill_details(raw_data.get("skillDetails")),
         "topSkills": _coerce_skill_list(raw_data.get("topSkills")),
     }
@@ -708,15 +710,15 @@ def _ensure_score_friendly_profile(
     missing_keys = {skill.lower() for skill in _coerce_skill_list(missing_keywords)}
     prioritized = [skill for skill in grounded_skills if skill.lower() in missing_keys]
     score_keywords = _append_unique_skills(prioritized, grounded_skills, 24)
-    if score_keywords:
-        relevant_keys = {skill.lower() for skill in score_keywords}
-        current_relevant = [
-            skill for skill in result.get("skills", [])
-            if any(skill.lower() == key or skill.lower() in key or key in skill.lower() for key in relevant_keys)
-        ]
-        result["skills"] = _append_unique_skills([], score_keywords + current_relevant, 30)
-    else:
-        result["skills"] = _append_unique_skills([], result.get("skills", []), 30)
+    # Every skill already on LinkedIn stays. This used to keep only the ones
+    # overlapping the master profile's keywords and cut the list to 30, so a
+    # profile with 52 skills came back from optimization with two. Grounded
+    # master-profile skills the profile is missing go first, where recruiter
+    # searches weigh them; LinkedIn allows 100.
+    existing_skills = _coerce_skill_list(source.get("skills"), 100)
+    result["skills"] = _append_unique_skills(
+        score_keywords, existing_skills + _coerce_skill_list(result.get("skills"), 100), 100
+    )
 
     if not result.get("about"):
         result["about"] = source.get("about") or "Professional profile focused on delivering measurable business impact through practical execution and continuous improvement."
@@ -783,6 +785,31 @@ def _ensure_score_friendly_profile(
     result["projects"] = _ensure_score_friendly_projects(result, source, master_projects, score_keywords)
 
     return result
+
+_REWRITABLE_SECTIONS = ("skills", "headline", "about", "experience", "projects", "education")
+
+
+def _never_worse_profile(master_text: str, source_data: dict, candidate: dict, source_scores: dict) -> tuple[dict, dict]:
+    """
+    The current profile with every rewritten section that does not lower the
+    score swapped in.
+
+    Sections are tried one at a time against the best profile so far, so the
+    result scores at or above the current profile by construction. A rewrite
+    can improve the headline and the experience and still lose points overall
+    on, say, a shorter About section; this keeps the wins without the loss.
+    """
+    best = _normalize_linkedin_profile(source_data)
+    best_scores = source_scores
+    for key in _REWRITABLE_SECTIONS:
+        if key not in (candidate or {}):
+            continue
+        trial = _normalize_linkedin_profile({**best, key: candidate[key]})
+        trial_scores = _compute_linkedin_scores(master_text, _build_linkedin_profile_text(trial), trial)
+        if float(trial_scores.get("overall_score", 0)) >= float(best_scores.get("overall_score", 0)):
+            best, best_scores = trial, trial_scores
+    return best, best_scores
+
 
 def _fallback_linkedin_optimization(source_data: dict, master_keywords: list[str], missing_keywords: list[str], master_data: dict | None = None) -> dict:
     source = _normalize_linkedin_profile(source_data)
@@ -1155,13 +1182,19 @@ Keep the original number of experiences and education items if possible, but agg
             None,
             partial(_compute_linkedin_scores, master_score_text, optimized_profile_text, result),
         )
-        optimized_score = round(float(optimized_scores.get("overall_score", current_score)), 1)
+        # The baseline is the current profile scored now, with the same master
+        # profile and scorer as the rewrite. The stored analysis score was
+        # computed at scan time, possibly against a different or since-edited
+        # master profile, so comparing with it could make an optimization look
+        # like it lowered the score.
+        baseline_score = round(float(current_scores.get("overall_score", current_score)), 1)
+        optimized_score = round(float(optimized_scores.get("overall_score", baseline_score)), 1)
 
-        if optimized_score < current_score:
+        if optimized_score < baseline_score:
             logger.info(
                 "LinkedIn optimized score %.1f was below current %.1f; trying deterministic fallback.",
                 optimized_score,
-                current_score,
+                baseline_score,
             )
             fallback_result = _fallback_linkedin_optimization(raw_data, master_keywords, missing_keywords, master_data)
             fallback_profile_text = _build_linkedin_profile_text(fallback_result)
@@ -1175,9 +1208,21 @@ Keep the original number of experiences and education items if possible, but agg
                 optimized_scores = fallback_scores
                 optimized_score = fallback_score
 
+        if optimized_score < baseline_score:
+            # Neither rewrite beat the profile as a whole, but parts of them
+            # usually do. Take each rewritten section only if the score does not
+            # drop, so what we hand back never scores below what the user has.
+            result, optimized_scores = await loop.run_in_executor(
+                None,
+                partial(_never_worse_profile, master_score_text, raw_data, result, current_scores),
+            )
+            optimized_score = round(float(optimized_scores.get("overall_score", baseline_score)), 1)
+
+        result["currentScore"] = baseline_score
+        result["currentSectionScores"] = current_scores.get("sectionScores", {})
         result["optimizedScore"] = optimized_score
         result["optimizedSectionScores"] = optimized_scores.get("sectionScores", {})
-        result["scoreDelta"] = round(max(0.0, optimized_score - current_score), 1)
+        result["scoreDelta"] = round(max(0.0, optimized_score - baseline_score), 1)
         
         # Save optimized content to DB
         with get_db_connection() as conn:

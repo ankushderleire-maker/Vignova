@@ -80,7 +80,7 @@ export async function GET(req: Request) {
                 credits: u.credit_buckets.map((row) => ({
                     bucket: row.bucket,
                     total: row.total,
-                    remaining: row.period_start < periodStart ? row.total : row.remaining,
+                    remaining: row.period_start < periodStart ? row.total : Math.max(0, row.remaining),
                 })),
                 counts: {
                     resumes: u._count.generated_resumes,

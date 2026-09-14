@@ -69,7 +69,11 @@
         return row;
     }
 
-    function pillGroup(iconName, tone, title, words) {
+    /**
+     * A labelled row of keyword pills. With `onAdd`, each pill is a button that
+     * adds that skill to the user's Master Profile.
+     */
+    function pillGroup(iconName, tone, title, words, onAdd) {
         const wrap = el("div", "vg-mp-group");
 
         const head = el("div", `vg-mp-group-head vg-mp-${tone}`);
@@ -78,9 +82,41 @@
         wrap.appendChild(head);
 
         const pills = el("div", "vg-mp-pills");
-        words.slice(0, 12).forEach((word) => pills.appendChild(el("span", `vg-mp-pill vg-mp-pill-${tone}`, word)));
+        words.slice(0, 12).forEach((word) => {
+            if (!onAdd) {
+                pills.appendChild(el("span", `vg-mp-pill vg-mp-pill-${tone}`, word));
+                return;
+            }
+            const pill = el("button", `vg-mp-pill vg-mp-pill-${tone} vg-mp-pill-add`, `+ ${word}`);
+            pill.type = "button";
+            pill.title = `Add "${word}" to your Master Profile`;
+            pill.addEventListener("click", async (event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                if (pill.disabled) return;
+                pill.disabled = true;
+                pill.classList.add("vg-mp-pill-adding");
+                pill.textContent = `Adding ${word}...`;
+                try {
+                    await onAdd(word);
+                    pill.classList.remove("vg-mp-pill-adding", `vg-mp-pill-${tone}`);
+                    pill.classList.add("vg-mp-pill-added");
+                    pill.textContent = `\u2713 ${word}`;
+                    pill.title = "Added to your Master Profile";
+                } catch (error) {
+                    pill.disabled = false;
+                    pill.classList.remove("vg-mp-pill-adding");
+                    pill.textContent = `+ ${word}`;
+                    pill.title = (error && error.message) || "Could not add this skill. Try again.";
+                    pill.classList.add("vg-mp-pill-failed");
+                    setTimeout(() => pill.classList.remove("vg-mp-pill-failed"), 900);
+                }
+            });
+            pills.appendChild(pill);
+        });
         if (words.length > 12) pills.appendChild(el("span", "vg-mp-pill vg-mp-pill-more", `+${words.length - 12} more`));
         wrap.appendChild(pills);
+        if (onAdd) wrap.appendChild(el("p", "vg-mp-hint", "Have one of these? Click it to add it to your Master Profile."));
 
         return wrap;
     }
@@ -180,7 +216,7 @@
             node.appendChild(pillGroup("check", "good", "Keyword matches", model.matched));
         }
         if ((model.missing || []).length) {
-            node.appendChild(pillGroup("alert", "poor", "Missing keywords", model.missing));
+            node.appendChild(pillGroup("alert", "poor", "Missing keywords", model.missing, handlers.onAddSkill));
         }
 
         // ── What to do about it ──
@@ -238,13 +274,19 @@
         node.style.top = `${Math.round(top)}px`;
     }
 
+    // A panel opened by clicking stays open until it is closed, so the cursor
+    // can travel to a pill without the panel vanishing on the way.
+    let pinned = false;
+
     function scheduleHide() {
+        if (pinned) return;
         clearTimeout(hideTimer);
-        hideTimer = setTimeout(hide, 180);
+        hideTimer = setTimeout(hide, 320);
     }
 
     function hide() {
         clearTimeout(hideTimer);
+        pinned = false;
         if (panel) panel.classList.remove("vg-mp-open");
         anchor = null;
     }
@@ -265,13 +307,19 @@
         if (e.key === "Escape" && panel && panel.classList.contains("vg-mp-open")) hide();
     });
 
+    document.addEventListener("mousedown", (e) => {
+        if (!pinned || !panel) return;
+        if (panel.contains(e.target) || (anchor && anchor.contains(e.target))) return;
+        hide();
+    }, true);
+
     window.addEventListener("scroll", () => { if (anchor) place(panel, anchor); }, { passive: true });
 
     /**
      * Wires a score badge to the panel.
      *
      * `model` is { score, matched[], missing[] };
-     * `handlers` is { onImprove, onAnalysis, onSettings }.
+     * `handlers` is { onImprove, onAnalysis, onAddSkill, onSettings }.
      */
     function attach(badge, model, handlers) {
         badge.removeAttribute("data-tooltip-html");
@@ -280,15 +328,32 @@
         if (badge._vgMatchHandlers) {
             badge.removeEventListener("mouseenter", badge._vgMatchHandlers.enter);
             badge.removeEventListener("mouseleave", badge._vgMatchHandlers.leave);
+            badge.removeEventListener("click", badge._vgMatchHandlers.click);
         }
 
-        const enter = () => show(badge, model, handlers);
+        // Hover shows the panel; a click opens it and keeps it open. Hover alone
+        // was unreliable: the page re-renders the badge, and crossing the gap to
+        // the panel could close it before the cursor arrived.
+        const enter = () => { if (!pinned) show(badge, model, handlers); };
         const leave = () => scheduleHide();
-        badge._vgMatchHandlers = { enter, leave };
+        const click = (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            if (pinned && anchor === badge) {
+                hide();
+                return;
+            }
+            show(badge, model, handlers);
+            pinned = true;
+        };
+        badge._vgMatchHandlers = { enter, leave, click };
 
         badge.addEventListener("mouseenter", enter);
         badge.addEventListener("mouseleave", leave);
+        badge.addEventListener("click", click);
         badge.style.cursor = "pointer";
+        badge.setAttribute("role", "button");
+        badge.setAttribute("aria-haspopup", "dialog");
     }
 
     window.VignovaMatchPanel = { attach, show, hide, tierOf, suggestionFor };
