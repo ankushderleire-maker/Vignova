@@ -809,7 +809,7 @@
     $('supportedSitesList').textContent = 'LinkedIn, Indeed, Workday, Greenhouse, Lever, Ashby and other standard application forms. Custom forms may require manual input.';
     for (const [id, action] of Object.entries({ tailorResumeBtn: 'resume', coverLetterBtn: 'letter', extractJobBtn: 'extract', saveJobBtn: 'save', hrMessageBtn: 'hr', applyEmailBtn: 'email', updateResumeBtn: 'resume' }))
         $(id).onclick = () => void editJob(action);
-    $('interviewPrepBtn').onclick = async () => { if (await paid('Interview Prep')) openApp('/dashboard/interview-prep'); };
+    $('naukriOptimizerBtn').onclick = async () => { if (await paid('Naukri Optimizer')) openApp('/dashboard/naukri-optimizer'); };
     $('linkedinOptimizerBtn').onclick = async () => {
         if (await paid('LinkedIn Optimizer'))
             openApp('/dashboard/linkedin-optimizer');

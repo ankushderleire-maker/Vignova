@@ -522,7 +522,7 @@ function NaukriOptimizerContent() {
                                         <p className="text-xs font-bold text-[var(--foreground)]">Current profile</p>
                                         <p className="text-[11px] text-[var(--text-secondary)]">What the extension read from Naukri</p>
                                     </div>
-                                    <NaukriProfileView profile={profile} copiedText={copiedText} onCopy={handleCopy} />
+                                    <NaukriProfileView profile={profile} quickLinks={false} idPrefix="before" copiedText={copiedText} onCopy={handleCopy} />
                                 </div>
                                 <div className="min-w-0 space-y-3 rounded-xl border border-green-200/80 bg-green-50/80 p-3 dark:border-emerald-800/50 dark:bg-emerald-950/20">
                                     <div className="flex items-center justify-between gap-3 rounded-xl border border-green-500/20 bg-green-500/10 px-4 py-3 shadow-sm">
@@ -534,17 +534,17 @@ function NaukriOptimizerContent() {
                                             Open Naukri to make changes
                                         </a>
                                     </div>
-                                    <NaukriProfileView profile={optimized} editable addedSkills={addedSkills} copiedText={copiedText} onCopy={handleCopy} />
+                                    <NaukriProfileView profile={optimized} editable addedSkills={addedSkills} quickLinks={false} idPrefix="after" copiedText={copiedText} onCopy={handleCopy} />
                                 </div>
                             </div>
                         )}
                     </div>
                 ) : (
-                    <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-12">
-                        <div className="min-w-0 lg:col-span-7">
+                    <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
+                        <div className="min-w-0">
                             <NaukriProfileView profile={profile} copiedText={copiedText} onCopy={handleCopy} />
                         </div>
-                        <div className="space-y-4 lg:sticky lg:top-0 lg:col-span-5 lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto lg:pb-2">
+                        <div className="space-y-4 xl:sticky xl:top-0 xl:max-h-[calc(100vh-7rem)] xl:overflow-y-auto xl:pb-2">
                             <div className="flex flex-col items-center gap-4 rounded-xl border border-[var(--border-color)] bg-[var(--sidebar-bg)]/50 p-6 shadow-xl">
                                 <ScoreRing score={currentScore} label="Naukri profile strength" />
                                 <p className="text-center text-xs text-[var(--text-secondary)]">
