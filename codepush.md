@@ -42,3 +42,5 @@ If you have already verified the build manually, you can use this chained comman
 ```bash
 git add . ; git commit -m "Update message" ; git checkout Deploy ; git merge main ; git push origin Deploy ; git checkout main ; git push origin main
 ```
+
+- Deploy trigger: 2026-09-14 02:16:09 +01:00 — documentation-only change to trigger GitHub Actions deploy.
