@@ -188,52 +188,22 @@
         };
     }
 
-    // ─── On-page button ───
+    // ─── Scan status on the page ───
+    // There is no button on Naukri. A scan starts from the Vignova dashboard's
+    // Naukri Optimizer (the extension's Naukri Optimizer tile opens it); this
+    // page reads itself when that scan arrives and says how it went.
 
-    let button = null;
     let toast = null;
+    let hideTimer = null;
     let busy = false;
 
-    function ensureUi() {
-        if (button && document.body.contains(button)) return;
-        button = document.createElement("button");
-        button.type = "button";
-        button.id = "vignova-naukri-btn";
-        button.className = "vg-nk-btn";
-        const logo = document.createElement("img");
-        logo.src = chrome.runtime.getURL("icons/icon48.png");
-        logo.alt = "";
-        const label = document.createElement("span");
-        label.textContent = "Optimize with Vignova";
-        button.append(logo, label);
-        button.addEventListener("click", run);
-
-        toast = document.createElement("div");
-        toast.className = "vg-nk-toast";
-        toast.setAttribute("role", "status");
-        toast.hidden = true;
-        document.body.append(button, toast);
-
-        // A scan started from the Vignova dashboard runs once the page is ready.
-        chrome.runtime.sendMessage({ type: "NAUKRI_SCAN_PENDING" })
-            .then((reply) => {
-                if (reply && reply.pending) {
-                    say("Scanning your profile for Vignova\u2026");
-                    setTimeout(run, 1500);
-                }
-            })
-            .catch(() => null);
-    }
-
-    function removeUi() {
-        if (button) button.remove();
-        if (toast) toast.remove();
-        button = null;
-        toast = null;
-    }
-
     function say(message, tone = "info", action = null) {
-        if (!toast) return;
+        if (!toast || !document.body.contains(toast)) {
+            toast = document.createElement("div");
+            toast.setAttribute("role", "status");
+            document.body.appendChild(toast);
+        }
+        clearTimeout(hideTimer);
         toast.textContent = "";
         toast.className = `vg-nk-toast vg-nk-${tone}`;
         const text = document.createElement("span");
@@ -248,6 +218,7 @@
             toast.appendChild(link);
         }
         toast.hidden = false;
+        if (tone === "success") hideTimer = setTimeout(() => { if (toast) toast.hidden = true; }, 15000);
     }
 
     const openResults = (id) =>
@@ -256,18 +227,17 @@
     async function run() {
         if (busy) return;
         if (!(chrome.runtime && chrome.runtime.id)) {
-            say("Vignova was updated. Reload this page and try again.", "error");
+            say("Vignova was updated. Reload this page and scan again from Vignova.", "error");
             return;
         }
         busy = true;
-        button.disabled = true;
         try {
             say("Reading your Naukri profile\u2026");
             await loadAllSections();
             await expandReadMore();
             const profile = scrapeProfile();
             if (!profile.headline && !profile.keySkills.length && !profile.employment.length) {
-                say("Couldn't find your profile on this page. Let it load fully, then try again.", "error");
+                say("Couldn't find your profile on this page. Let it load fully, then scan again from Vignova.", "error");
                 return;
             }
 
@@ -275,7 +245,7 @@
             const reply = await chrome.runtime.sendMessage({ type: "API_NAUKRI_IMPORT", data: { profile } }).catch(() => null);
             if (!reply || !reply.success) {
                 const message = reply && reply.authenticated === false
-                    ? "Sign in to the Vignova extension first, then try again."
+                    ? "Sign in to the Vignova extension first, then scan again."
                     : (reply && (reply.error || reply.message)) || "Vignova couldn't analyze your profile. Try again in a moment.";
                 say(message, "error");
                 return;
@@ -289,28 +259,29 @@
             say(`Profile analyzed.${score}`, "success", { label: "View results", onClick: () => openResults(reply.analysisId) });
             openResults(reply.analysisId);
         } catch (error) {
-            say("Something went wrong reading the profile. Reload the page and try again.", "error");
+            say("Something went wrong reading the profile. Reload the page and scan again from Vignova.", "error");
         } finally {
             busy = false;
-            if (button) button.disabled = false;
         }
     }
 
-    function sync() {
-        if (PROFILE_PATH.test(location.pathname)) ensureUi();
-        else removeUi();
+    /** Runs a scan the dashboard started for this tab, once the profile is showing. */
+    async function scanIfRequested() {
+        if (!(chrome.runtime && chrome.runtime.id)) return;
+        const reply = await chrome.runtime.sendMessage({ type: "NAUKRI_SCAN_PENDING" }).catch(() => null);
+        if (reply && reply.pending) {
+            say("Scanning your profile for Vignova\u2026");
+            setTimeout(run, 1500);
+        }
     }
 
-    // Naukri is a single-page app: the profile can open without a page load,
-    // and a re-render can drop the button.
+    // Naukri is a single-page app, so the profile can open without a page load,
+    // for example straight after signing in.
     let lastPath = location.pathname;
-    sync();
+    if (PROFILE_PATH.test(lastPath)) scanIfRequested();
     setInterval(() => {
-        if (location.pathname !== lastPath) {
-            lastPath = location.pathname;
-            sync();
-        } else if (PROFILE_PATH.test(lastPath) && !document.getElementById("vignova-naukri-btn")) {
-            sync();
-        }
+        if (location.pathname === lastPath) return;
+        lastPath = location.pathname;
+        if (PROFILE_PATH.test(lastPath)) scanIfRequested();
     }, 1000);
 })();
