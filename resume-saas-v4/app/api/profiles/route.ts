@@ -4,6 +4,7 @@ import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { db } from "@/lib/db";
 import { getUserSubscription } from "@/lib/subscription";
 import { UNLIMITED, enforcedPlanLimits } from "@/lib/planLimits";
+import { capProfileSkills } from "@/lib/profileSkills";
 
 /**
  * GET /api/profiles
@@ -108,7 +109,8 @@ export async function POST(req: Request) {
             data: {
                 user_id: userId,
                 name: name,
-                parsed_data: parsed_data || {},
+                // An import can carry more skills than a profile holds.
+                parsed_data: capProfileSkills(parsed_data) || {},
                 is_default: isFirstProfile, // First profile is default
             },
         });

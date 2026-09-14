@@ -34,7 +34,7 @@ export const BUCKET_LABELS: Record<Bucket, string> = {
 /** What spends from each bucket, for the usage screen and upgrade prompts. */
 export const BUCKET_DESCRIPTIONS: Record<Bucket, string> = {
     tailoring: "Tailored resumes and AI ATS insights",
-    writing: "Cover letters, application emails, LinkedIn optimization and recruiter messages",
+    writing: "Cover letters, application emails, LinkedIn and Naukri optimization and recruiter messages",
     interview: "AI-written interview question sets",
 };
 
@@ -56,6 +56,7 @@ export const CREDIT_COSTS = {
     coverLetter: { writing: 1 },
     applicationEmail: { writing: 1 },
     linkedinOptimization: { writing: 1 },
+    naukriOptimization: { writing: 1 },
     recruiterMessage: { writing: 1 },
     interviewQuestions: { interview: 1 },
     // Three generations priced as one resume and one piece of writing, taken
@@ -72,6 +73,7 @@ export const CREDIT_ACTIONS: { action: CreditAction; label: string; detail: stri
     { action: "coverLetter", label: "Cover letter", detail: "Written for the job you are applying to" },
     { action: "applicationEmail", label: "Application email", detail: "A short email to send with the application" },
     { action: "linkedinOptimization", label: "LinkedIn optimization", detail: "AI rewrites of your analysed profile" },
+    { action: "naukriOptimization", label: "Naukri optimization", detail: "AI rewrites of the profile the extension reads from Naukri" },
     { action: "recruiterMessage", label: "Recruiter message", detail: "An outreach note, from the Chrome extension" },
     { action: "interviewQuestions", label: "Interview questions", detail: "One tailored set with answer tips" },
     { action: "applicationPack", label: "Application pack", detail: "Resume, cover letter and email in one go" },
@@ -253,7 +255,7 @@ export function planAllowances(plan: PlanSummary): AllowanceRow[] {
     const writingUses = [
         "Cover letters",
         "emails",
-        ...(plan.has_linkedin_optimization ? ["LinkedIn optimization"] : []),
+        ...(plan.has_linkedin_optimization ? ["LinkedIn and Naukri optimization"] : []),
         "recruiter messages",
     ];
     return [
@@ -289,7 +291,7 @@ export function planFeatures(plan: PlanSummary): FeatureRow[] {
     return [
         { label: "Keyword match score and job tracker", included: true },
         { label: "Chrome extension", included: plan.has_extension_access },
-        { label: "LinkedIn profile optimization", included: plan.has_linkedin_optimization },
+        { label: "LinkedIn and Naukri profile optimization", included: plan.has_linkedin_optimization },
         { label: "AI ATS insights", included: isPaidPlan(plan.plan_type) },
         ...(templates ? [{ label: templates, included: true }] : []),
         ...(support ? [{ label: /support/i.test(support) ? support : `${support} support`, included: true }] : []),

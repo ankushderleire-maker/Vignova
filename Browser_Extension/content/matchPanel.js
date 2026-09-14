@@ -82,6 +82,7 @@
         wrap.appendChild(head);
 
         const pills = el("div", "vg-mp-pills");
+        const hint = onAdd ? el("p", "vg-mp-hint", "Have one of these? Click + to add it to your Master Profile.") : null;
         words.slice(0, 12).forEach((word) => {
             if (!onAdd) {
                 pills.appendChild(el("span", `vg-mp-pill vg-mp-pill-${tone}`, word));
@@ -108,6 +109,12 @@
                     pill.classList.remove("vg-mp-pill-adding");
                     pill.textContent = `+ ${word}`;
                     pill.title = (error && error.message) || "Could not add this skill. Try again.";
+                    // The reason, such as a full Skills section, belongs where
+                    // the user is looking rather than only in a tooltip.
+                    if (hint) {
+                        hint.textContent = pill.title;
+                        hint.classList.add("vg-mp-hint-error");
+                    }
                     pill.classList.add("vg-mp-pill-failed");
                     setTimeout(() => pill.classList.remove("vg-mp-pill-failed"), 900);
                 }
@@ -116,7 +123,7 @@
         });
         if (words.length > 12) pills.appendChild(el("span", "vg-mp-pill vg-mp-pill-more", `+${words.length - 12} more`));
         wrap.appendChild(pills);
-        if (onAdd) wrap.appendChild(el("p", "vg-mp-hint", "Have one of these? Click it to add it to your Master Profile."));
+        if (hint) wrap.appendChild(hint);
 
         return wrap;
     }

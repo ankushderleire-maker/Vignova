@@ -26,6 +26,7 @@ model users {
   generated_resumes       GeneratedResume[]
   job_applications        JobApplication[]
   linkedin_analyses       LinkedInAnalysis[]
+  naukri_analyses         NaukriAnalysis[]
   payments                Payment[]
   saved_interviews        SavedInterview[]
   exchange_rates          exchange_rates[]
@@ -379,6 +380,25 @@ model LinkedInAnalysis {
   user             users    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+}
+
+/// A Naukri profile the extension read from naukri.com, scored against a
+/// Master Profile, with the AI rewrite once one is made.
+model NaukriAnalysis {
+  id               String   @id @default(cuid())
+  userId           String   @db.Uuid
+  profileUrl       String?
+  masterProfileId  String?  @db.Uuid
+  overallScore     Float?
+  sectionScores    Json?
+  recommendations  Json?
+  optimizedContent Json?
+  rawProfileData   Json
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  user             users    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
 }
 
 model SavedInterview {

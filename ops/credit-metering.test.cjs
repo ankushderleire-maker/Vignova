@@ -23,6 +23,7 @@ const REPLIES={
     '/api/generate-draft-email':{response:'Subject: Application'},
     '/api/interview/questions':{questions:[{question:'How do you test a payment flow?'}]},
     '/api/linkedin/optimize':{headline:'Backend engineer'},
+    '/api/naukri/optimize':{optimized:{headline:'Backend engineer'},currentScore:60,optimizedScore:70},
     '/api/enhance-ats-report':{summary:'Strong match'},
 };
 
@@ -40,8 +41,8 @@ function harness({plan='PRO',balances={tailoring:5,writing:5,interview:5},flags=
         notOnPlanBody:(feature,planType)=>({error:feature+' not on '+planType,upgradeRequired:true,feature,plan:planType}),
     };
     const callBackend=async(url,opts)=>{calls.push(['model',url,opts]);if(fail===true||fail.includes(url))return {ok:false,status:500,data:null,error:'model unavailable'};return {ok:true,status:200,data:REPLIES[url]};};
-    const db={master_profiles:{findFirst:async()=>({parsed_data:{fullName:'Example Person'}})},savedInterview:{create:async()=>({id:'interview1'})}};
-    const overrides={'next-auth':session,'@/app/api/auth/[...nextauth]/route':auth,'@/lib/credits':credits,'@/lib/career-ops':{callBackend},'@/lib/planCatalog':catalog,'@/lib/db':{db},'@/lib/linkedin-skills':{sanitizeLinkedInProfile:data=>data}};
+    const db={master_profiles:{findFirst:async()=>({parsed_data:{fullName:'Example Person'}})},savedInterview:{create:async()=>({id:'interview1'})},naukriAnalysis:{findFirst:async()=>({id:'analysis1',rawProfileData:{headline:'Engineer',keySkills:['Python']}}),update:async()=>({})}};
+    const overrides={'next-auth':session,'@/app/api/auth/[...nextauth]/route':auth,'@/lib/credits':credits,'@/lib/career-ops':{callBackend},'@/lib/planCatalog':catalog,'@/lib/db':{db},'@/lib/linkedin-skills':{sanitizeLinkedInProfile:data=>data},'@/lib/naukri-profile':{sanitizeNaukriProfile:data=>data},'@/lib/extensionDashboard':{jsonObject:value=>value||{}}};
     const spent=()=>Object.fromEntries(Object.keys(start).map(b=>[b,start[b]-state[b]]).filter(([,n])=>n!==0));
     return {calls,spent,route:file=>load('app/api/'+file+'/route.ts',overrides)};
 }
@@ -53,6 +54,7 @@ const METERED=[
     ['cover letter','cover-letter/generate','coverLetter',jobInput],
     ['application email','email/generate','applicationEmail',jobInput],
     ['LinkedIn optimization','linkedin/optimize','linkedinOptimization',{analysisId:'analysis1'}],
+    ['Naukri optimization','naukri/optimize','naukriOptimization',{analysisId:'analysis1'}],
     ['interview questions','interview/questions','interviewQuestions',{job_title:'Engineer',company:'Example',job_description:'Build reliable services.',num_questions:5}],
     ['AI ATS insights','ats/insights','atsInsights',{jdText:'Build reliable services.',resumeText:'Built reliable services.',atsScores:{overall_ats_score:72}}],
 ];
@@ -100,6 +102,7 @@ test('two resume requests racing for the last tailoring credit generate once',as
 });
 for(const [name,file,body,options] of [
     ['LinkedIn optimization on a plan without it','linkedin/optimize',{analysisId:'analysis1'},{plan:'FREE',flags:{has_linkedin_optimization:false}}],
+    ['Naukri optimization on a plan without it','naukri/optimize',{analysisId:'analysis1'},{plan:'FREE',flags:{has_linkedin_optimization:false}}],
     ['interview prep switched off for the plan','interview/questions',{job_title:'Engineer',job_description:'Build reliable services.'},{plan:'FREE',flags:{has_interview_prep:false}}],
     ['AI ATS insights on Free','ats/insights',{jdText:'Build things.',resumeText:'Built things.',atsScores:{overall_ats_score:60}},{plan:'FREE'}],
 ])test(`${name} is refused before any credit moves`,async()=>{
@@ -155,7 +158,8 @@ test('creating a master profile stops at the plan max_profiles',async()=>{
     const route=load('app/api/profiles/route.ts',{'next-auth':session,'@/app/api/auth/[...nextauth]/route':auth,
         '@/lib/db':{db:{master_profiles:{count:async()=>5,findFirst:async()=>null,create:async args=>{created.push(args);return {id:'profile6'};}}}},
         '@/lib/subscription':{getUserSubscription:async()=>({plan_type:'PRO'})},
-        '@/lib/planLimits':{UNLIMITED:-1,enforcedPlanLimits:async()=>({plan_type:'PRO',max_profiles:5})}});
+        '@/lib/planLimits':{UNLIMITED:-1,enforcedPlanLimits:async()=>({plan_type:'PRO',max_profiles:5})},
+        '@/lib/profileSkills':load('lib/profileSkills.ts')});
     const r=await route.POST(post({name:'Sixth profile',parsed_data:{}}));
     assert.equal(r.status,403);assert.match((await r.json()).message,/5 master profiles/);assert.equal(created.length,0);
 });

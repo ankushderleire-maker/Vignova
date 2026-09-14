@@ -5,6 +5,10 @@
  */
 
 const Vignova_API_BASE = "https://app.vignova.io";
+const NAUKRI_PROFILE_URL = "https://www.naukri.com/mnjuser/profile";
+// A dashboard-started scan waits this long for the user to reach their profile,
+// signing in to Naukri first if they have to.
+const NAUKRI_SCAN_TTL_MS = 15 * 60 * 1000;
 
 importScripts("auth.js", "dashboard.js");
 
@@ -168,6 +172,24 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     })();
     return true;
 });
+
+/**
+ * After a scan the dashboard started, shows the results in that dashboard tab
+ * rather than a new one. False when the import was not such a scan.
+ */
+async function returnToDashboard(sender, analysisId) {
+    try {
+        const { naukriScan: scan } = await chrome.storage.session.get("naukriScan");
+        if (!scan || !analysisId || sender.tab?.id !== scan.tabId) return false;
+        await chrome.storage.session.remove("naukriScan");
+        const url = `${Vignova_API_BASE}/dashboard/naukri-optimizer?analysis=${encodeURIComponent(analysisId)}`;
+        const tab = await chrome.tabs.update(scan.returnTabId, { url, active: true });
+        if (tab && tab.windowId !== undefined) await chrome.windows.update(tab.windowId, { focused: true });
+        return true;
+    } catch (_) {
+        return false; // the dashboard tab is gone; the Naukri page opens a new one
+    }
+}
 
 function routeMessage(message, sender, sendResponse, requestEpoch) {
     if (message.type === 'APPLICATION_FORM_FOUND') {
@@ -549,6 +571,72 @@ function routeMessage(message, sender, sendResponse, requestEpoch) {
                     sendResponse({ success: true, ...data });
                 } else {
                     sendResponse(apiFailure(data, "Could not add this skill"));
+                }
+            } catch (err) {
+                sendResponse({ success: false, error: "Cannot connect to Vignova server." });
+            }
+        });
+        return true;
+    }
+
+    // ─── Naukri scan started from the dashboard ───
+    // Opens the profile in a new tab and remembers both tabs, so the Naukri
+    // page scans by itself and the results open back in the dashboard tab.
+    if (message.type === "NAUKRI_SCAN_START") {
+        (async () => {
+            const origin = sender.url ? new URL(sender.url).origin : "";
+            if (!sender.tab || origin !== Vignova_API_BASE) {
+                sendResponse({ success: false, error: "Scans can only start from the Vignova dashboard." });
+                return;
+            }
+            const stored = await chrome.storage.local.get(["vignova_token"]);
+            if (requestEpoch !== authEpoch || !stored.vignova_token) {
+                sendResponse({ success: false, authenticated: false, error: "Sign in to the Vignova extension first." });
+                return;
+            }
+            const tab = await chrome.tabs.create({ url: NAUKRI_PROFILE_URL, active: true });
+            await chrome.storage.session.set({
+                naukriScan: { tabId: tab.id, returnTabId: sender.tab.id, startedAt: Date.now(), started: false },
+            });
+            sendResponse({ success: true });
+        })().catch((error) => sendResponse({ success: false, error: error.message }));
+        return true;
+    }
+
+    // Asked by the Naukri page once it loads: should it scan straight away?
+    if (message.type === "NAUKRI_SCAN_PENDING") {
+        (async () => {
+            const { naukriScan: scan } = await chrome.storage.session.get("naukriScan");
+            const pending = !!scan && !scan.started && sender.tab?.id === scan.tabId
+                && Date.now() - scan.startedAt < NAUKRI_SCAN_TTL_MS;
+            if (pending) await chrome.storage.session.set({ naukriScan: { ...scan, started: true } });
+            sendResponse({ pending });
+        })().catch(() => sendResponse({ pending: false }));
+        return true;
+    }
+
+    // ─── API Proxy: Import the Naukri profile read off naukri.com ───
+    if (message.type === "API_NAUKRI_IMPORT") {
+        chrome.storage.local.get(["vignova_token"], async (result) => {
+            if (requestEpoch !== authEpoch || !result.vignova_token) {
+                sendResponse({ success: false, authenticated: false, error: "Please sign in to Vignova." });
+                return;
+            }
+            try {
+                const response = await fetch(`${Vignova_API_BASE}/api/extension/naukri-profile`, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "Authorization": `Bearer ${result.vignova_token}`,
+                    },
+                    body: JSON.stringify(message.data || {}),
+                });
+                const data = await response.json().catch(() => ({}));
+                if (response.ok) {
+                    const returnedToDashboard = await returnToDashboard(sender, data.analysisId);
+                    sendResponse({ success: true, ...data, returnedToDashboard });
+                } else {
+                    sendResponse(apiFailure(data, "Could not analyze your Naukri profile"));
                 }
             } catch (err) {
                 sendResponse({ success: false, error: "Cannot connect to Vignova server." });

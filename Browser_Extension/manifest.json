@@ -63,6 +63,19 @@
         },
         {
             "matches": [
+                "*://*.naukri.com/*",
+                "*://naukri.com/*"
+            ],
+            "js": [
+                "content/naukriProfile.js"
+            ],
+            "css": [
+                "content/naukriProfile.css"
+            ],
+            "run_at": "document_idle"
+        },
+        {
+            "matches": [
                 "<all_urls>"
             ],
             "js": [
