@@ -170,7 +170,9 @@ export default function AdminExtensionPage() {
                         />
                         <p className="text-[11px] text-gray-500 mt-1.5">
                             Found in chrome://extensions — the 32-character ID of your published extension.
-                            Leave blank to skip ID matching.
+                            Leave blank to skip ID matching, which you want while testing an unpacked copy: Chrome
+                            gives that a different ID on each machine, and a mismatch hides extension features
+                            such as Naukri scanning.
                         </p>
                     </div>
 

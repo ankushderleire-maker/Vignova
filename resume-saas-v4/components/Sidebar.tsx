@@ -20,6 +20,7 @@ import {
   ScanLine,
   Mic,
   Linkedin,
+  IdCard,
   X,
 } from "lucide-react";
 
@@ -35,6 +36,7 @@ const navigationGroups = [
     items: [
       { name: "Master Profile", href: "/dashboard/profile", icon: UserCircle },
       { name: "LinkedIn Optimizer", href: "/dashboard/linkedin-optimizer", icon: Linkedin, isNew: true },
+      { name: "Naukri Optimizer", href: "/dashboard/naukri-optimizer", icon: IdCard, isNew: true },
       { name: "Resume Generator", href: "/dashboard/generator", icon: Zap, isPro: true },
       { name: "Saved Resumes", href: "/dashboard/resumes", icon: History },
       { name: "Cover Letter", href: "/dashboard/cover-letter", icon: FileText },

@@ -20,6 +20,10 @@ function isContextValid() {
     }
 }
 
+// Pages allowed to start a Naukri scan. This script runs on every site, and a
+// scan opens a tab and sends the user's Naukri profile to their account.
+const DASHBOARD_ORIGIN = "https://app.vignova.io";
+
 // ── window → extension bridge ────────────────────────────────────────
 function onWindowMessage(event) {
     // Only accept messages originating from this window (not iframes, not other tabs)
@@ -41,9 +45,32 @@ function onWindowMessage(event) {
                     type:             "VIGNOVA_EXTENSION_PONG",
                     extensionId:      chrome.runtime.id,
                     extensionVersion: manifest.version,
+                    // What this build can do for the page, so the dashboard
+                    // only offers a feature the installed extension has.
+                    features:         ["naukri-scan"],
                 },
                 window.location.origin   // tighter than "*"
             );
+        }
+
+        // "Scan Naukri profile" on the dashboard's Naukri Optimizer.
+        if (event.data.type === "VIGNOVA_NAUKRI_SCAN" && window.location.origin === DASHBOARD_ORIGIN) {
+            const requestId = String(event.data.requestId || "");
+            chrome.runtime.sendMessage({ type: "NAUKRI_SCAN_START" }, (reply) => {
+                const failed = chrome.runtime.lastError;
+                window.postMessage(
+                    {
+                        type:          "VIGNOVA_NAUKRI_SCAN_RESULT",
+                        requestId,
+                        success:       !failed && !!(reply && reply.success),
+                        authenticated: !reply || reply.authenticated !== false,
+                        error:         failed
+                            ? "The extension did not respond. Reload this page and try again."
+                            : (reply && reply.error) || "",
+                    },
+                    window.location.origin
+                );
+            });
         }
     } catch (err) {
         // Most likely "Extension context invalidated" — clean up and move on

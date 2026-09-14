@@ -430,7 +430,7 @@ export default function AdminPlansPage() {
                                             { key: "has_extension_access", label: "Chrome Extension" },
                                             { key: "has_multi_profile", label: "Multiple Profiles" },
                                             { key: "has_unlimited_resumes", label: "Unlimited Resumes" },
-                                            { key: "has_linkedin_optimization", label: "AI LinkedIn Profile Optimization" },
+                                            { key: "has_linkedin_optimization", label: "AI LinkedIn & Naukri Profile Optimization" },
                                             { key: "has_interview_prep", label: "AI Interview Questions Generator" },
                                             { key: "is_popular", label: "Popular Badge" },
                                         ].map(({ key, label }) => (

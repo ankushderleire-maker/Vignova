@@ -26,6 +26,7 @@ import {
   MessageSquareQuote,
   Mic,
   Gauge,
+  IdCard,
   Sparkles,
   Menu,
   Bell,
@@ -91,6 +92,11 @@ const pageInfo: Record<string, { title: string; description: string; icon: Lucid
     title: "LinkedIn Optimizer",
     description: "Connect your profile to maximize your visibility and keyword alignment. AI optimization uses 1 writing credit",
     icon: Linkedin,
+  },
+  "/dashboard/naukri-optimizer": {
+    title: "Naukri Optimizer",
+    description: "Import your Naukri profile with the Chrome extension and tune it for recruiter search. AI optimization uses 1 writing credit",
+    icon: IdCard,
   },
   "/dashboard/interview-prep": {
     title: "Interview Prep",

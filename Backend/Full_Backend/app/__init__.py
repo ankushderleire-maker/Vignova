@@ -82,6 +82,8 @@ from app.routes.scan        import router as scan_router
 from app.routes.ats_ingest  import router as ats_ingest_router
 # LinkedIn Optimizer
 from app.routes.linkedin    import router as linkedin_router
+# Naukri Optimizer (profile scraped by the Chrome extension)
+from app.routes.naukri      import router as naukri_router
 from app.routes.jd_format   import router as jd_format_router
 from app.routes.resume_assist import router as resume_assist_router
 from app.routes.outreach import router as outreach_router
@@ -105,6 +107,7 @@ app.include_router(ats_ingest_router)
 
 # LinkedIn Optimizer
 app.include_router(linkedin_router)
+app.include_router(naukri_router)
 app.include_router(jd_format_router)
 app.include_router(resume_assist_router)
 app.include_router(outreach_router)
