@@ -1,14 +1,7 @@
-"use client";
+import { redirect } from "next/navigation";
 
-import { useEffect } from "react";
-import { useRouter } from "next/navigation";
-
+// The app has no public home page, so visitors go straight to sign in. A server
+// redirect answers with a real redirect instead of an empty page.
 export default function Home() {
-  const router = useRouter();
-
-  useEffect(() => {
-    router.replace("/login");
-  }, [router]);
-
-  return null;
+  redirect("/login");
 }

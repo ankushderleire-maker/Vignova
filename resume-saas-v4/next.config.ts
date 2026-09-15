@@ -31,6 +31,12 @@ const nextConfig: NextConfig = {
             key: "Strict-Transport-Security",
             value: "max-age=31536000; includeSubDomains",
           },
+          {
+            // app.vignova.io is the signed-in product; search results belong
+            // on vignova.io. "follow" keeps links out of these pages crawlable.
+            key: "X-Robots-Tag",
+            value: "noindex, follow",
+          },
         ],
       },
     ];
