@@ -9,6 +9,10 @@ sources are retained in content/blog for editorial reference and future builds.
 
 from __future__ import annotations
 
+# Retired in September 2026: the articles now live in content/articles and are
+# rendered by build-pages.py. Running this migration again would overwrite them.
+raise SystemExit("migrate-blog.py is retired. Edit content/articles and run build-pages.py instead.")
+
 import argparse
 import copy
 import html

@@ -1,13 +1,10 @@
-<?xml version='1.0' encoding='utf-8'?>
+<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
     <loc>https://vignova.io/</loc>
   </url>
   <url>
     <loc>https://vignova.io/how-it-works/</loc>
-  </url>
-  <url>
-    <loc>https://vignova.io/blog/</loc>
   </url>
   <url>
     <loc>https://vignova.io/about/</loc>
@@ -28,35 +25,99 @@
     <loc>https://vignova.io/shipping/</loc>
   </url>
   <url>
+    <loc>https://vignova.io/ai-resume-builder/</loc>
+    <lastmod>2026-09-14</lastmod>
+  </url>
+  <url>
+    <loc>https://vignova.io/ats-resume-checker/</loc>
+    <lastmod>2026-09-14</lastmod>
+  </url>
+  <url>
+    <loc>https://vignova.io/resume-tailor/</loc>
+    <lastmod>2026-09-14</lastmod>
+  </url>
+  <url>
+    <loc>https://vignova.io/linkedin-profile-optimizer/</loc>
+    <lastmod>2026-09-14</lastmod>
+  </url>
+  <url>
+    <loc>https://vignova.io/naukri-profile-optimizer/</loc>
+    <lastmod>2026-09-14</lastmod>
+  </url>
+  <url>
+    <loc>https://vignova.io/job-application-tracker/</loc>
+    <lastmod>2026-09-14</lastmod>
+  </url>
+  <url>
+    <loc>https://vignova.io/resume-keyword-scanner/</loc>
+    <lastmod>2026-09-14</lastmod>
+  </url>
+  <url>
+    <loc>https://vignova.io/chrome-extension/</loc>
+    <lastmod>2026-09-14</lastmod>
+  </url>
+  <url>
+    <loc>https://vignova.io/job-application-autofill/</loc>
+    <lastmod>2026-09-14</lastmod>
+  </url>
+  <url>
+    <loc>https://vignova.io/cover-letter-generator/</loc>
+    <lastmod>2026-09-14</lastmod>
+  </url>
+  <url>
+    <loc>https://vignova.io/interview-preparation/</loc>
+    <lastmod>2026-09-15</lastmod>
+  </url>
+  <url>
+    <loc>https://vignova.io/tools/</loc>
+    <lastmod>2026-09-14</lastmod>
+  </url>
+  <url>
+    <loc>https://vignova.io/blog/</loc>
+    <lastmod>2026-09-15</lastmod>
+  </url>
+  <url>
+    <loc>https://vignova.io/blog/ats-friendly-resume-format-india/</loc>
+    <lastmod>2026-09-14</lastmod>
+  </url>
+  <url>
+    <loc>https://vignova.io/blog/linkedin-headline-examples/</loc>
+    <lastmod>2026-09-14</lastmod>
+  </url>
+  <url>
+    <loc>https://vignova.io/blog/naukri-profile-headline-examples/</loc>
+    <lastmod>2026-09-14</lastmod>
+  </url>
+  <url>
+    <loc>https://vignova.io/blog/what-is-a-good-ats-score/</loc>
+    <lastmod>2026-09-14</lastmod>
+  </url>
+  <url>
     <loc>https://vignova.io/blog/ats-resume-checker-how-scoring-works/</loc>
-    <lastmod>2026-08-21T00:00:00.000Z</lastmod>
+    <lastmod>2026-09-15</lastmod>
   </url>
   <url>
     <loc>https://vignova.io/blog/can-recruiters-tell-you-used-ai-on-your-resume/</loc>
-    <lastmod>2026-08-21T00:00:00.000Z</lastmod>
-  </url>
-  <url>
-    <loc>https://vignova.io/blog/how-ai-is-changing-the-job-search/</loc>
-    <lastmod>2026-05-23T00:00:00.000Z</lastmod>
+    <lastmod>2026-09-15</lastmod>
   </url>
   <url>
     <loc>https://vignova.io/blog/how-many-jobs-to-apply-to-and-how-to-track-them/</loc>
-    <lastmod>2026-08-21T00:00:00.000Z</lastmod>
+    <lastmod>2026-09-15</lastmod>
   </url>
   <url>
     <loc>https://vignova.io/blog/how-to-tailor-your-resume-to-a-job-description/</loc>
-    <lastmod>2026-08-21T00:00:00.000Z</lastmod>
-  </url>
-  <url>
-    <loc>https://vignova.io/blog/how-vignova-works/</loc>
-    <lastmod>2026-05-24T00:00:00.000Z</lastmod>
+    <lastmod>2026-09-15</lastmod>
   </url>
   <url>
     <loc>https://vignova.io/blog/resume-keywords-how-to-find-and-use-them/</loc>
-    <lastmod>2026-08-21T00:00:00.000Z</lastmod>
+    <lastmod>2026-09-15</lastmod>
   </url>
   <url>
     <loc>https://vignova.io/blog/the-75-percent-ats-rejection-myth/</loc>
-    <lastmod>2026-08-21T00:00:00.000Z</lastmod>
+    <lastmod>2026-09-15</lastmod>
+  </url>
+  <url>
+    <loc>https://vignova.io/blog/how-ai-is-changing-the-job-search/</loc>
+    <lastmod>2026-09-14</lastmod>
   </url>
 </urlset>

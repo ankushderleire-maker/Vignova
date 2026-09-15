@@ -1,6 +1,4 @@
 User-agent: *
 Allow: /
-Disallow: /dashboard
-Disallow: /api/
 
 Sitemap: https://vignova.io/sitemap.xml

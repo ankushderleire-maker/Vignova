@@ -1,100 +1,88 @@
-# Vignova — new landing page
+# Vignova marketing website
 
-An independent, static Hostinger website in the purple-blue Vignova theme. The original application and LandingCode files are unchanged.
+The static website for https://vignova.io, hosted on Hostinger. The signed-in product at https://app.vignova.io is deployed separately from `resume-saas-v4`. `LandingCode` is the previous Next.js site, kept for reference and for its Node dependencies.
 
-## Current revision
+## How the site is built
 
-- Side-by-side hero with compact typography, paired resume/Chrome buttons, and three assurances matching the supplied reference.
-- Thin gradient frames: 8px on desktop and 6px on mobile, with a compact preview toolbar.
-- White centre Master Profile card, with the six surrounding information cards restored to purple.
-- Chrome extension featured immediately below the hero, using the supplied Vignova logo and a browser-extension badge.
-- Alternating text and graphic sections for the Master Profile, ATS check, LinkedIn optimizer, and application tracker.
-- Six unique animation placements, reduced from sixteen. Repeated tours, workflow sections, template animations, and feature explanations have been removed.
-- Faster animation timing (1.6× for the adapted sequences and transitions). A scene begins when it enters view, pauses offscreen, and replays after leaving and re-entering the viewport.
-- Master Profile cards and SVG connectors share the same coordinates; each connection meets the centre of its card. The diagram now shows six types of profile information.
-- Plain headings, compact descriptions, plan comparison, FAQs, and the existing signup/checkout handoff.
-- A global pause preference, system reduced-motion support, and hero replay/pause controls.
-- Static fallback graphics remain if an animation cannot load.
+| Pages | Source | Rendered by |
+| --- | --- | --- |
+| 12 product and tool pages | `content/pages/*.html` | `build-pages.py` |
+| 11 career guides and the `/blog/` index | `content/articles/*.html` | `build-pages.py` |
+| Homepage, about, contact, how it works, legal pages, 404 and the plan handoff | the HTML files themselves | edited directly; `sync-layout.py` applies the shared layout |
 
-## Blog and SEO migration
+Source files begin with JSON front matter inside an HTML comment: path, title, H1, description, breadcrumbs, FAQs, related guides and images. `seo_site.py` defines the navigation, footer, canonical rules, redirects and structured data for every page.
 
-All eight source blog articles are included at their original URLs, with a purple/blue blog index, article navigation, breadcrumbs and related reading. About, contact and how-it-works pages are restored. All 17 original sitemap URLs remain available; the deployment also includes the checkout handoff and a custom 404 page.
+The product and tool pages are `/ai-resume-builder/`, `/ats-resume-checker/`, `/resume-tailor/`, `/linkedin-profile-optimizer/`, `/naukri-profile-optimizer/`, `/job-application-tracker/`, `/resume-keyword-scanner/`, `/chrome-extension/`, `/job-application-autofill/`, `/cover-letter-generator/`, `/interview-preparation/` and `/tools/`.
 
-Page metadata, structured data, sitemap, crawl rules and the original GA4 property are carried over or improved. Existing favicon and social image URLs now serve the purple-blue branding. Unused screenshots containing the retired green logo are excluded. See [SEO-MIGRATION.md](SEO-MIGRATION.md) for the preservation inventory, checks, deployment steps and next SEO priorities. Rankings cannot be guaranteed.
+## Build and package
 
-The current upload contains 58 public files, including 19 HTML pages. Source articles, obsolete product screenshots and build/verification tools are excluded.
+From this folder:
+
+    python build-pages.py
+    python build.py
+
+`build-pages.py` generates the social cards (`build-og.cjs`), renders the pages, guides, blog index and sitemap, writes the redirect block in `.htaccess` and runs `sync-layout.py`. `build.py` regenerates the favicons and default social card, validates the whole site and writes `hostinger-upload.zip`. Both use Node.js and Sharp from the adjacent LandingCode project; Hostinger needs none of this.
+
+`build.py` stops at the first problem it finds, including:
+
+- a page without exactly one H1, duplicate IDs or titles, or broken local links and anchors
+- missing or mismatched title, description and social tags, or an Open Graph image that is not in the package
+- a page without exactly one JSON-LD graph or the Organization identity, a page other than the homepage without breadcrumbs, or any rating or review data
+- a canonical that is not the page's own URL, an indexable page missing from the sitemap, or a sitemap URL without a page
+- links to redirected URLs or to `www` or `http` Vignova addresses, and pages that nothing links to
+- images without alt text, width and height
+- a robots.txt or `.htaccess` redirect rule that has gone missing
+
+`migrate-blog.py`, `migrate-pages.py` and `prepare-seo.py` are retired and exit straight away. They built an earlier version of the site and would overwrite the current pages.
 
 ## Preview
 
-Visit http://127.0.0.1:4173/?v=11 while the preview server is running. Styles and scripts have versioned URLs.
-
-From this folder, start a local preview with:
-
     python -m http.server 4173 --bind 127.0.0.1
 
-Use the HTTP preview for the animations. Hosting needs no Node.js server, database, API key, package installation, or build step. Fonts, branding, scripts and styles are bundled locally.
+Then open http://127.0.0.1:4173/. The Python server ignores `.htaccess`, so check redirects after upload.
 
 ## Upload to Hostinger
 
-1. Back up the current website.
-2. Open the website's public_html directory in Hostinger File Manager.
-3. Upload hostinger-upload.zip and extract it.
-4. Place index.html directly in public_html, alongside all included CSS/JavaScript files and the assets and visuals folders.
-5. Include start, privacy, terms, refund and shipping. The policy text is preserved from the existing site.
-6. Merge the included .htaccess with any hosting rules you already need.
-7. Check signup, login, selected-plan checkout and the extension destination before launch.
-8. If an earlier ZIP was already extracted, overwrite its files with this corrected package and remove its old `public_html/images/` folder (the 19 legacy product screenshots; the new site does not use it). Keep `assets/`, `visuals/`, `templates/` and all page folders. Back up first and preserve unrelated hosting files.
-9. Clear the website/CDN cache and refresh the browser. Icon links and social metadata include a branding version to avoid requesting the old cached assets.
-
-The ZIP is for Hostinger web/cloud hosting. All public assets use relative paths, so the page also supports a subfolder.
+1. Back up `public_html`, including `.htaccess` and any verification files.
+2. Upload `hostinger-upload.zip` to `public_html` and extract it, so that `index.html`, `.htaccess`, `robots.txt` and `sitemap.xml` sit directly inside `public_html`. Keep any host-specific rules when merging `.htaccess`.
+3. Delete the folders this release replaces with redirects, if they exist: `public_html/blog/how-vignova-works/` and `public_html/blog/sample-post/`. Delete `public_html/images/` as well if an earlier release left it behind.
+4. Purge the Hostinger or CDN cache.
+5. Run `python verify-live.py` and fix anything it reports. SEO-MIGRATION.md lists the Search Console steps.
 
 ## Editing
 
 | File | Purpose |
 | --- | --- |
-| index.html | Content, section order, headings, navigation, pricing and FAQs |
-| live-demos.css | Split hero, alternating sections, extension branding and responsive sizing |
-| styles.css, sections.css, responsive.css, conversion.css, cards.css | Existing base theme, shared controls, pricing and footer |
-| script.js | Mobile menu, motion preference, scroll reveals and reading progress |
-| visuals-src/index.tsx | Scene loading, viewport playback, hero controls and tracker loop |
-| visuals-src/components/MasterProfile.tsx | Profile diagram with a shared coordinate system |
-| visuals-src/runtime.tsx, visuals-src/motion.tsx | Animation tempo and pause handling |
-| visuals-src/theme.css | Styles isolated to the animated previews |
-| visuals/demo.js, visuals/demo.css | Compiled public animation assets |
+| content/pages, content/articles | Product, tool and guide copy with front matter |
+| seo_site.py | Navigation, footer, canonical URLs, redirects and structured data |
+| build-pages.py, sync-layout.py, build-og.cjs | Rendering, shared layout and social cards |
+| site.css, site.js | Shared header, footer and page components, including dropdown menus that work without JavaScript |
+| keyword-scanner.js | The free resume keyword scanner, which runs entirely in the browser |
+| assets/screens, assets/og | Product screenshots with fictional example data, and social cards |
+| index.html | Homepage content, pricing and FAQs |
+| styles.css, sections.css, responsive.css, conversion.css, cards.css, live-demos.css | Homepage and legal page styles |
+| script.js | Homepage motion preference, scroll reveals and reading progress |
+| visuals-src, visuals | Homepage animations |
 | start/index.html, start.css, start.js | Selected-plan account and checkout handoff |
-| assets/vignova-purple-blue.png | Latest supplied logo, used unchanged |
-| build-branding.cjs | Exports favicons, device icons and a purple-blue social card from the supplied logo |
-| assets/ats-analysis.png | Existing product screenshot behind the ATS report disclosure |
+| analytics.js, analytics.css | GA4 (G-Z5QX5FCT9J), loaded only after consent |
+| build-branding.cjs | Favicons, device icons and the default social card |
+| verify-live.py | Post-release checks for redirects, sitemap URLs, canonicals and app noindex |
 
-The site is configured for https://vignova.io/. For another domain, update canonical/Open Graph URLs, robots.txt and sitemap.xml. The app links still point to https://app.vignova.io/.
+## Homepage animations
 
-## Rebuild and package
-
-If animation source changes, use the dependencies already installed in the adjacent LandingCode project:
+If animation source changes, use the dependencies already installed in LandingCode:
 
     node visuals-src/verify.cjs
     node visuals-src/build.cjs
 
-Verification renders the six used components in normal and paused states, checks the page's unique animation order, and checks that every profile connector ends at the corresponding card's centre. The build compiles and minifies React, Framer Motion and Tailwind for static hosting.
-
-prepare.cjs refreshes adapted components from LandingCode. It preserves the locally maintained MasterProfile.tsx but overwrites the other adapted components. Preserve manual changes before running it. Some older source components remain available in the workspace; the four unbranded resume previews in `templates/` remain in the upload to preserve their existing URLs.
-
-After editing any public file:
-
-    python build.py
-
-The helper regenerates branding with Node.js and the Sharp dependency already installed in the adjacent LandingCode project, then validates page structure, local links, assets, canonical and sitemap parity, metadata, JSON-LD, analytics inclusion and ZIP integrity. Hostinger needs none of these build dependencies. The ZIP contains only public website files, with index.html at the archive root.
+Verification renders the six used components in normal and paused states, checks the page's unique animation order, and checks that every profile connector ends at the centre of its card. The build compiles and minifies React, Framer Motion and Tailwind for static hosting. `prepare.cjs` refreshes adapted components from LandingCode; it keeps `MasterProfile.tsx` but overwrites the other adapted components.
 
 ## Pricing and checkout
 
-The page shows reference defaults from resume-saas-v4/app/api/plans/route.ts: Free with 3 introductory credits, Pro at $13.99/month with 40 credits, and Premium at $29.99/month with 150 credits. The application's database can override these defaults. Visitors are told to confirm current prices and inclusions at checkout.
+The homepage shows Free with 3 introductory AI credits, Pro at $13.99 a month with 40 and Premium at $29.99 a month with 150. On 15 September 2026, `https://app.vignova.io/api/plans` returned the same prices with separate monthly allowances: Pro with 50 tailoring, 50 writing and 15 interview credits, and Premium with 200, 200 and 60. The credit copy is unchanged until the business decides how to present it. The same response shows that the Free plan includes the Chrome extension but not interview preparation, and the homepage comparison table now says so.
 
-The live plans endpoint returned 502 Bad Gateway during verification on 5 September 2026. That historical result does not establish its current status. Verify the live app and payment flow before publishing; this landing page does not change the application backend.
-
-Paid-plan buttons open start/?plan=PRO or start/?plan=PREMIUM. Registration/login opens the existing app. The visitor can return to the handoff page and continue to the chosen monthly checkout. This preserves plan selection despite the current auth form's dashboard redirect. Payments are handled by the real app.
+Paid-plan buttons open `start/?plan=PRO` or `start/?plan=PREMIUM`. Registration and login open the app, and the visitor can return to the handoff page to continue to the chosen monthly checkout. Payments are handled in the app.
 
 ## Content and assets
 
-The previews use illustrative data and do not perform AI processing or submit applications. No fictional reviews, ratings, user counts or hiring outcomes are presented as real. The extension is prominently featured without claiming that no competitor offers one.
-
-The animation source was adapted from the existing Vignova site and recolored. Geist's license is in assets/FONT-LICENSE.txt; dependency licenses are in visuals/LICENSES.txt. The original GA4 property G-Z5QX5FCT9J is preserved. Analytics loads only after acceptance on vignova.io; the existing consent key and conversion event names are retained. Cookie settings in the footer allow the visitor to change their choice. The local motion preference is stored separately.
+Product screenshots were captured from the real app and extension with fictional people and companies. Illustrative examples on the pages are labelled as such. There are no reviews, ratings, user counts or hiring outcomes. Geist's licence is in `assets/FONT-LICENSE.txt`, and animation dependency licences are in `visuals/LICENSES.txt`. Analytics loads only after acceptance, and the footer's Cookie settings let visitors change their choice.
