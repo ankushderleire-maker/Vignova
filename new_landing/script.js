@@ -1,11 +1,15 @@
 'use strict';
+// The shared site header (site.js) replaced the old menu button, so everything
+// below must keep working on pages that no longer have it.
 const menuToggle = document.querySelector('.menu-toggle');
 const mobileNav = document.querySelector('#mobile-nav');
-function closeMenu() { mobileNav.hidden = true; menuToggle.setAttribute('aria-expanded', 'false'); menuToggle.setAttribute('aria-label', 'Open menu'); }
-menuToggle.addEventListener('click', () => { const isOpen = menuToggle.getAttribute('aria-expanded') === 'true'; mobileNav.hidden = isOpen; menuToggle.setAttribute('aria-expanded', String(!isOpen)); menuToggle.setAttribute('aria-label', isOpen ? 'Open menu' : 'Close menu'); });
-mobileNav.querySelectorAll('a').forEach(link => link.addEventListener('click', closeMenu));
-document.addEventListener('keydown', event => { if (event.key === 'Escape' && !mobileNav.hidden) { closeMenu(); menuToggle.focus(); } });
-window.matchMedia('(min-width: 901px)').addEventListener('change', event => { if (event.matches) closeMenu(); });
+function closeMenu() { if (!menuToggle || !mobileNav) return; mobileNav.hidden = true; menuToggle.setAttribute('aria-expanded', 'false'); menuToggle.setAttribute('aria-label', 'Open menu'); }
+if (menuToggle && mobileNav) {
+  menuToggle.addEventListener('click', () => { const isOpen = menuToggle.getAttribute('aria-expanded') === 'true'; mobileNav.hidden = isOpen; menuToggle.setAttribute('aria-expanded', String(!isOpen)); menuToggle.setAttribute('aria-label', isOpen ? 'Open menu' : 'Close menu'); });
+  mobileNav.querySelectorAll('a').forEach(link => link.addEventListener('click', closeMenu));
+  document.addEventListener('keydown', event => { if (event.key === 'Escape' && !mobileNav.hidden) { closeMenu(); menuToggle.focus(); } });
+  window.matchMedia('(min-width: 901px)').addEventListener('change', event => { if (event.matches) closeMenu(); });
+}
 document.querySelectorAll('[data-year]').forEach(element => { element.textContent = new Date().getFullYear(); });
 
 // Remember the local animation preference. Analytics consent is handled separately.

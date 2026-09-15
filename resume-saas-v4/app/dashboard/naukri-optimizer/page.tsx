@@ -1,10 +1,10 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useState, type ReactNode } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import {
-    AlertCircle, ArrowRight, BarChart3, CheckCircle2, Chrome, ExternalLink, IdCard, Info, Loader2, RefreshCw, ScanLine, Sparkles, Target, Wand2,
+    AlertCircle, ArrowLeft, ArrowRight, BarChart3, CheckCircle2, Chrome, ExternalLink, IdCard, Info, Loader2, RefreshCw, ScanLine, Sparkles, Target, Wand2,
 } from "lucide-react";
 import NaukriProfileView from "@/components/naukri/NaukriProfileView";
 import NaukriSideBySide from "@/components/naukri/NaukriSideBySide";
@@ -37,6 +37,7 @@ type Analysis = {
     createdAt: string;
 };
 type MasterProfile = { id: string; name: string; is_default?: boolean };
+type ScanSummary = { id: string; createdAt: string; overallScore: number | null; optimized: boolean };
 
 const SCORE_LABELS: Record<string, { label: string; help: string }> = {
     keyword: { label: "Keyword match", help: "How much of your Master Profile's vocabulary appears on Naukri." },
@@ -51,6 +52,14 @@ const SCORE_ORDER = Object.keys(SCORE_LABELS);
 
 const scoreColor = (score: number) => (score < 50 ? "#ef4444" : score < 80 ? "#eab308" : "#22c55e");
 const round = (value: unknown) => (typeof value === "number" && Number.isFinite(value) ? Math.round(value) : 0);
+const scanLabel = (item: ScanSummary) =>
+    [
+        `Scan of ${new Date(item.createdAt).toLocaleString()}`,
+        typeof item.overallScore === "number" ? `${Math.round(item.overallScore)}/100` : "",
+        item.optimized ? "Optimized" : "",
+    ]
+        .filter(Boolean)
+        .join(" \u00B7 ");
 
 function ScoreRing({ score, label }: { score: number; label: string }) {
     return (
@@ -125,14 +134,16 @@ function ErrorBanner({ message }: { message: string }) {
     );
 }
 
-async function fetchAnalysis(id: string | null): Promise<{ result: Analysis | null; error: string }> {
+type Loaded = { result: Analysis | null; analyses: ScanSummary[]; error: string };
+
+async function fetchAnalysis(id: string | null): Promise<Loaded> {
     try {
         const res = await fetch(`/api/naukri/history${id ? `?id=${encodeURIComponent(id)}` : ""}`);
         const data = await res.json().catch(() => ({}));
-        if (!res.ok) return { result: null, error: data?.error || "Could not load your Naukri analysis." };
-        return { result: data.result || null, error: "" };
+        if (!res.ok) return { result: null, analyses: [], error: data?.error || "Could not load your Naukri analysis." };
+        return { result: data.result || null, analyses: Array.isArray(data.analyses) ? data.analyses : [], error: "" };
     } catch {
-        return { result: null, error: "Could not load your Naukri analysis." };
+        return { result: null, analyses: [], error: "Could not load your Naukri analysis." };
     }
 }
 
@@ -158,16 +169,23 @@ function NaukriOptimizerContent() {
     const [copyFailed, setCopyFailed] = useState(false);
     const extension = useVignovaExtension();
     const [scan, setScan] = useState<{ startedAt: number; previousId: string | null } | null>(null);
+    const [analyses, setAnalyses] = useState<ScanSummary[]>([]);
+    /** The start screen, opened over existing results by "New Analysis". */
+    const [startingOver, setStartingOver] = useState(false);
+    // The analysis on screen, so putting its id in the URL does not load it again.
+    const shownIdRef = useRef<string | null>(null);
 
     useEffect(() => {
+        if (requestedId && requestedId === shownIdRef.current) return;
         let cancelled = false;
         Promise.all([
             fetchAnalysis(requestedId),
             fetch("/api/profiles").then((res) => res.json()).catch(() => ({})),
-        ]).then(([{ result, error: message }, profileData]) => {
+        ]).then(([{ result, analyses: scans, error: message }, profileData]) => {
             if (cancelled) return;
             const list: MasterProfile[] = profileData?.data || profileData?.profiles || [];
             setAnalysis(result);
+            setAnalyses(scans);
             setError(message);
             setProfiles(list);
             const stored = result?.masterProfileId && list.some((p) => p.id === result.masterProfileId) ? result.masterProfileId : "";
@@ -178,6 +196,18 @@ function NaukriOptimizerContent() {
             cancelled = true;
         };
     }, [requestedId]);
+
+    // Keep the URL on the analysis being shown. A reload used to reopen the scan
+    // named in the link, which after "Scan again" or loading another import was
+    // not the one optimized, so a saved optimization looked lost.
+    useEffect(() => {
+        shownIdRef.current = analysis?.id ?? null;
+        if (!analysis?.id) return;
+        const url = new URL(window.location.href);
+        if (url.searchParams.get("analysis") === analysis.id) return;
+        url.searchParams.set("analysis", analysis.id);
+        window.history.replaceState(window.history.state, "", url);
+    }, [analysis?.id]);
 
     // While a scan runs in the Naukri tab, watch for the analysis it creates.
     // The extension also sends this tab to the results; polling covers a tab
@@ -190,10 +220,12 @@ function NaukriOptimizerContent() {
                 setError("The scan is taking too long. Check the Naukri tab, then load the latest import.");
                 return;
             }
-            const { result } = await fetchAnalysis(null);
+            const { result, analyses: scans } = await fetchAnalysis(null);
             if (result && result.id !== scan.previousId) {
                 setAnalysis(result);
+                setAnalyses(scans);
                 setScan(null);
+                setStartingOver(false);
             }
         }, 4000);
         return () => clearInterval(timer);
@@ -225,12 +257,23 @@ function NaukriOptimizerContent() {
         }
     }, []);
 
+    const showLoaded = ({ result, analyses: scans, error: message }: Loaded) => {
+        setAnalysis(result);
+        setAnalyses(scans);
+        setError(message);
+        setStartingOver(false);
+        setLoading(false);
+    };
+
     const refresh = async () => {
         setLoading(true);
-        const { result, error: message } = await fetchAnalysis(null);
-        setAnalysis(result);
-        setError(message);
-        setLoading(false);
+        showLoaded(await fetchAnalysis(null));
+    };
+
+    const openScan = async (id: string) => {
+        if (!id || id === analysis?.id) return;
+        setLoading(true);
+        showLoaded(await fetchAnalysis(id));
     };
 
     const rescore = async () => {
@@ -254,10 +297,15 @@ function NaukriOptimizerContent() {
         setError("");
         try {
             const data = await postJson("/api/naukri/optimize", { analysisId: analysis.id, masterProfileId: selectedProfileId || null });
-            const optimizedContent: Optimization = { ...data };
+            const { saved, ...rest } = data;
+            const optimizedContent: Optimization = { ...rest };
             delete (optimizedContent as Record<string, unknown>).credits_remaining;
             setAnalysis((current) => (current ? { ...current, optimizedContent } : current));
+            setAnalyses((scans) => scans.map((item) => (item.id === analysis.id ? { ...item, optimized: saved !== false } : item)));
             setCompareMode("full");
+            if (saved === false) {
+                setError("Your optimization is below, but it couldn't be saved. Copy what you need before leaving this page.");
+            }
         } catch (err) {
             setError(err instanceof Error ? err.message : "AI optimization failed.");
         } finally {
@@ -288,7 +336,7 @@ function NaukriOptimizerContent() {
         </button>
     );
 
-    if (!analysis || !profile) {
+    if (!analysis || !profile || startingOver) {
         const steps: [string, string, ReactNode][] = extension.supportsNaukriScan
             ? [
                   ["Click \u201CScan Naukri profile\u201D", "Your Naukri profile opens in a new tab.", <ScanLine key="s" className="h-4 w-4" />],
@@ -297,8 +345,8 @@ function NaukriOptimizerContent() {
               ]
             : [
                   ["Install the extension", "Or update it to the latest version, which reads Naukri profiles.", <Chrome key="c" className="h-4 w-4" />],
-                  ["Open your Naukri profile", "Sign in to naukri.com and open your profile page.", <ExternalLink key="e" className="h-4 w-4" />],
-                  ["Click \u201COptimize with Vignova\u201D", "The button sits at the bottom right. Your results open here.", <Sparkles key="s" className="h-4 w-4" />],
+                  ["Reload this page", "The extension is found on its own once it is installed.", <RefreshCw key="r" className="h-4 w-4" />],
+                  ["Scan your Naukri profile", "It opens in a new tab, and your results appear here.", <ScanLine key="s" className="h-4 w-4" />],
               ];
         const extensionNote = {
             checking: "Looking for the Vignova extension\u2026",
@@ -311,6 +359,11 @@ function NaukriOptimizerContent() {
         const installLabel = extension.status === "installed" ? "Update the extension" : "Install the extension";
         return (
             <div className="mx-auto w-full max-w-4xl space-y-6 animate-slide-down">
+                {analysis && profile && (
+                    <button type="button" onClick={() => setStartingOver(false)} className={secondary}>
+                        <ArrowLeft className="h-4 w-4" /> Back to your analysis
+                    </button>
+                )}
                 {error && <ErrorBanner message={error} />}
                 {scanBanner}
                 <div className="rounded-2xl border border-[var(--border-color)] bg-[var(--sidebar-bg)]/50 p-6 shadow-xl sm:p-8">
@@ -353,9 +406,6 @@ function NaukriOptimizerContent() {
                                             <Chrome className="h-4 w-4" /> {installLabel}
                                         </Link>
                                     ))}
-                                <a href={NAUKRI_PROFILE_URL} target="_blank" rel="noopener noreferrer" className={secondary}>
-                                    Open my Naukri profile <ExternalLink className="h-4 w-4" />
-                                </a>
                             </>
                         )}
                         <button type="button" onClick={refresh} className={secondary}>
@@ -414,9 +464,24 @@ function NaukriOptimizerContent() {
                 {scanBanner}
 
                 <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[var(--border-color)] bg-[var(--sidebar-bg)]/50 p-3">
-                    <p className="px-1 text-xs text-[var(--text-secondary)]">
-                        Imported from Naukri on {new Date(analysis.createdAt).toLocaleDateString()}
-                    </p>
+                    {analyses.length > 1 ? (
+                        <select
+                            value={analysis.id}
+                            onChange={(e) => openScan(e.target.value)}
+                            aria-label="Naukri scan to show"
+                            className="max-w-full rounded-lg border border-[var(--border-color)] bg-[var(--background)] px-3 py-2.5 text-xs font-medium text-[var(--foreground)]"
+                        >
+                            {analyses.map((item) => (
+                                <option key={item.id} value={item.id}>
+                                    {scanLabel(item)}
+                                </option>
+                            ))}
+                        </select>
+                    ) : (
+                        <p className="px-1 text-xs text-[var(--text-secondary)]">
+                            Imported from Naukri on {new Date(analysis.createdAt).toLocaleDateString()}
+                        </p>
+                    )}
                     <div className="flex flex-wrap items-center gap-2">
                         {profiles.length > 0 && (
                             <select
@@ -437,15 +502,15 @@ function NaukriOptimizerContent() {
                                 {isRescoring ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />} Re-score
                             </button>
                         )}
-                        {extension.supportsNaukriScan ? (
-                            scanButton("Scan again", secondary)
-                        ) : (
-                            <a href={NAUKRI_PROFILE_URL} target="_blank" rel="noopener noreferrer" className={secondary}>
-                                Re-import from Naukri <ExternalLink className="h-4 w-4" />
-                            </a>
-                        )}
-                        <button type="button" onClick={refresh} className={secondary}>
-                            <RefreshCw className="h-4 w-4" /> Load latest import
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setError("");
+                                setStartingOver(true);
+                            }}
+                            className={secondary}
+                        >
+                            <RefreshCw className="h-4 w-4" /> New Analysis
                         </button>
                     </div>
                 </div>
@@ -534,7 +599,7 @@ function NaukriOptimizerContent() {
                                             Open Naukri to make changes
                                         </a>
                                     </div>
-                                    <NaukriProfileView profile={optimized} editable addedSkills={addedSkills} quickLinks={false} idPrefix="after" copiedText={copiedText} onCopy={handleCopy} />
+                                    <NaukriProfileView profile={optimized} editable addedSkills={addedSkills} quickLinks={false} idPrefix="after" newProjectsFrom={profile.projects.length} copiedText={copiedText} onCopy={handleCopy} />
                                 </div>
                             </div>
                         )}

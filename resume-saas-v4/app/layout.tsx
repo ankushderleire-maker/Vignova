@@ -13,6 +13,14 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+export const metadata: Metadata = {
+  title: { default: "Vignova", template: "%s | Vignova" },
+  description: "Sign in to Vignova, the AI career workspace for resumes, ATS checks, LinkedIn and Naukri profiles, and job applications.",
+  // The marketing site at vignova.io is what belongs in search results. App
+  // pages are also noindexed by the X-Robots-Tag header in next.config.ts.
+  robots: { index: false, follow: true },
+};
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" suppressHydrationWarning>

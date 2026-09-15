@@ -169,7 +169,19 @@ export function applyNaukriRewrite(current: NaukriProfile, rewrite: unknown): Na
         profileSummary: text(next.profileSummary, 5000) || current.profileSummary,
         keySkills: skills.length ? skills : current.keySkills,
         employment: current.employment.map((item, i) => ({ ...item, description: described(next.employment, i) || item.description })),
-        projects: current.projects.map((item, i) => ({ ...item, description: described(next.projects, i) || item.description })),
+        projects: [
+            ...current.projects.map((item, i) => ({ ...item, description: described(next.projects, i) || item.description })),
+            // Projects the rewrite brought in from the Master Profile follow the ones already on Naukri.
+            ...(Array.isArray(next.projects) ? next.projects.slice(current.projects.length) : [])
+                .filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === "object")
+                .map((item) => ({
+                    title: text(item.title, 200),
+                    client: text(item.client, 200),
+                    duration: text(item.duration, 120),
+                    description: text(item.description, 6000),
+                }))
+                .filter((item) => item.title),
+        ],
     };
 }
 

@@ -69,6 +69,7 @@ export async function POST(req: NextRequest) {
     }
 
     const optimizedContent = { ...result.data, createdAt: new Date().toISOString() };
+    let saved = true;
     try {
         await db.naukriAnalysis.update({
             where: { id: analysis.id },
@@ -76,9 +77,10 @@ export async function POST(req: NextRequest) {
         });
     } catch (error) {
         // The credit is spent and the rewrite exists, so it still goes back to
-        // the user; it just will not be there after a reload.
+        // the user, and the page says it will not be there after a reload.
+        saved = false;
         console.error("[NAUKRI_OPTIMIZE] could not store the rewrite", error);
     }
 
-    return NextResponse.json({ ...optimizedContent, credits_remaining: spent.remaining });
+    return NextResponse.json({ ...optimizedContent, saved, credits_remaining: spent.remaining });
 }

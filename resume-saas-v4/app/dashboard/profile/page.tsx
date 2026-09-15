@@ -5,12 +5,16 @@ import {
   User, Briefcase, GraduationCap, Code2,
   Plus, Trash2, Save, Loader2, Link as LinkIcon,
   Mail, Phone, MapPin, Globe, Layout, X, ChevronDown, Check, Crown, FileText,
-  FolderGit2, Award, Languages, Upload, AlertTriangle, CheckCircle2, AlertCircle, Linkedin, Trophy
+  FolderGit2, Award, Languages, Upload, AlertTriangle, CheckCircle2, AlertCircle, Linkedin, Trophy,
+  IdCard, ScanLine, Chrome
 } from "lucide-react";
 import { X as CloseIcon } from "lucide-react";
+import Link from "next/link";
 import { MAX_PROFILE_SKILLS } from "@/lib/profileSkills";
 import { DotLottieReact } from '@lottiefiles/dotlottie-react';
-import { linkedInToProfile, type ImportSummary } from "@/lib/linkedin-to-profile";
+import { linkedInToProfile, type ImportedProfile, type ImportSummary } from "@/lib/linkedin-to-profile";
+import { naukriToProfile } from "@/lib/naukri-to-profile";
+import { useVignovaExtension } from "@/lib/useVignovaExtension";
 
 // --- TYPES & SCHEMA (Matches Database) ---
 type Experience = { id: string; company: string; role: string; location: string; startDate: string; endDate: string; description: string; };
@@ -45,6 +49,39 @@ const INITIAL_STATE: ResumeData = {
   achievements: [], references: ""
 };
 
+/**
+ * Lays an imported profile over the form. Only what the import found replaces
+ * what is there, so an email and phone typed by hand survive an import that
+ * cannot supply them.
+ */
+function mergeImport(prev: ResumeData, profile: ImportedProfile): ResumeData {
+  return {
+    ...INITIAL_STATE,
+    ...prev,
+    ...Object.fromEntries(
+      Object.entries(profile).filter(([, v]) =>
+        Array.isArray(v) ? v.length > 0 : typeof v === "object" ? true : Boolean(v)
+      )
+    ),
+    skills: {
+      technical: profile.skills.technical || prev.skills.technical,
+      soft: prev.skills.soft,
+    },
+  };
+}
+
+/** What an import brought in: "3 roles, 2 education entries, 14 skills". */
+function describeImport(summary: ImportSummary): string {
+  return [
+    summary.experience && `${summary.experience} role${summary.experience === 1 ? "" : "s"}`,
+    summary.education && `${summary.education} education entr${summary.education === 1 ? "y" : "ies"}`,
+    summary.skills && `${summary.skills} skill${summary.skills === 1 ? "" : "s"}`,
+    summary.projects && `${summary.projects} project${summary.projects === 1 ? "" : "s"}`,
+    summary.certifications && `${summary.certifications} certification${summary.certifications === 1 ? "" : "s"}`,
+    summary.languages && `${summary.languages} language${summary.languages === 1 ? "" : "s"}`,
+  ].filter(Boolean).join(", ");
+}
+
 // --- CONTEXT ---
 type ProfileContextType = {
   data: ResumeData;
@@ -60,11 +97,12 @@ type ProfileContextType = {
   isLoading: boolean;
   profiles: any[];
   selectedProfileId: string | null;
-  setSelectedProfileId: (id: string) => void;
+  selectProfile: (id: string) => Promise<void>;
   createNewProfile: (name?: string, parsed_data?: any) => Promise<void>;
   deleteProfile: (id: string) => Promise<void>;
   loadFromPdf: (file: File) => Promise<void>;
   loadFromLinkedIn: (url: string) => Promise<ImportSummary>;
+  loadFromNaukri: (scannedProfile: unknown) => ImportSummary;
   subscription: any;
   showFeedback: (
     type: "confirm" | "success" | "error" | "loading" | "analyzing",
@@ -144,6 +182,26 @@ function ProfileProvider({ children }: { children: React.ReactNode }) {
     selectedProfileIdRef.current = selectedProfileId;
   }, [selectedProfileId]);
 
+  /**
+   * Opens a profile and makes it the active one: the profile the extension and
+   * Resume Studio work from. It is stored on the account, so a refresh, or the
+   * extension's own switcher, lands on the same profile.
+   */
+  const selectProfile = async (id: string) => {
+    setSelectedProfileId(id);
+    setProfiles(prev => prev.map(p => ({ ...p, is_default: p.id === id })));
+    try {
+      const res = await fetch("/api/profiles/default", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ profileId: id }),
+      });
+      if (!res.ok) throw new Error("Could not set the active profile");
+    } catch {
+      showFeedback("error", "Profile Not Switched", "We couldn't make this your active profile, so a refresh will open the previous one. Please try again.");
+    }
+  };
+
   const createNewProfile = async (name?: string, parsed_data?: any) => {
     try {
       const createRes = await fetch("/api/profiles", {
@@ -154,7 +212,7 @@ function ProfileProvider({ children }: { children: React.ReactNode }) {
       const createJson = await createRes.json();
       if (createJson.profile) {
         setProfiles(prev => [...prev, createJson.profile]);
-        setSelectedProfileId(createJson.profile.id);
+        await selectProfile(createJson.profile.id);
       } else {
         throw new Error(createJson.error || createJson.message || "Failed to create profile");
       }
@@ -217,7 +275,7 @@ function ProfileProvider({ children }: { children: React.ReactNode }) {
 
       if (selectedProfileId === id) {
         const newSelected = updatedProfiles.find(p => p.is_default) || updatedProfiles[0];
-        setSelectedProfileId(newSelected.id);
+        await selectProfile(newSelected.id);
       }
     } catch (err: any) {
       console.error("Failed to delete profile", err);
@@ -292,22 +350,7 @@ function ProfileProvider({ children }: { children: React.ReactNode }) {
 
       if (data?.status === "ready" && data?.profile) {
         const { profile, summary } = linkedInToProfile(data.profile.rawProfileData || data.profile);
-        // Merged over what is already there rather than replacing it, so an
-        // email and phone typed by hand survive an import that cannot
-        // supply them.
-        setData((prev) => ({
-          ...INITIAL_STATE,
-          ...prev,
-          ...Object.fromEntries(
-            Object.entries(profile).filter(([, v]) =>
-              Array.isArray(v) ? v.length > 0 : typeof v === "object" ? true : Boolean(v)
-            )
-          ),
-          skills: {
-            technical: profile.skills.technical || prev.skills.technical,
-            soft: prev.skills.soft,
-          },
-        }));
+        setData((prev) => mergeImport(prev, profile));
         return summary;
       }
 
@@ -317,6 +360,17 @@ function ProfileProvider({ children }: { children: React.ReactNode }) {
     }
 
     throw new Error("The import is taking longer than expected. Please try again in a moment.");
+  };
+
+  /**
+   * Fills the form from a Naukri profile the extension scanned. As with
+   * LinkedIn, nothing is saved until the user has reviewed the form.
+   */
+  const loadFromNaukri = (scannedProfile: unknown): ImportSummary => {
+    const imported = naukriToProfile(scannedProfile);
+    if (!imported) throw new Error("That scan has nothing to import. Scan your Naukri profile again once the page has fully loaded.");
+    setData((prev) => mergeImport(prev, imported.profile));
+    return imported.summary;
   };
 
   useEffect(() => {
@@ -341,7 +395,7 @@ function ProfileProvider({ children }: { children: React.ReactNode }) {
     if (!profileId) return;
 
     setIsSaving(true);
-    showFeedback("loading", "Saving Profile", "Updating your master dataset...");
+    showFeedback("loading", "Saving Profile", "Updating your Master Profile...");
     try {
       const res = await fetch(`/api/profiles/${profileId}`, {
         method: "PATCH",
@@ -352,7 +406,7 @@ function ProfileProvider({ children }: { children: React.ReactNode }) {
       if (options?.silentSuccess) {
         hideFeedback();
       } else {
-        showFeedback("success", "Profile Saved", "Your master dataset has been updated successfully.");
+        showFeedback("success", "Profile Saved", "Your Master Profile has been updated successfully.");
       }
     } catch (error) {
       showFeedback("error", "Save Failed", "There was an error saving your profile. Please try again.");
@@ -374,7 +428,7 @@ function ProfileProvider({ children }: { children: React.ReactNode }) {
   const removeListItem = (list: "experience" | "education" | "projects" | "certifications" | "languages" | "achievements", index: number) => setData(prev => ({ ...prev, [list]: prev[list].filter((_, i) => i !== index) as any }));
 
   return (
-    <ProfileContext.Provider value={{ data, updateField, updateNested, addListItem, updateListItem, removeListItem, activeSection, setActiveSection, isSaving, handleSave, isLoading, profiles, selectedProfileId, setSelectedProfileId, createNewProfile, deleteProfile, loadFromPdf, loadFromLinkedIn, subscription, showFeedback, hideFeedback }}>
+    <ProfileContext.Provider value={{ data, updateField, updateNested, addListItem, updateListItem, removeListItem, activeSection, setActiveSection, isSaving, handleSave, isLoading, profiles, selectedProfileId, selectProfile, createNewProfile, deleteProfile, loadFromPdf, loadFromLinkedIn, loadFromNaukri, subscription, showFeedback, hideFeedback }}>
       {children}
 
       {/* GLOBAL FEEDBACK MODAL */}
@@ -1024,7 +1078,7 @@ function ProfileCreationModal({ isOpen, onClose }: { isOpen: boolean; onClose: (
             </div>
             <h3 className="text-xl font-bold text-[var(--foreground)] font-heading">Upgrade to Unlock More</h3>
             <p className="text-[var(--text-secondary)] text-sm leading-relaxed">
-              Free users are limited to 1 Master Profile dataset. Upgrade to Pro or Premium to create unlimited tailored profiles for different job types.
+              Free users are limited to 1 Master Profile. Upgrade to Pro or Premium to create unlimited tailored profiles for different job types.
             </p>
             <a href="/dashboard/billing" className="mt-4 w-full flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-bold uppercase tracking-wide text-xs text-black bg-yellow-500 hover:bg-yellow-400 transition-colors shadow-[0_0_15px_rgba(234,179,8,0.3)]">
               View Plans & Upgrade
@@ -1102,7 +1156,7 @@ function ProfileCreationModal({ isOpen, onClose }: { isOpen: boolean; onClose: (
           <div>
             <h3 className="text-xl font-bold text-[var(--foreground)] font-heading mb-2">Create New Profile</h3>
             <p className="text-[var(--text-secondary)] text-sm leading-relaxed">
-              Create a new master profile dataset tailored for specific roles or industries.
+              Create a new Master Profile tailored for specific roles or industries.
             </p>
           </div>
 
@@ -1208,14 +1262,7 @@ function LinkedInImportModal({ isOpen, onClose }: { isOpen: boolean; onClose: ()
         trimmed.startsWith("http") ? trimmed : `https://${trimmed}`
       );
 
-      const found = [
-        summary.experience && `${summary.experience} role${summary.experience === 1 ? "" : "s"}`,
-        summary.education && `${summary.education} education entr${summary.education === 1 ? "y" : "ies"}`,
-        summary.skills && `${summary.skills} skill${summary.skills === 1 ? "" : "s"}`,
-        summary.projects && `${summary.projects} project${summary.projects === 1 ? "" : "s"}`,
-        summary.certifications && `${summary.certifications} certification${summary.certifications === 1 ? "" : "s"}`,
-        summary.languages && `${summary.languages} language${summary.languages === 1 ? "" : "s"}`,
-      ].filter(Boolean).join(", ");
+      const found = describeImport(summary);
 
       onClose();
       showFeedback(
@@ -1310,13 +1357,259 @@ function LinkedInImportModal({ isOpen, onClose }: { isOpen: boolean; onClose: ()
   );
 }
 
+type NaukriScan = { id: string; createdAt: string; rawProfileData: unknown };
+
+/** The requested Naukri scan, or else the newest on the account; null when there is none. */
+async function fetchNaukriScan(id?: string | null): Promise<NaukriScan | null> {
+  const res = await fetch(`/api/naukri/history${id ? `?id=${encodeURIComponent(id)}` : ""}`);
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(body?.error || "Could not load your Naukri scans.");
+  const result = body?.result;
+  return result ? { id: result.id, createdAt: result.createdAt, rawProfileData: result.rawProfileData } : null;
+}
+
+/** How long a scan started here is waited for, the same limit the extension keeps. */
+const NAUKRI_SCAN_WAIT_MS = 15 * 60 * 1000;
+
+/**
+ * Fills the form from the Naukri profile the Vignova extension scanned.
+ *
+ * Naukri has no API, so the profile comes from a scan saved to the account:
+ * the newest one, which includes Naukri Optimizer scans, or one started from
+ * here, after which the extension brings the user back to this page.
+ */
+function NaukriImportModal({ scanId, onClose }: { scanId: string | null; onClose: () => void }) {
+  const { loadFromNaukri, handleSave, showFeedback, isLoading } = useProfile();
+  const extension = useVignovaExtension();
+  const [scan, setScan] = useState<NaukriScan | null>(null);
+  const [phase, setPhase] = useState<"loading" | "found" | "none" | "scanning">("loading");
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchNaukriScan(scanId)
+      .then((found) => {
+        if (cancelled) return;
+        setScan(found);
+        setPhase(found ? "found" : "none");
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setPhase("none");
+        setError(err instanceof Error ? err.message : "Could not load your Naukri scans.");
+      });
+    return () => { cancelled = true; };
+  }, [scanId]);
+
+  // The extension brings this tab back with the new scan. Watching for it too
+  // covers a tab it could not return to.
+  const previousScanId = scan?.id ?? null;
+  useEffect(() => {
+    if (phase !== "scanning") return;
+    const startedAt = Date.now();
+    const timer = setInterval(async () => {
+      if (Date.now() - startedAt > NAUKRI_SCAN_WAIT_MS) {
+        clearInterval(timer);
+        setPhase(previousScanId ? "found" : "none");
+        return;
+      }
+      try {
+        const latest = await fetchNaukriScan();
+        if (latest && latest.id !== previousScanId) {
+          clearInterval(timer);
+          setScan(latest);
+          setPhase("found");
+        }
+      } catch {
+        // A dropped check is made again on the next tick.
+      }
+    }, 4000);
+    return () => clearInterval(timer);
+  }, [phase, previousScanId]);
+
+  const preview = scan ? naukriToProfile(scan.rawProfileData) : null;
+  const canScan = extension.supportsNaukriScan;
+
+  const startScan = async () => {
+    setError("");
+    const reply = await extension.requestNaukriScan("profile");
+    if (!reply.success) {
+      setError(
+        reply.authenticated
+          ? reply.error || "Could not start the scan."
+          : "Sign in to the Vignova extension (click its icon in Chrome), then scan again."
+      );
+      return;
+    }
+    setPhase("scanning");
+  };
+
+  const runImport = () => {
+    if (!scan) return;
+    try {
+      const found = describeImport(loadFromNaukri(scan.rawProfileData));
+      onClose();
+      showFeedback(
+        "confirm",
+        "Imported from Naukri",
+        `${found ? `Brought in ${found}.` : "Brought in your profile summary."} Naukri scans don't include your email or phone, so the ones you typed are kept. Review the form and save if it looks right.`,
+        () => handleSave({ silentSuccess: true }),
+        { confirmLabel: "Save", cancelLabel: "Review first", iconType: "success" }
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not import that profile.");
+    }
+  };
+
+  const extensionNote = {
+    checking: "Looking for the Vignova extension…",
+    installed: `Your Vignova extension (${extension.version}) can't read Naukri yet. Update it to the latest version.`,
+    mismatch: "This browser has a different build of the Vignova extension. Install the official one to scan from here.",
+    missing: "Install the Vignova extension to read your Naukri profile. Already installed? Reload this page.",
+  }[extension.status];
+  const installLabel = extension.status === "installed" ? "Update the extension" : "Install the extension";
+  const primaryButton = "flex-1 py-2.5 rounded-xl bg-[var(--primary)] text-white text-sm font-bold hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2";
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+      <div className="w-full max-w-md bg-[var(--sidebar-bg)] border border-[var(--border-color)] rounded-2xl shadow-2xl p-6 relative">
+        <button
+          onClick={onClose}
+          aria-label="Close"
+          className="absolute top-4 right-4 text-[var(--text-secondary)] hover:text-[var(--foreground)] transition-colors"
+        >
+          <X className="w-5 h-5" />
+        </button>
+
+        <div className="flex items-center gap-3 mb-1">
+          <div className="w-10 h-10 rounded-xl bg-[#275df5]/10 border border-[#275df5]/20 flex items-center justify-center shrink-0">
+            <IdCard className="w-5 h-5 text-[#275df5] dark:text-[#8aa4ff]" />
+          </div>
+          <h3 className="text-lg font-bold text-[var(--foreground)] font-heading">Import from Naukri</h3>
+        </div>
+        <p className="text-xs text-[var(--text-secondary)] mb-5 leading-relaxed">
+          The Vignova extension reads your profile straight from naukri.com, and we fill this form in from
+          it. Nothing is saved until you review it.
+        </p>
+
+        {phase === "loading" && (
+          <div className="flex items-center gap-2.5 py-3 text-xs text-[var(--text-secondary)]">
+            <Loader2 className="w-4 h-4 animate-spin text-[var(--primary)] shrink-0" />
+            <span>Looking for your Naukri profile…</span>
+          </div>
+        )}
+
+        {phase === "found" && scan && (
+          <div className="rounded-xl border border-[var(--border-color)] bg-[var(--background)] p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-sm font-bold text-[var(--foreground)] truncate">{preview?.profile.fullName || "Your Naukri profile"}</p>
+                <p className="text-[11px] text-[var(--text-secondary)] mt-0.5">
+                  Scanned {new Date(scan.createdAt).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" })}
+                </p>
+              </div>
+              {canScan && (
+                <button
+                  onClick={startScan}
+                  className="shrink-0 flex items-center gap-1.5 text-[11px] font-bold text-[var(--primary)] hover:opacity-80 transition-opacity"
+                >
+                  <ScanLine className="w-3.5 h-3.5" /> Scan again
+                </button>
+              )}
+            </div>
+            {preview && describeImport(preview.summary) && (
+              <p className="text-xs text-[var(--text-secondary)] mt-3 leading-relaxed">Has {describeImport(preview.summary)}.</p>
+            )}
+          </div>
+        )}
+
+        {phase === "scanning" && (
+          <div className="flex items-start gap-2.5 py-3 text-xs text-[var(--text-secondary)] leading-relaxed">
+            <Loader2 className="w-4 h-4 animate-spin text-[var(--primary)] shrink-0 mt-px" />
+            <span>
+              Reading your profile in the Naukri tab. Sign in to Naukri there if it asks.
+              {extension.supportsNaukriReturn
+                ? " You'll come back here when it's done."
+                : " When it's done, come back to this page to import it."}
+            </span>
+          </div>
+        )}
+
+        {phase === "none" && (
+          <div className="rounded-xl border border-dashed border-[var(--border-color)] p-4">
+            <p className="text-sm font-bold text-[var(--foreground)]">No Naukri scan yet</p>
+            <p className="text-xs text-[var(--text-secondary)] mt-1 leading-relaxed">
+              {canScan
+                ? "Scan your profile: it opens in a new tab, and the extension reads every section for you."
+                : extensionNote}
+            </p>
+          </div>
+        )}
+
+        {error && (
+          <div className="mt-3 flex items-start gap-2 text-xs text-red-500">
+            <AlertCircle className="w-4 h-4 shrink-0 mt-px" />
+            <span>{error}</span>
+          </div>
+        )}
+
+        <p className="mt-4 text-[11px] text-[var(--text-secondary)]/80 leading-relaxed">
+          Your email, phone and other personal details aren&apos;t read from Naukri, so the ones you have typed are kept.
+        </p>
+
+        <div className="flex gap-2 mt-5">
+          <button
+            onClick={onClose}
+            className="flex-1 py-2.5 rounded-xl border border-[var(--border-color)] text-sm font-bold text-[var(--text-secondary)] hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+          >
+            {phase === "scanning" ? "Close" : "Cancel"}
+          </button>
+          {phase === "found" && (
+            <button onClick={runImport} disabled={isLoading} className={primaryButton}>
+              Import
+            </button>
+          )}
+          {phase === "none" && canScan && (
+            <button onClick={startScan} className={primaryButton}>
+              <ScanLine className="w-4 h-4" /> Scan Naukri profile
+            </button>
+          )}
+          {phase === "none" && !canScan && extension.status !== "checking" && (
+            extension.installUrl.startsWith("http") ? (
+              <a href={extension.installUrl} target="_blank" rel="noopener noreferrer" className={primaryButton}>
+                <Chrome className="w-4 h-4" /> {installLabel}
+              </a>
+            ) : (
+              <Link href={extension.installUrl} className={primaryButton}>
+                <Chrome className="w-4 h-4" /> {installLabel}
+              </Link>
+            )
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function MainContent() {
-  const { activeSection, isLoading, profiles, selectedProfileId, setSelectedProfileId, deleteProfile, loadFromPdf, showFeedback, handleSave } = useProfile();
+  const { activeSection, isLoading, profiles, selectedProfileId, selectProfile, deleteProfile, loadFromPdf, showFeedback, handleSave } = useProfile();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [isLinkedInOpen, setIsLinkedInOpen] = useState(false);
+  const [naukriImport, setNaukriImport] = useState<{ scanId: string | null } | null>(null);
+
+  // A Naukri scan started from here comes back as ?naukri=<scan id>. Open the
+  // import on it once, then drop the id so a refresh doesn't reopen it.
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    const scanId = url.searchParams.get("naukri");
+    if (!scanId) return;
+    setNaukriImport({ scanId });
+    url.searchParams.delete("naukri");
+    window.history.replaceState(window.history.state, "", url.pathname + url.search + url.hash);
+  }, []);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -1333,7 +1626,7 @@ function MainContent() {
   };
 
   const handleSelect = (id: string) => {
-    setSelectedProfileId(id);
+    if (id !== selectedProfileId) void selectProfile(id);
     setDropdownOpen(false);
   };
 
@@ -1392,6 +1685,7 @@ function MainContent() {
     <div id="tour-profile" className="flex-1 flex flex-col font-ui w-full min-w-0">
       <ProfileCreationModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
       <LinkedInImportModal isOpen={isLinkedInOpen} onClose={() => setIsLinkedInOpen(false)} />
+      {naukriImport && <NaukriImportModal scanId={naukriImport.scanId} onClose={() => setNaukriImport(null)} />}
 
       {/* HEADER BAR: SECTION TITLE & PROFILE SELECTOR */}
       <div className="flex flex-row items-center justify-between gap-4 mb-6 pb-4 border-b border-[var(--border-color)]/50">
@@ -1439,19 +1733,33 @@ function MainContent() {
               title="Fill this profile from your public LinkedIn page"
             >
               <Linkedin className="w-4 h-4" />
-              <span className="hidden lg:inline">Import from LinkedIn</span>
+              {/* Short until the row has room: the section title shares it. */}
+              <span className="hidden lg:inline 2xl:hidden">LinkedIn</span>
+              <span className="hidden 2xl:inline">Import from LinkedIn</span>
             </button>
 
-            <label className={`flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-bold text-[var(--text-secondary)] bg-transparent hover:bg-black/5 dark:hover:bg-white/10 border border-[var(--border-color)] rounded-lg transition-colors hover:border-gray-500 shrink-0 ${isUploading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}>
+            <button
+              onClick={() => setNaukriImport({ scanId: null })}
+              disabled={isUploading}
+              className="flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-bold text-[#275df5] dark:text-[#8aa4ff] bg-[#275df5]/10 hover:bg-[#275df5]/20 border border-[#275df5]/25 rounded-lg transition-colors shrink-0 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              title="Fill this profile from your Naukri profile"
+            >
+              <IdCard className="w-4 h-4" />
+              <span className="hidden lg:inline 2xl:hidden">Naukri</span>
+              <span className="hidden 2xl:inline">Import from Naukri</span>
+            </button>
+
+            <label className={`flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-bold text-[var(--text-secondary)] bg-transparent hover:bg-black/5 dark:hover:bg-white/10 border border-[var(--border-color)] rounded-lg transition-colors hover:border-gray-500 shrink-0 ${isUploading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`} title="Overwrite this profile from a PDF resume">
               {isUploading ? <Loader2 className="w-4 h-4 animate-spin text-[var(--primary)]" /> : <Upload className="w-4 h-4" />}
-              <span className="hidden lg:inline">{isUploading ? "Extracting..." : "Overwrite from PDF"}</span>
+              <span className="hidden lg:inline 2xl:hidden">{isUploading ? "Extracting..." : "From PDF"}</span>
+              <span className="hidden 2xl:inline">{isUploading ? "Extracting..." : "Overwrite from PDF"}</span>
               <input type="file" id="pdf-upload-input" accept=".pdf" className="hidden" disabled={isUploading} suppressHydrationWarning onChange={handlePdfUpload} />
             </label>
           </div>
 
           {/* Profile Selector Dropdown */}
           <div className="flex items-center justify-end gap-2 pl-3 border-l border-[var(--border-color)]/50 shrink-0">
-            <label className="text-[10px] font-bold uppercase tracking-wider text-gray-500 text-right hidden xl:block">Active Dataset</label>
+            <label className="text-[10px] font-bold uppercase tracking-wider text-gray-500 text-right hidden xl:block">Active Profile</label>
             <div className="relative group">
               <div
                 onClick={toggleDropdown}
@@ -1475,7 +1783,7 @@ function MainContent() {
                       >
                         <div className="truncate pr-2 border-r border-transparent">
                           <span className={`block truncate ${selectedProfileId === profile.id ? "text-[var(--primary)] font-bold" : "font-medium"}`}>{profile.name}</span>
-                          {profile.is_default && <span className="text-[10px] text-[var(--text-secondary)]">Default dataset</span>}
+                          {profile.is_default && <span className="text-[10px] text-[var(--text-secondary)]">Active</span>}
                         </div>
                         {selectedProfileId === profile.id && <Check className="w-4 h-4 text-[var(--primary)] shrink-0" />}
                       </button>

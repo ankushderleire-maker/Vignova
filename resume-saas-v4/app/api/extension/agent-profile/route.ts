@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { cleanSkills } from "@/lib/linkedin-skills";
 import { getExtensionUser } from "@/lib/extensionAuth";
 import { withCors, handleCorsOptions } from "@/lib/extensionCors";
+import { experienceYears, latestRole } from "@/lib/experience";
 
 // CORS preflight
 export async function OPTIONS() {
@@ -115,6 +116,14 @@ export async function GET(req: Request) {
             proficiency: lang.proficiency || lang.level || "",
         })) : [];
 
+        // The profile form never asks for years of experience, so unless one was
+        // typed in it is worked out from the roles. The popup showed
+        // "Experience: Not added" for everyone with a work history.
+        const latest = latestRole(parsedExperience);
+        const typedYears = [data.yearsExperience, personalDetails.yearsExperience].find(
+            (value) => value !== undefined && value !== null && String(value).trim() !== ""
+        );
+
         // Build the agent profile from Master Profile data
         const agentProfile = {
             first_name: firstName || "",
@@ -127,9 +136,10 @@ export async function GET(req: Request) {
             city: data.location || personalDetails.city || personalDetails.location || "",
             state: personalDetails.state || "",
             country: personalDetails.country || "",
-            current_title: data.jobTitle || data.currentTitle || parsedExperience[0]?.title || "",
-            current_company: data.currentCompany || parsedExperience[0]?.company || "",
-            years_experience: data.yearsExperience ?? personalDetails.yearsExperience ?? "",
+            full_name: fullName || [firstName, lastName].filter(Boolean).join(" "),
+            current_title: data.jobTitle || data.currentTitle || latest?.title || "",
+            current_company: data.currentCompany || latest?.company || "",
+            years_experience: typedYears ?? experienceYears(parsedExperience) ?? "",
             work_authorized: personalDetails.workAuthorized ?? "",
             // workAuthorization is what the profile form now collects ("Stamp 1G",
             // "EU Citizen"); the older spellings stay for profiles saved before it.

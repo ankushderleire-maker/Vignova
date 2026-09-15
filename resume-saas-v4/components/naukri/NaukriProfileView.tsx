@@ -26,6 +26,8 @@ type Props = {
     quickLinks?: boolean;
     /** Keeps section ids unique when two profiles share a page. */
     idPrefix?: string;
+    /** Index of the first project the rewrite added from the Master Profile. */
+    newProjectsFrom?: number;
     copiedText: string;
     onCopy: (text: string) => void;
 };
@@ -103,7 +105,7 @@ function missingDetails(profile: NaukriProfile): string[] {
     ].filter((item): item is string => Boolean(item));
 }
 
-export default function NaukriProfileView({ profile, editable = false, addedSkills, quickLinks = true, idPrefix = "naukri", copiedText, onCopy }: Props) {
+export default function NaukriProfileView({ profile, editable = false, addedSkills, quickLinks = true, idPrefix = "naukri", newProjectsFrom, copiedText, onCopy }: Props) {
     const copy = { copiedText, onCopy };
     const id = (section: string) => `${idPrefix}-${section}`;
     const tools = (value: string, max: number, label: string) =>
@@ -339,6 +341,11 @@ export default function NaukriProfileView({ profile, editable = false, addedSkil
                                             <p className="flex min-w-0 items-center gap-2 text-sm font-bold text-[var(--foreground)]">
                                                 <span className="truncate">{project.title}</span>
                                                 {!editable && <EditOnNaukri label={project.title || "project"} />}
+                                                {editable && newProjectsFrom !== undefined && i >= newProjectsFrom && (
+                                                    <span className="shrink-0 rounded-full bg-green-500/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-green-700 dark:text-green-400">
+                                                        New from Master Profile
+                                                    </span>
+                                                )}
                                             </p>
                                             {editable && project.description && (
                                                 <div className="flex shrink-0 items-center gap-2">

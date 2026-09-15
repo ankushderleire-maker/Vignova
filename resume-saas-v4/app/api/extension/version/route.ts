@@ -60,8 +60,12 @@ export async function GET(req: Request) {
                     message:
                         row?.update_message ||
                         "This version of the Vignova extension is no longer supported. Update to carry on.",
+                    // The admin's own words without the block screen's fallback,
+                    // for the "update available" notice of a build still allowed to run.
+                    updateMessage: row?.update_message || "",
                 },
-                { headers: { "Cache-Control": "public, max-age=900" } }
+                // Short, so a release set in the admin panel reaches extensions within minutes.
+                { headers: { "Cache-Control": "public, max-age=300" } }
             )
         );
     } catch (error) {
@@ -77,6 +81,7 @@ export async function GET(req: Request) {
                 updateAvailable: false,
                 installUrl: "https://chromewebstore.google.com/search/vignova",
                 message: "",
+                updateMessage: "",
             })
         );
     }

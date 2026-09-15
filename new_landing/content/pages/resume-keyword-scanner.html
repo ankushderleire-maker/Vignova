@@ -1,0 +1,180 @@
+<!--
+{
+  "path": "/resume-keyword-scanner/",
+  "order": 7,
+  "title": "Free Resume Keyword Scanner – Check Keywords Against a JD | Vignova",
+  "h1": "Resume keyword scanner: compare your resume with a job description",
+  "description": "Paste your resume and a job description to see which skills and keywords match and which are missing. Free, no sign-up, and your text stays in your browser.",
+  "breadcrumbName": "Resume Keyword Scanner",
+  "breadcrumbs": [["Tools", "/tools/"]],
+  "topicLabel": "Free tool",
+  "lang": "en",
+  "modified": "2026-09-14",
+  "primaryKeyword": "resume keyword scanner",
+  "intent": "Transactional (free tool)",
+  "ogImage": "/assets/og/vignova-resume-keyword-scanner.png",
+  "ogAlt": "Vignova Resume Keyword Scanner: compare resume and job description keywords",
+  "scripts": ["/keyword-scanner.js?v=1"],
+  "application": {
+    "name": "Vignova Resume Keyword Scanner",
+    "category": "BusinessApplication",
+    "featureList": [
+      "Skills and tools found in a job description",
+      "Matched and missing keywords in a resume",
+      "Weighting for terms in requirements and repeated terms",
+      "Runs in the browser without uploading text"
+    ]
+  },
+  "faqs": [
+    {"q": "Is the resume keyword scanner free?", "a": "Yes. It is free, needs no account and has no usage limit, because it runs entirely in your browser."},
+    {"q": "Is my resume uploaded or stored?", "a": "No. The comparison happens on your device. The resume and job description you paste are not sent to Vignova or anyone else, and they are gone when you close the page."},
+    {"q": "Is keyword coverage the same as an ATS score?", "a": "No. Keyword coverage is one part of how a resume matches a job. Vignova's <a href='/ats-resume-checker/'>ATS resume checker</a> also scores meaning, sections, impact, format and readability. Neither predicts whether an employer will shortlist you."},
+    {"q": "Should I add every missing keyword to my resume?", "a": "Only the ones that are true for you. Add a skill where you can show it, ideally in an experience or project bullet that says how you used it. A keyword you cannot discuss in an interview does more harm than good."},
+    {"q": "Why didn't the scanner find a skill that is in the job description?", "a": "The scanner recognises several hundred common skills, tools and certifications, plus phrases the posting repeats. A rare tool mentioned only once may not be picked up. Vignova's full ATS check uses AI to extract keywords from any posting."},
+    {"q": "Does it work for non-IT jobs?", "a": "Yes. Alongside software skills it recognises common finance, accounting, HR, sales, marketing, operations, design, engineering and healthcare terms, such as Tally, GST, payroll, lead generation, SEO, SAP MM or AutoCAD."},
+    {"q": "Can I use it with a Naukri or LinkedIn job posting?", "a": "Yes. Copy the full job description from the posting and paste it into the second box. Include the requirements section, because terms listed there count for more."},
+    {"q": "What should I do after scanning?", "a": "Update your resume with the missing terms that apply to you, then scan again. To have Vignova rewrite the resume for the job from your own experience, use the <a href='/resume-tailor/'>resume tailor</a>."}
+  ],
+  "guidesTitle": "Use keywords the right way",
+  "guides": [
+    "/blog/resume-keywords-how-to-find-and-use-them/",
+    "/blog/how-to-tailor-your-resume-to-a-job-description/",
+    "/blog/ats-resume-checker-how-scoring-works/",
+    "/blog/what-is-a-good-ats-score/",
+    "/blog/ats-friendly-resume-format-india/",
+    "/blog/the-75-percent-ats-rejection-myth/"
+  ]
+}
+-->
+<section class="vn-hero" aria-labelledby="page-title">
+  <div class="vn-container">
+    <div class="vn-hero-grid vn-hero-single">
+      <div>
+        <span class="vn-eyebrow">Free tool · No sign-up</span>
+        <h1 id="page-title">Resume keyword scanner: compare your resume with a job description</h1>
+        <p class="vn-lead">Paste your resume and the job description you are applying to. The scanner finds the skills, tools and repeated terms in the posting and shows which ones your resume includes and which are missing. It runs in your browser, so your text is never uploaded.</p>
+      </div>
+    </div>
+    <div class="vn-tool" data-keyword-scanner data-mode="full" data-tool="resume_keyword_scanner" style="margin-top:28px">
+      <div class="vn-tool-grid">
+        <div class="vn-field">
+          <label for="scan-resume-text">Your resume <small>Paste the full text</small></label>
+          <textarea id="scan-resume-text" data-ks-resume spellcheck="false" placeholder="Paste your resume: summary, experience, projects, education and skills."></textarea>
+        </div>
+        <div class="vn-field">
+          <label for="scan-job-text">Job description <small>Include the requirements</small></label>
+          <textarea id="scan-job-text" data-ks-jd spellcheck="false" placeholder="Paste the job description from Naukri, LinkedIn or the company's career page."></textarea>
+        </div>
+      </div>
+      <div class="vn-tool-actions">
+        <button type="button" class="vn-button" data-ks-run>Scan keywords</button>
+        <button type="button" class="vn-button vn-button-ghost" data-ks-example>Try an example</button>
+        <span class="vn-tool-privacy">Runs on your device. Nothing is sent or stored.</span>
+      </div>
+      <p class="vn-tool-error" data-ks-error role="alert" hidden></p>
+      <div class="vn-results" data-ks-results aria-live="polite" hidden></div>
+    </div>
+  </div>
+</section>
+
+<section class="vn-section vn-section-tint" aria-labelledby="how-title">
+  <div class="vn-container">
+    <div class="vn-section-head">
+      <span class="vn-eyebrow">How it works</span>
+      <h2 id="how-title">What the scanner looks for</h2>
+      <p>A job description contains two kinds of words: the specific skills and qualifications the employer wants, and everything else. The scanner ignores the everything else.</p>
+    </div>
+    <div class="vn-grid vn-grid-3">
+      <article class="vn-card"><h3>Skills, tools and certifications</h3><p>Several hundred common terms, from Python, Power BI and AWS to Tally, GST, payroll, SEO, SAP MM and AutoCAD, including common short forms such as JS or k8s.</p></article>
+      <article class="vn-card"><h3>Phrases the posting repeats</h3><p>Multi-word terms that appear more than once, such as "store operations" or "visual merchandising", even when they are not on the skills list.</p></article>
+      <article class="vn-card"><h3>What counts for more</h3><p>Specific tools count for more than general skills. Terms listed under requirements, or repeated through the posting, count for more than a passing mention.</p></article>
+    </div>
+    <ol class="vn-steps" style="margin-top:28px">
+      <li><h3>Paste your resume</h3><p>Copy all of it, including skills listed under each role, not only the summary.</p></li>
+      <li><h3>Paste the job description</h3><p>The full posting works best, with responsibilities and requirements.</p></li>
+      <li><h3>Read the gaps</h3><p>Missing terms are listed first by importance. Copy the list and update the resume where the terms apply to you.</p></li>
+    </ol>
+  </div>
+</section>
+
+<section class="vn-section" aria-labelledby="use-title">
+  <div class="vn-container vn-split">
+    <div>
+      <span class="vn-eyebrow">Using the results</span>
+      <h2 id="use-title">Put keywords where they carry weight</h2>
+      <p>A term in your skills section tells a reader you claim the skill. The same term in a bullet point shows where you used it. For the skills a posting cares about most, aim for both.</p>
+      <ul class="vn-checklist">
+        <li><strong>Summary:</strong> the two or three terms that define the role, such as "financial analysis" and "SAP FICO"</li>
+        <li><strong>Skills section:</strong> each relevant tool once, in the posting's spelling</li>
+        <li><strong>Experience and projects:</strong> the important terms again, inside what you did and achieved</li>
+      </ul>
+      <p>For the full method, read <a href="/blog/resume-keywords-how-to-find-and-use-them/">how to find the right resume keywords and use them properly</a>.</p>
+    </div>
+    <div class="vn-example-panel vn-example-after">
+      <h3>Example: showing a keyword in context</h3>
+      <p class="vn-quote">Skills: Power BI</p>
+      <p class="vn-note">Claims the skill.</p>
+      <p class="vn-quote" style="margin-top:12px">Built a Power BI dashboard tracking weekly sales for 40 stores, used by regional managers to plan stock.</p>
+      <p class="vn-note">Shows the skill, the scale and who relied on it. Illustrative example.</p>
+    </div>
+  </div>
+</section>
+
+<section class="vn-section vn-section-tint" aria-labelledby="roles-title">
+  <div class="vn-container">
+    <div class="vn-section-head">
+      <span class="vn-eyebrow">By role</span>
+      <h2 id="roles-title">Keywords job descriptions often ask for</h2>
+      <p>Common terms in postings for roles that many people in India apply for. Every posting differs, so always scan the one you are applying to rather than copying a list.</p>
+    </div>
+    <div class="vn-table-wrap">
+      <table class="vn-table">
+        <caption class="vn-sr-only">Examples of keywords by role</caption>
+        <thead><tr><th scope="col">Role</th><th scope="col">Terms that often appear</th></tr></thead>
+        <tbody>
+          <tr><td>Data analyst</td><td>SQL, Excel or Advanced Excel, Power BI or Tableau, Python, dashboards, data cleaning, statistics, stakeholder management</td></tr>
+          <tr><td>Software developer</td><td>A language such as Java, Python or JavaScript, frameworks such as Spring Boot or React, REST APIs, SQL, Git, unit testing, cloud platforms</td></tr>
+          <tr><td>Accounts executive</td><td>Tally, GST returns, TDS, bank reconciliation, accounts payable and receivable, MIS reports, Advanced Excel</td></tr>
+          <tr><td>HR executive</td><td>Recruitment, sourcing, onboarding, payroll, HRMS, employee engagement, statutory compliance, labour laws</td></tr>
+          <tr><td>Digital marketing executive</td><td>SEO, Google Ads, Meta Ads, social media marketing, Google Analytics, content marketing, campaign management</td></tr>
+          <tr><td>Sales and business development</td><td>Lead generation, B2B sales, CRM, pipeline management, negotiation, key account management, targets</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<section class="vn-section" aria-labelledby="limits-title">
+  <div class="vn-container vn-split">
+    <div>
+      <span class="vn-eyebrow">Limits, honestly</span>
+      <h2 id="limits-title">What a keyword scan cannot tell you</h2>
+      <ul class="vn-checklist">
+        <li>Whether you are a strong fit. That depends on experience, not vocabulary.</li>
+        <li>Whether a phrase means the same thing in context. "Managed vendor payments" and "accounts payable" may describe the same work.</li>
+        <li>How a particular employer's applicant tracking system is configured.</li>
+        <li>Rare tools mentioned once, which a fixed list may not recognise.</li>
+      </ul>
+    </div>
+    <div class="vn-callout">
+      <p><strong>Need more than keywords?</strong> The <a href="/ats-resume-checker/">ATS resume checker</a> in Vignova extracts keywords from any posting with AI and also scores meaning, sections, impact, format and readability. It is free with an account.</p>
+      <p>To rewrite the resume for the job from your own experience, use the <a href="/resume-tailor/">resume tailor</a>.</p>
+    </div>
+  </div>
+</section>
+
+{{FAQ}}
+
+{{GUIDES}}
+
+<section class="vn-section" aria-labelledby="cta-title">
+  <div class="vn-container">
+    <div class="vn-cta-band">
+      <div>
+        <h2 id="cta-title">Found the gaps? Close them with a tailored resume</h2>
+        <p>Vignova rewrites your resume for the job from your own profile, then checks it across all six ATS areas.</p>
+      </div>
+      <a class="vn-button" href="{{REGISTER}}">Tailor my resume</a>
+    </div>
+  </div>
+</section>

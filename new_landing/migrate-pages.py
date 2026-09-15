@@ -7,6 +7,10 @@ visible 24-48 hour response policy. Workflow claims about guaranteed outcomes,
 live job counts, unlimited plan allowances, and competitor timings are omitted.
 No screenshot assets or Next.js runtime are required.
 """
+# Retired in September 2026: these pages are edited as HTML and kept in line by
+# sync-layout.py. Running this generator again would overwrite them.
+raise SystemExit("migrate-pages.py is retired. Edit the page HTML and run build-pages.py instead.")
+
 from html import escape
 import json
 from pathlib import Path

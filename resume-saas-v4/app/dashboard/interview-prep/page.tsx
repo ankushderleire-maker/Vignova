@@ -324,10 +324,10 @@ export default function InterviewPrepPage() {
             <h2 className="text-lg font-semibold text-[var(--foreground)] mb-3">Generating Questions...</h2>
             
             <div className="text-sm text-[var(--primary)] font-medium max-w-sm h-6 animate-pulse">
-              {waitingStepIndex === 0 && "Initializing secure connection..."}
-              {waitingStepIndex === 1 && "Searching internet for most recent interview patterns..."}
-              {waitingStepIndex === 2 && (source === "job" && activeCompany ? `Searching most recent interview questions of ${activeCompany} from internet...` : "Synthesizing master profile data...")}
-              {waitingStepIndex === 3 && "Generating draft questions and hints..."}
+              {waitingStepIndex === 0 && "Getting started..."}
+              {waitingStepIndex === 1 && (source === "job" ? "Reading the job description..." : "Reading your Master Profile...")}
+              {waitingStepIndex === 2 && (source === "job" && activeCompany ? `Matching questions to the ${activeCompany} role...` : "Matching questions to your experience...")}
+              {waitingStepIndex === 3 && "Writing questions and answer tips..."}
               {waitingStepIndex >= 4 && "Finalizing formatting..."}
             </div>
           </div>

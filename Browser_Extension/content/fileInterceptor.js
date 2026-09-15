@@ -17,6 +17,23 @@
         return;
     }
 
+    // Nor on Vignova itself: an upload there is the user's own file, such as
+    // the resume PDF for a Master Profile, not a generated document to pick.
+    if (/(^|\.)vignova\.io$/.test(hostname)) {
+        return;
+    }
+
+    // An extension update or reload leaves this script running in tabs that
+    // were already open, cut off from the extension: every chrome.runtime call
+    // then throws "Extension context invalidated". Check before calling.
+    const extensionAlive = () => {
+        try {
+            return Boolean(chrome.runtime && chrome.runtime.id);
+        } catch (_) {
+            return false;
+        }
+    };
+
     let documentsCache = null;
     let accountVersion = 0;
     chrome.runtime.onMessage.addListener(message => {
@@ -291,6 +308,10 @@
     async function handleDocumentSelect(docId, docType) {
         const version = accountVersion;
         const listContainer = document.getElementById("vignova-doc-list");
+        if (!extensionAlive()) {
+            alert("Vignova was updated. Reload this page to attach a document.");
+            return;
+        }
 
         const downloadOverlay = document.createElement('div');
         downloadOverlay.className = 'vignova-download-overlay';
@@ -390,20 +411,30 @@
             </div>
         `;
 
-        chrome.runtime.sendMessage({ type: "API_GET_DOCUMENTS" }, (result) => {
-            if (version !== accountVersion) return;
-            if (result && result.success) {
-                documentsCache = { data: result.documents, timestamp: Date.now() };
-                renderDocuments(result.documents);
-            } else {
-                listContainer.innerHTML = `
-                    <div class="vignova-loading" style="color:#ef4444;">
-                        Failed to fetch documents.<br>
-                        ${result?.error || "Are you logged in?"}
-                    </div>
-                `;
-            }
-        });
+        try {
+            chrome.runtime.sendMessage({ type: "API_GET_DOCUMENTS" }, (result) => {
+                if (version !== accountVersion) return;
+                const failed = chrome.runtime.lastError;
+                if (!failed && result && result.success) {
+                    documentsCache = { data: result.documents, timestamp: Date.now() };
+                    renderDocuments(result.documents);
+                } else {
+                    listContainer.innerHTML = `
+                        <div class="vignova-loading" style="color:#ef4444;">
+                            Failed to fetch documents.<br>
+                            ${result?.error || "Are you logged in?"}
+                        </div>
+                    `;
+                }
+            });
+        } catch (_) {
+            listContainer.innerHTML = `
+                <div class="vignova-loading" style="color:#ef4444;">
+                    Vignova was updated. Reload this page to pick a document,
+                    or upload one from your computer below.
+                </div>
+            `;
+        }
     }
 
     /**
@@ -427,6 +458,13 @@
                     return;
                 }
 
+                // With the extension gone there are no documents to offer, so
+                // the page's own file picker opens as if Vignova were not here.
+                if (!extensionAlive()) {
+                    observer.disconnect();
+                    return;
+                }
+
                 // Otherwise, abort the native OS file picker and show Vignova Selector instead
                 e.preventDefault();
                 openDocumentModal(input);
@@ -438,6 +476,10 @@
     interceptFileInputs();
 
     const observer = new MutationObserver((mutations) => {
+        if (!extensionAlive()) {
+            observer.disconnect();
+            return;
+        }
         let shouldCheck = false;
         for (const mut of mutations) {
             if (mut.addedNodes.length > 0) {

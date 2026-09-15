@@ -47,16 +47,20 @@ function onWindowMessage(event) {
                     extensionVersion: manifest.version,
                     // What this build can do for the page, so the dashboard
                     // only offers a feature the installed extension has.
-                    features:         ["naukri-scan"],
+                    features:         ["naukri-scan", "naukri-scan-return"],
                 },
                 window.location.origin   // tighter than "*"
             );
         }
 
-        // "Scan Naukri profile" on the dashboard's Naukri Optimizer.
+        // "Scan Naukri profile" on the dashboard's Naukri Optimizer or in the
+        // Master Profile's Naukri import.
         if (event.data.type === "VIGNOVA_NAUKRI_SCAN" && window.location.origin === DASHBOARD_ORIGIN) {
             const requestId = String(event.data.requestId || "");
-            chrome.runtime.sendMessage({ type: "NAUKRI_SCAN_START" }, (reply) => {
+            // The page the results open on. Only the Master Profile is named;
+            // anything else means the Naukri Optimizer.
+            const returnTo = event.data.returnTo === "profile" ? "profile" : "optimizer";
+            chrome.runtime.sendMessage({ type: "NAUKRI_SCAN_START", returnTo }, (reply) => {
                 const failed = chrome.runtime.lastError;
                 window.postMessage(
                     {

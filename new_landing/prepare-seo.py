@@ -3,6 +3,10 @@
 Run after migrate-blog.py and migrate-pages.py. Uses BeautifulSoup already
 available in this workspace; the deployable website has no Python dependency.
 """
+# Retired in September 2026: seo_site.py, build-pages.py and sync-layout.py now own
+# metadata and structured data. Running this script would bring back the old tags.
+raise SystemExit("prepare-seo.py is retired. Run build-pages.py and then build.py instead.")
+
 from pathlib import Path
 from urllib.parse import urlsplit
 from xml.etree import ElementTree as ET

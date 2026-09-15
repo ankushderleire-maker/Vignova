@@ -6,15 +6,32 @@ ErrorDocument 404 /404.html
 <IfModule mod_rewrite.c>
   RewriteEngine On
 
-  # Normalize known legacy HTML forms without redirecting missing URLs home.
+  # Retired and consolidated URLs. Generated from REDIRECTS in seo_site.py by
+  # build-pages.py; edit that map rather than these lines. Each goes straight
+  # to the final HTTPS URL in one hop.
+  # BEGIN VIGNOVA REDIRECTS
+  RewriteRule ^blog/sample-post/?$ https://vignova.io/blog/how-ai-is-changing-the-job-search/ [R=301,L]
+  RewriteRule ^blog/how-vignova-works/?$ https://vignova.io/how-it-works/ [R=301,L]
+  # END VIGNOVA REDIRECTS
+
+  # A real folder requested without its trailing slash goes straight to the
+  # canonical https://vignova.io/folder/, whatever scheme or host it arrived
+  # on, instead of fixing the slash and the host in two separate hops.
+  RewriteCond %{HTTP_HOST} ^(www\.)?vignova\.io$ [NC]
+  RewriteCond %{REQUEST_FILENAME} -d
+  RewriteRule ^(.+[^/])$ https://vignova.io/$1/ [R=301,L,NE]
+
+  # Legacy index.html and .html forms of real pages, also in one hop.
   # THE_REQUEST prevents a loop when DirectoryIndex serves index.html internally.
+  RewriteCond %{HTTP_HOST} ^(www\.)?vignova\.io$ [NC]
   RewriteCond %{THE_REQUEST} \s/+(.*/)?index\.html[?\s] [NC]
   RewriteCond %{REQUEST_FILENAME} -f
-  RewriteRule ^(.*/)?index\.html$ /$1 [R=301,L,NE]
+  RewriteRule ^(.*/)?index\.html$ https://vignova.io/$1 [R=301,L,NE]
+  RewriteCond %{HTTP_HOST} ^(www\.)?vignova\.io$ [NC]
   RewriteCond %{DOCUMENT_ROOT}/$1/index.html -f
-  RewriteRule ^(.+)\.html$ /$1/ [R=301,L,NE]
+  RewriteRule ^(.+)\.html$ https://vignova.io/$1/ [R=301,L,NE]
 
-  # Keep the existing HTTPS apex canonical host. Local previews are unaffected.
+  # HTTPS apex host. Query strings are preserved. Local previews are unaffected.
   RewriteCond %{HTTP_HOST} ^www\.vignova\.io$ [NC]
   RewriteRule ^ https://vignova.io%{REQUEST_URI} [R=301,L,NE]
   RewriteCond %{HTTP_HOST} ^vignova\.io$ [NC]
@@ -30,7 +47,7 @@ ErrorDocument 404 /404.html
   <FilesMatch "\.(css|js)$">
     Header set Cache-Control "public, max-age=3600, must-revalidate"
   </FilesMatch>
-  <FilesMatch "\.(png|jpe?g|webp|svg|ico|woff2)$">
+  <FilesMatch "\.(png|jpe?g|webp|avif|svg|ico|woff2)$">
     Header set Cache-Control "public, max-age=604800"
   </FilesMatch>
   <FilesMatch "\.html$">
@@ -43,4 +60,9 @@ ErrorDocument 404 /404.html
 
 <IfModule mod_deflate.c>
   AddOutputFilterByType DEFLATE text/html text/css application/javascript image/svg+xml application/xml text/xml application/json application/manifest+json
+</IfModule>
+
+<IfModule mod_mime.c>
+  AddType image/webp .webp
+  AddType image/avif .avif
 </IfModule>

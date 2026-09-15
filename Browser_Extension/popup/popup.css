@@ -297,3 +297,96 @@ dialog .helper{font-size:10px;margin-top:12px}
 .usage-fill.low{background:#d97706}
 .usage-fill.empty{background:#dc2626}
 .usage-fill.unlimited{background:#6c4bea}
+
+/* ── Brand refresh ──────────────────────────────────────────────────────
+   The dashboard's gradient (purple -> indigo -> blue) on the wordmark, the
+   profile picker and the controls, so the panel reads as the same product. */
+:root{--brand-gradient:linear-gradient(110deg,#861cf6 0%,#5141f5 45%,#157bdc 100%);--brand-soft:linear-gradient(110deg,rgba(134,28,246,.08),rgba(81,65,245,.06) 45%,rgba(21,123,220,.08));--brand-line:linear-gradient(120deg,rgba(134,28,246,.45),rgba(81,65,245,.35) 45%,rgba(21,123,220,.45));--tile-line:linear-gradient(140deg,#e9e3ff,#e3ecfb)}
+.brand-copy{display:flex;flex-direction:column;line-height:1.1}
+.brand-name{font-size:16px;font-weight:850;letter-spacing:1px;background:var(--brand-gradient);-webkit-background-clip:text;background-clip:text;color:transparent}
+.brand small{color:var(--muted)}
+
+.profile-picker{height:auto;min-height:58px;gap:11px;padding:9px 12px;border:1px solid transparent;border-radius:13px;background:linear-gradient(135deg,#fff,#fbfaff) padding-box,var(--brand-line) border-box;box-shadow:0 3px 12px rgba(81,65,245,.08);transition:box-shadow .15s}
+.profile-picker:hover{box-shadow:0 6px 18px rgba(81,65,245,.16)}
+.profile-picker:focus-within{outline:2px solid #8a55ff;outline-offset:2px}
+.profile-picker .avatar{width:36px;height:36px;font-size:12px;font-weight:750;letter-spacing:.3px;color:#fff;background:var(--brand-gradient);box-shadow:0 3px 8px rgba(81,65,245,.28)}
+.picker-copy{display:flex;flex-direction:column;min-width:0;flex:1}
+.picker-name{font-size:13px;font-weight:750;line-height:1.25;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.picker-meta{font-size:10px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.picker-chevron{width:28px;height:28px;display:grid;place-items:center;border-radius:9px;background:var(--brand-soft);color:#5141f5;flex:none;transition:background .15s}
+.picker-chevron .icon{width:14px;height:14px}
+.profile-picker:hover .picker-chevron{background:linear-gradient(110deg,rgba(134,28,246,.16),rgba(21,123,220,.16))}
+.picker-select{position:absolute;inset:0;width:100%;height:100%;margin:0;opacity:0;cursor:pointer;border:0;appearance:none;font-size:13px}
+.picker-select:disabled{cursor:default}
+
+.primary{background:var(--brand-gradient);border:1px solid transparent;box-shadow:0 4px 12px rgba(81,65,245,.24)}
+.primary:hover{background:linear-gradient(110deg,#7a10e6 0%,#4333e4 45%,#0f6ec6 100%);box-shadow:0 6px 16px rgba(81,65,245,.32)}
+
+/* Quick Actions: gradient-edged tiles with gradient icons */
+.tool-grid{gap:8px}
+.tool{min-height:88px;border:1px solid transparent;border-radius:13px;background:linear-gradient(165deg,#fff 55%,#faf8ff) padding-box,var(--tile-line) border-box;box-shadow:0 1px 3px rgba(16,19,51,.05);transition:transform .15s,box-shadow .15s,background .15s}
+.tool:hover{transform:translateY(-2px);border-color:transparent;background:linear-gradient(165deg,#fff 40%,#f5f1ff) padding-box,var(--brand-line) border-box;box-shadow:0 8px 18px rgba(81,65,245,.15)}
+.tool strong{color:var(--ink)}
+.tool-icon{width:36px;height:36px;border-radius:11px;margin-bottom:3px;box-shadow:0 4px 10px rgba(16,19,51,.12)}
+.tool-icon.purple{background:linear-gradient(135deg,#b06cff,#6d28d9);color:#fff}
+.tool-icon.blue{background:linear-gradient(135deg,#4cc3ff,#1d4ed8);color:#fff}
+.tool-icon.green{background:linear-gradient(135deg,#3fdca0,#059669);color:#fff}
+.tool-icon.pink{background:linear-gradient(135deg,#ff8aa5,#db2777);color:#fff}
+.tool-icon.orange{background:linear-gradient(135deg,#ffc94d,#f97316);color:#fff}
+
+/* Save Job is the action most people come for, so it carries the brand. */
+/* The tint is translucent, so a white layer sits under it; without one the
+   border gradient shows through and fills the whole button. */
+.save-job-tool{min-height:62px;border:1.5px solid transparent;background:var(--brand-soft) padding-box,linear-gradient(#fff,#fff) padding-box,var(--brand-gradient) border-box;box-shadow:0 6px 16px rgba(81,65,245,.16)}
+.save-job-tool:hover{background:linear-gradient(110deg,rgba(134,28,246,.14),rgba(81,65,245,.09) 45%,rgba(21,123,220,.14)) padding-box,linear-gradient(#fff,#fff) padding-box,var(--brand-gradient) border-box;box-shadow:0 10px 22px rgba(81,65,245,.24)}
+.save-job-tool .tool-icon{background:var(--brand-gradient);color:#fff;box-shadow:0 4px 12px rgba(81,65,245,.35)}
+.save-job-tool strong{font-size:13px;font-weight:800;background:var(--brand-gradient);-webkit-background-clip:text;background-clip:text;color:transparent}
+.save-job-tool small{color:#5141f5;font-weight:550}
+
+/* Draft HR Message and Draft Email, always visible under the grid */
+.extra-tools{grid-template-columns:1fr 1fr;gap:8px;margin:0 0 12px}
+.writing-tool{position:relative;display:flex;align-items:center;gap:9px;min-height:52px;padding:9px 10px;text-align:left;border:1px solid transparent;border-radius:13px;background:linear-gradient(165deg,#fff 55%,#faf8ff) padding-box,var(--tile-line) border-box;box-shadow:0 1px 3px rgba(16,19,51,.05);transition:transform .15s,box-shadow .15s,background .15s}
+.writing-tool:hover{transform:translateY(-1px);background:linear-gradient(165deg,#fff 40%,#f5f1ff) padding-box,var(--brand-line) border-box;box-shadow:0 6px 14px rgba(81,65,245,.13)}
+.writing-icon{width:32px;height:32px;display:grid;place-items:center;border-radius:10px;background:linear-gradient(135deg,#8b5cf6,#157bdc);color:#fff;flex:none;box-shadow:0 3px 8px rgba(81,65,245,.25)}
+.writing-icon .icon{width:16px;height:16px}
+.writing-copy{min-width:0}
+.writing-copy strong{display:block;font-size:10.5px;line-height:1.25;color:var(--ink)}
+.writing-copy small{font-size:9px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+@media(max-width:340px){.tool strong,.writing-copy strong{font-size:9px}.tool small,.writing-copy small{font-size:8px}.extra-tools{grid-template-columns:1fr}.picker-name{font-size:12px}}
+
+/* Profile menu: the native select list cannot be styled, so the picker opens this */
+.profile-switcher{position:relative;margin-bottom:12px}
+.profile-switcher .profile-picker{width:100%;margin-bottom:0;text-align:left;cursor:pointer;color:inherit}
+.profile-switcher .profile-picker:focus-within{outline:none}
+.profile-switcher .profile-picker:focus-visible{outline:2px solid #8a55ff;outline-offset:2px}
+.profile-picker[aria-expanded="true"]{box-shadow:0 8px 22px rgba(81,65,245,.2)}
+.picker-chevron .icon{transition:transform .18s ease}
+.profile-picker[aria-expanded="true"] .picker-chevron{background:linear-gradient(110deg,rgba(134,28,246,.16),rgba(21,123,220,.16))}
+.profile-picker[aria-expanded="true"] .picker-chevron .icon{transform:rotate(180deg)}
+.picker-select{display:none}
+.profile-menu{position:absolute;top:calc(100% + 6px);left:0;right:0;z-index:80;padding:6px;border:1px solid transparent;border-radius:14px;background:linear-gradient(#fff,#fff) padding-box,var(--brand-line) border-box;box-shadow:0 18px 40px rgba(16,19,51,.18),0 2px 6px rgba(81,65,245,.08);transform-origin:top center;animation:vg-menu-in .14s ease-out}
+@keyframes vg-menu-in{from{opacity:0;transform:translateY(-4px) scale(.98)}to{opacity:1;transform:none}}
+.profile-menu-title{padding:5px 9px 6px;font-size:9px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;color:#7f8ba7}
+.profile-option{display:flex;align-items:center;gap:10px;width:100%;padding:8px 9px;margin:1px 0;border-radius:10px;text-align:left;transition:background .12s}
+.profile-option:hover,.profile-option.is-focused{background:var(--brand-soft);outline:none}
+.profile-option[aria-selected="true"]{background:linear-gradient(110deg,rgba(134,28,246,.1),rgba(81,65,245,.07) 45%,rgba(21,123,220,.1))}
+.option-avatar{width:32px;height:32px;display:grid;place-items:center;flex:none;border-radius:50%;background:var(--brand-gradient);color:#fff;font-size:11px;font-weight:750;box-shadow:0 3px 8px rgba(81,65,245,.25)}
+.profile-option:not([aria-selected="true"]) .option-avatar{background:#efeafd;color:#5141f5;box-shadow:none}
+.option-copy{min-width:0;flex:1;display:flex;flex-direction:column;line-height:1.3}
+.option-copy strong{font-size:12px;font-weight:700;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.option-copy small{font-size:10px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.option-check{width:20px;height:20px;padding:4px;flex:none;border-radius:50%;background:var(--brand-gradient);color:#fff}
+.profile-menu-manage{display:flex;align-items:center;gap:8px;width:100%;margin-top:5px;padding:9px 10px 7px;border-top:1px solid var(--line);color:#5141f5;font-size:11px;font-weight:650;text-align:left;border-radius:0 0 9px 9px}
+.profile-menu-manage:hover{background:var(--brand-soft)}
+.profile-menu-manage .icon{width:14px;height:14px}
+/* Update available: a newer build is out and this one still works. */
+.update-banner{display:flex;align-items:center;gap:9px;margin:10px 14px 0;padding:9px 8px 9px 10px;border:1px solid transparent;border-radius:13px;background:linear-gradient(135deg,#fff,#fbfaff) padding-box,var(--brand-line) border-box;box-shadow:0 4px 14px rgba(81,65,245,.12)}
+.update-banner-icon{width:30px;height:30px;display:grid;place-items:center;border-radius:9px;background:var(--brand-soft);color:#5141f5;flex:none}
+.update-banner-icon .icon{width:15px;height:15px}
+.update-banner-copy{display:flex;flex-direction:column;gap:1px;min-width:0;flex:1}
+.update-banner-copy strong{font-size:11.5px;font-weight:700;color:var(--ink)}
+.update-banner-copy small{font-size:10px;line-height:1.45;color:var(--muted)}
+.update-banner-action{height:28px;padding:0 12px;border-radius:9px;font-size:11px;font-weight:650;color:#fff;flex:none}
+.update-banner .icon-button{width:24px;height:24px;color:var(--muted);flex:none}
+.update-banner .icon-button .icon{width:13px;height:13px}

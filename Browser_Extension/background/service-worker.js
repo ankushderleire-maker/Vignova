@@ -57,7 +57,9 @@ async function warmExtensionCache(token, epoch = authEpoch) {
  * just for this. Cached for six hours, and every failure fails open: a server
  * we cannot reach must never lock a working extension.
  */
-const UPDATE_CHECK_TTL_MS = 6 * 60 * 60 * 1000;
+// Often enough that a release set in the admin panel shows up within about
+// twenty minutes; the server caches its answer for five.
+const UPDATE_CHECK_TTL_MS = 15 * 60 * 1000;
 
 async function getUpdateState({ force = false } = {}) {
     const version = chrome.runtime.getManifest().version;
@@ -87,6 +89,7 @@ async function getUpdateState({ force = false } = {}) {
             latest: data.latest || null,
             installUrl: data.installUrl || "https://chromewebstore.google.com/search/vignova",
             message: data.message || "",
+            note: data.updateMessage || "",
             checkedAt: Date.now(),
         };
         await chrome.storage.local.set({ vignova_update_state: fresh });
@@ -101,6 +104,7 @@ async function getUpdateState({ force = false } = {}) {
                 latest: null,
                 installUrl: "https://chromewebstore.google.com/search/vignova",
                 message: "",
+                note: "",
                 checkedAt: 0,
             }
         );
@@ -182,7 +186,11 @@ async function returnToDashboard(sender, analysisId) {
         const { naukriScan: scan } = await chrome.storage.session.get("naukriScan");
         if (!scan || !analysisId || sender.tab?.id !== scan.tabId) return false;
         await chrome.storage.session.remove("naukriScan");
-        const url = `${Vignova_API_BASE}/dashboard/naukri-optimizer?analysis=${encodeURIComponent(analysisId)}`;
+        // A scan started from the Master Profile's import goes back there.
+        const path = scan.returnTo === "profile"
+            ? `/dashboard/profile?naukri=${encodeURIComponent(analysisId)}`
+            : `/dashboard/naukri-optimizer?analysis=${encodeURIComponent(analysisId)}`;
+        const url = `${Vignova_API_BASE}${path}`;
         const tab = await chrome.tabs.update(scan.returnTabId, { url, active: true });
         if (tab && tab.windowId !== undefined) await chrome.windows.update(tab.windowId, { focused: true });
         return true;
@@ -596,7 +604,13 @@ function routeMessage(message, sender, sendResponse, requestEpoch) {
             }
             const tab = await chrome.tabs.create({ url: NAUKRI_PROFILE_URL, active: true });
             await chrome.storage.session.set({
-                naukriScan: { tabId: tab.id, returnTabId: sender.tab.id, startedAt: Date.now(), started: false },
+                naukriScan: {
+                    tabId: tab.id,
+                    returnTabId: sender.tab.id,
+                    returnTo: message.returnTo === "profile" ? "profile" : "optimizer",
+                    startedAt: Date.now(),
+                    started: false,
+                },
             });
             sendResponse({ success: true });
         })().catch((error) => sendResponse({ success: false, error: error.message }));

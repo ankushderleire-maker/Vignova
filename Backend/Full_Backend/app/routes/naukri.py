@@ -243,6 +243,15 @@ _DESCRIPTION_LIST = {
         "additionalProperties": False,
     },
 }
+_PROJECT_LIST = {
+    "type": "array",
+    "items": {
+        "type": "object",
+        "properties": {key: {"type": "string"} for key in ("title", "client", "duration", "description")},
+        "required": ["title", "client", "duration", "description"],
+        "additionalProperties": False,
+    },
+}
 _REWRITE_SCHEMA = {
     "type": "object",
     "properties": {
@@ -250,16 +259,49 @@ _REWRITE_SCHEMA = {
         "profileSummary": {"type": "string"},
         "keySkills": {"type": "array", "items": {"type": "string"}},
         "employment": _DESCRIPTION_LIST,
-        "projects": _DESCRIPTION_LIST,
+        "projects": _PROJECT_LIST,
     },
     "required": ["headline", "profileSummary", "keySkills", "employment", "projects"],
     "additionalProperties": False,
 }
 
 
-def _rewrite_prompt(profile: dict, master: dict, missing_keywords: list[str]) -> tuple[str, str]:
+# At most this many Master Profile projects are added to a Naukri profile.
+_MAX_ADDED_PROJECTS = 3
+
+
+def _title_key(value) -> str:
+    return re.sub(r"[^a-z0-9]+", " ", str(value or "").lower()).strip()
+
+
+def _master_projects(master: dict, profile: dict) -> list[dict]:
+    """Master Profile projects that are not on Naukri yet, in Naukri's project shape."""
+    on_naukri = {_title_key(project.get("title")) for project in _entries(profile, "projects")}
+    items = master.get("projects") if isinstance(master, dict) and isinstance(master.get("projects"), list) else []
+    found = []
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        title = _text(item.get("name") or item.get("title") or item.get("projectName"))
+        if not title or _title_key(title) in on_naukri:
+            continue
+        description = item.get("description") or item.get("summary") or ""
+        if isinstance(description, list):
+            description = "\n".join(f"\u2022 {_text(line)}" for line in description if _text(line))
+        dates = " - ".join(part for part in (_text(item.get("startDate")), _text(item.get("endDate"))) if part)
+        found.append({
+            "title": title,
+            "client": _text(item.get("associatedWith") or item.get("organization") or item.get("company")),
+            "duration": _text(item.get("dateRange")) or dates,
+            "description": _text(description),
+            "skills": ", ".join(coerce_skill_list(item.get("techStack") or item.get("skills") or item.get("technologies"), 12)),
+        })
+    return found
+
+
+def _rewrite_prompt(profile: dict, master: dict, missing_keywords: list[str], new_projects: list[dict]) -> tuple[str, str]:
     jobs = [{key: job.get(key) for key in ("designation", "company", "duration", "description")} for job in _entries(profile, "employment")]
-    projects = [{key: project.get(key) for key in ("title", "client", "description")} for project in _entries(profile, "projects")]
+    projects = [{key: project.get(key) for key in ("title", "client", "duration", "description")} for project in _entries(profile, "projects")]
     system = (
         "You rewrite Naukri.com profiles so recruiters searching Naukri find and shortlist the candidate. "
         "Use only facts in the Naukri profile or the Master Profile. Never invent employers, dates, numbers, "
@@ -273,7 +315,7 @@ Rules:
 - profileSummary: at most {LIMITS['profileSummary']} characters, in 2-3 short paragraphs.
 - keySkills: up to {LIMITS['keySkills']} real skills, most relevant first. Keep the ones the candidate uses and add these Master Profile skills where the profile supports them: {json.dumps(missing_keywords[:15])}.
 - employment: one entry per role below, same order. description is Naukri's Job profile, at most {LIMITS['jobProfile']} characters: 3-5 lines, each starting with a bullet and an action verb. Metrics only when a source states them.
-- projects: one entry per project below, same order, description at most {LIMITS['projectDetails']} characters.
+- projects: first one entry per Naukri project below, same order and title, with its description rewritten. Then add up to {_MAX_ADDED_PROJECTS} projects from MASTER PROFILE PROJECTS NOT ON NAUKRI, keeping their titles exactly. Each description is at most {LIMITS['projectDetails']} characters and uses only that project's facts.
 
 NAUKRI PROFILE
 Resume headline: {_text(profile.get('headline'))}
@@ -282,6 +324,9 @@ Key skills: {', '.join(coerce_skill_list(profile.get('keySkills'), 100))}
 IT skills: {', '.join(_text(row.get('skills')) for row in _entries(profile, 'itSkills'))}
 Employment: {json.dumps(jobs, ensure_ascii=False)}
 Projects: {json.dumps(projects, ensure_ascii=False)}
+
+MASTER PROFILE PROJECTS NOT ON NAUKRI
+{json.dumps(new_projects[:6], ensure_ascii=False) if new_projects else "None."}
 
 MASTER PROFILE
 {master_json}
@@ -318,7 +363,40 @@ def _clip(text: str, limit: int) -> str:
     return (cut[: end + 1] if end > limit * 0.6 else cut[: max(cut.rfind(" "), 1)]).strip()
 
 
-def _apply_rewrite(profile: dict, rewrite: dict, master_text: str) -> dict:
+def _source_description(source: dict) -> str:
+    parts = [source.get("description", ""), f"Tech stack: {source['skills']}" if source.get("skills") else ""]
+    return "\n".join(part for part in parts if part)
+
+
+def _added_projects(rewrite: dict, profile: dict, new_projects: list[dict]) -> list[dict]:
+    """
+    Master Profile projects to add after the ones already on Naukri. A project
+    the model returns counts only when its title is one of those projects; when
+    it returns none, they go in as the Master Profile describes them.
+    """
+    if not new_projects:
+        return []
+    by_title = {_title_key(project["title"]): project for project in new_projects}
+    rewritten = rewrite.get("projects") if isinstance(rewrite.get("projects"), list) else []
+    added = []
+    for entry in rewritten[len(_entries(profile, "projects")):]:
+        source = by_title.pop(_title_key(entry.get("title")), None) if isinstance(entry, dict) else None
+        if source:
+            added.append({
+                "title": source["title"],
+                "client": _text(entry.get("client")) or source["client"],
+                "duration": _text(entry.get("duration")) or source["duration"],
+                "description": _clip(_text(entry.get("description")) or _source_description(source), LIMITS["projectDetails"]),
+            })
+    if not added:
+        added = [
+            {"title": s["title"], "client": s["client"], "duration": s["duration"], "description": _clip(_source_description(s), LIMITS["projectDetails"])}
+            for s in new_projects
+        ]
+    return added[:_MAX_ADDED_PROJECTS]
+
+
+def _apply_rewrite(profile: dict, rewrite: dict, master_text: str, new_projects: list[dict] | None = None) -> dict:
     """The profile with the rewrite's text laid over it, inside Naukri's limits."""
     result = json.loads(json.dumps(profile))
     if _text(rewrite.get("headline")):
@@ -339,6 +417,9 @@ def _apply_rewrite(profile: dict, rewrite: dict, master_text: str) -> dict:
         for i, entry in enumerate(_entries(result, key)):
             if i < len(rewritten) and isinstance(rewritten[i], dict) and _text(rewritten[i].get("description")):
                 entry["description"] = _clip(rewritten[i]["description"], limit)
+    added = _added_projects(rewrite, profile, new_projects or [])
+    if added:
+        result["projects"] = _entries(result, "projects") + added
     return result
 
 
@@ -363,12 +444,13 @@ async def optimize_naukri(request: Request, payload: NaukriOptimizeRequest):
     master_text, master_skills = _master_inputs(payload.masterProfile)
     try:
         current = await _score(master_text, master_skills, profile)
-        system, user = _rewrite_prompt(profile, payload.masterProfile if master_text else {}, current["missing_keywords"])
+        new_projects = _master_projects(payload.masterProfile, profile) if master_text else []
+        system, user = _rewrite_prompt(profile, payload.masterProfile if master_text else {}, current["missing_keywords"], new_projects)
         loop = asyncio.get_event_loop()
         rewrite = await loop.run_in_executor(None, partial(_ask_rewrite, system, user))
         if not rewrite:
             raise HTTPException(status_code=502, detail="The AI rewrite came back empty.")
-        candidate = _apply_rewrite(profile, rewrite, master_text)
+        candidate = _apply_rewrite(profile, rewrite, master_text, new_projects)
         async with _NAUKRI_SEMAPHORE:
             optimized, scores = await loop.run_in_executor(
                 None, partial(_never_worse, master_text, master_skills, profile, candidate, current)
