@@ -2,6 +2,7 @@
 const VignovaIcons = (() => {
     const paths = {
         bolt: '<path d="m13 2-9 12h7l-1 8 10-12h-7z"/>',
+        home: '<path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10v10h13V10"/><path d="M10 20v-5h4v5"/>',
         chart: '<path d="M5 20V12m7 8V4m7 16V9"/>',
         user: '<circle cx="12" cy="7" r="4"/><path d="M4 21v-2a8 8 0 0 1 16 0v2"/>',
         settings: '<path d="m9 3-1 3-3 1v4l-2 1 2 2v3l3 1 1 3h5l1-3 3-1v-3l2-2-2-1V7l-3-1-1-3z"/><circle cx="11.5" cy="12" r="3"/>',

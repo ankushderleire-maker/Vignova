@@ -15,7 +15,7 @@ export async function PATCH(
 
     const { jobId } = await params;
     const body = await req.json();
-    const { status, company, jobTitle, description, location, jobUrl, coverLetter, interviewAt, deadlineAt } = body;
+    const { status, company, jobTitle, description, location, jobUrl, coverLetter, draftEmail, interviewAt, deadlineAt } = body;
 
     const updatedJob = await db.jobApplication.update({
       where: {
@@ -30,6 +30,7 @@ export async function PATCH(
         ...(location !== undefined && { location }),
         ...(jobUrl !== undefined && { jobUrl }),
         ...(coverLetter !== undefined && { coverLetter }),
+        ...(draftEmail !== undefined && { draftEmail }),
         // Sent as an ISO string or null; null clears the date.
         ...(interviewAt !== undefined && { interviewAt: interviewAt ? new Date(interviewAt) : null }),
         ...(deadlineAt !== undefined && { deadlineAt: deadlineAt ? new Date(deadlineAt) : null }),

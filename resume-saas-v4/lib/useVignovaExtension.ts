@@ -65,9 +65,13 @@ export function useVignovaExtension() {
         status = expectedId && pong.extensionId && pong.extensionId !== expectedId ? "mismatch" : "installed";
     }
 
-    /** Asks the extension to open the Naukri profile and scan it. */
+    /**
+     * Asks the extension to open the Naukri profile and scan it. The result
+     * opens on the Naukri Optimizer, or back on the Master Profile with
+     * `returnTo` "profile" when the extension supports that.
+     */
     const requestNaukriScan = useCallback(
-        () =>
+        (returnTo?: "profile") =>
             new Promise<NaukriScanReply>((resolve) => {
                 const requestId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
                 const onReply = (event: MessageEvent) => {
@@ -84,7 +88,7 @@ export function useVignovaExtension() {
                     SCAN_REPLY_TIMEOUT_MS
                 );
                 window.addEventListener("message", onReply);
-                window.postMessage({ type: "VIGNOVA_NAUKRI_SCAN", requestId }, window.location.origin);
+                window.postMessage({ type: "VIGNOVA_NAUKRI_SCAN", requestId, returnTo }, window.location.origin);
             }),
         []
     );
@@ -93,6 +97,8 @@ export function useVignovaExtension() {
         status,
         version: pong?.extensionVersion || "",
         supportsNaukriScan: status === "installed" && !!pong?.features?.includes("naukri-scan"),
+        /** Whether a scan brings the user back to the page that started it. */
+        supportsNaukriReturn: status === "installed" && !!pong?.features?.includes("naukri-scan-return"),
         installUrl,
         requestNaukriScan,
     };

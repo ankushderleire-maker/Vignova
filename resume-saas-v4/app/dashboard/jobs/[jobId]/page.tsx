@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, Suspense } from "react";
+import { useCallback, useEffect, useRef, useState, Suspense } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import dynamic from "next/dynamic";
 import {
@@ -64,7 +64,15 @@ type Job = {
     source?: string;
     createdAt?: string;
     coverLetter?: string | null;
+    draftEmail?: string | null;
     formattedJd?: any;
+};
+/** A saved resume version, as /api/resumes returns it. */
+type SavedResume = {
+    id: string;
+    name: string;
+    content: ResumeData;
+    templateId?: string | null;
 };
 type MasterProfile = any;
 
@@ -136,6 +144,8 @@ function ResumeStudioPageContent() {
     const [isGenerating, setIsGenerating] = useState(false);
     const [generatingType, setGeneratingType] = useState<"resume" | "cover-letter" | "email" | "all" | null>(null);
     const [hasGenerated, setHasGenerated] = useState(false);
+    /** The generate window, opened on request over documents that already exist. */
+    const [regenerating, setRegenerating] = useState(false);
     const [activeDocument, setActiveDocument] = useState<"resume" | "cover-letter" | "email">("resume");
 
     // ?doc=cover-letter lets other pages (the Cover Letter list) deep-link into
@@ -149,35 +159,16 @@ function ResumeStudioPageContent() {
     }, [searchParams]);
     const [coverLetter, setCoverLetter] = useState<string | null>(null);
     const [draftEmail, setDraftEmail] = useState<string | null>(null);
-    const [letterSaveState, setLetterSaveState] = useState<"idle" | "saving" | "saved">("idle");
-    /** What the server currently holds, so an unchanged letter never PATCHes. */
+    /** What the server currently holds, so unchanged text never PATCHes. */
     const persistedLetter = useRef<string | null>(null);
+    const persistedEmail = useRef<string | null>(null);
 
     const [activeTab, setActiveTab] = useState<"jd" | "profile" | "saved" | "analysis">("jd");
 
-    // The cover letter is a column on the job, so it is saved in place rather
-    // than through the resume Save dialog. Debounced so typing doesn't PATCH
-    // on every keystroke.
-    useEffect(() => {
-        if (coverLetter === null || coverLetter === persistedLetter.current) return;
-        const jobId = params.jobId as string;
-        setLetterSaveState("saving");
-        const timer = setTimeout(async () => {
-            try {
-                const res = await fetch(`/api/jobs/${jobId}`, {
-                    method: "PATCH",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ coverLetter }),
-                });
-                if (!res.ok) throw new Error("save failed");
-                persistedLetter.current = coverLetter;
-                setLetterSaveState("saved");
-            } catch {
-                setLetterSaveState("idle");
-            }
-        }, 900);
-        return () => clearTimeout(timer);
-    }, [coverLetter, params.jobId]);
+    // The cover letter and the email are columns on the job, so they are saved
+    // in place rather than through the resume Save dialog.
+    const letterSaver = useJobTextSaver(params.jobId as string, "coverLetter", coverLetter, persistedLetter);
+    const emailSaver = useJobTextSaver(params.jobId as string, "draftEmail", draftEmail, persistedEmail);
 
     // Structured JD from the formatter agent; falls back to the parser while
     // the agent answers, so this panel is never empty.
@@ -196,11 +187,33 @@ function ResumeStudioPageContent() {
                 ? Boolean(coverLetter)
                 : Boolean(draftEmail);
 
+    /**
+     * Documents that already exist are shown, not the generate window — a job
+     * the extension built an Application Pack for opens on that resume, letter
+     * and email. The window appears for a missing resume, for a letter or email
+     * before anything was generated, or when the user asks to regenerate.
+     */
+    const showGenerateWindow =
+        regenerating ||
+        (activeDocument === "resume" ? !resumeData : !hasGenerated && !activeDocumentHasContent);
+
+    /** Job details and profile sit beside the generate window; the editor sits beside a document. */
+    const showSetup = !hasGenerated || regenerating || (activeDocument === "resume" && !resumeData);
+
     /** Saved rows hold a plain string; only apply it if it is a template we ship. */
     const applySavedTemplate = (templateId?: string | null) => {
         if (templateId && TEMPLATES.some((t) => t.id === templateId)) {
             setSelectedTemplate(templateId as TemplateId);
         }
+    };
+
+    /** Loads a saved version into the editor and preview. */
+    const openSavedResume = (resume: SavedResume) => {
+        setResumeData(resume.content);
+        setHasGenerated(true);
+        setCurrentResumeId(resume.id);
+        setCurrentResumeName(resume.name);
+        applySavedTemplate(resume.templateId);
     };
 
     // --- DATA FETCHING ---
@@ -219,11 +232,14 @@ function ResumeStudioPageContent() {
                 setMasterProfilesList(pList);
                 setJob(foundJob);
 
-                // The letter lives on the job, so it is here on load — without
-                // this, arriving from the Cover Letter page showed an empty box.
+                // The letter and the email live on the job, so they are here on
+                // load — without this, arriving from the Cover Letter page showed
+                // an empty box, and an email drafted by the extension never showed.
                 if (foundJob) {
                     setCoverLetter(foundJob.coverLetter ?? null);
                     persistedLetter.current = foundJob.coverLetter ?? null;
+                    setDraftEmail(foundJob.draftEmail ?? null);
+                    persistedEmail.current = foundJob.draftEmail ?? null;
                 }
                 
                 // Set default or first profile as selected
@@ -249,29 +265,23 @@ function ResumeStudioPageContent() {
                     setMasterProfile(fetchedProfile);
                 }
 
-                // 3. Fetch Saved Resumes for this Job
+                // 3. Fetch Saved Resumes for this Job (newest first)
+                let saved: SavedResume[] = [];
                 if (foundJob) {
                     const savedRes = await fetch(`/api/resumes?jobId=${foundJob.id}`);
                     if (savedRes.ok) {
                         const savedJson = await savedRes.json();
-                        setSavedResumes(savedJson.data || []);
+                        saved = savedJson.data || [];
+                        setSavedResumes(saved);
                     }
                 }
 
                 // 4. Check URL for specific resume ID
                 const resumeId = searchParams.get("resumeId");
                 if (resumeId) {
-                    const resumeRes = await fetch(`/api/resumes?jobId=${params.jobId}`);
-                    const resumeJson = await resumeRes.json();
-                    const foundResume = resumeJson.data?.find((r: any) => r.id === resumeId);
-                    if (foundResume) {
-                        setResumeData(foundResume.content);
-                        setHasGenerated(true);
-                        setCurrentResumeId(foundResume.id);
-                        setCurrentResumeName(foundResume.name);
-                        applySavedTemplate(foundResume.templateId);
-                        // Ideally load saved design settings too if we saved them
-                    }
+                    // A link to a version deleted since still opens the newest one.
+                    const foundResume = saved.find((r) => r.id === resumeId) ?? saved[0];
+                    if (foundResume) openSavedResume(foundResume);
                 }
                 // 5. Auto Start from ATS Refine
                 else if (searchParams.get("refine") === "true" && foundJob) {
@@ -295,6 +305,14 @@ function ResumeStudioPageContent() {
                 // 6. Auto Start Normal
                 else if (searchParams.get("autoStart") === "true" && foundJob && fetchedProfile) {
                     setTimeout(() => handleGenerateResume(foundJob, fetchedProfile), 500);
+                }
+                // 7. Open what already exists — from an earlier visit or the
+                //    extension's Application Pack — instead of the generate window.
+                else if (saved.length > 0) {
+                    openSavedResume(saved[0]);
+                } else if (foundJob && !searchParams.get("doc")) {
+                    if (foundJob.coverLetter) setActiveDocument("cover-letter");
+                    else if (foundJob.draftEmail) setActiveDocument("email");
                 }
 
             } catch (error) {
@@ -342,14 +360,10 @@ function ResumeStudioPageContent() {
             const result = await response.json();
             if (result.coverLetter) {
                 setCoverLetter(result.coverLetter);
-                // Save to Job Application
-                await fetch(`/api/jobs/${job.id}`, {
-                    method: "PATCH",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ coverLetter: result.coverLetter }),
-                });
+                await letterSaver.save(result.coverLetter);
             }
             setHasGenerated(true);
+            setRegenerating(false);
             setActiveDocument("cover-letter");
             setMobilePanelView("preview");
         } catch (error) {
@@ -376,14 +390,49 @@ function ResumeStudioPageContent() {
             }
             if (!response.ok) throw new Error("Failed to generate email");
             const result = await response.json();
-            if (result.draftEmail) setDraftEmail(result.draftEmail);
+            if (result.draftEmail) {
+                setDraftEmail(result.draftEmail);
+                await emailSaver.save(result.draftEmail);
+            }
             setHasGenerated(true);
+            setRegenerating(false);
             setActiveDocument("email");
             setMobilePanelView("preview");
         } catch (error) {
             console.error(error);
         } finally {
             setIsGenerating(false);
+        }
+    };
+
+    /**
+     * Stores a freshly generated resume as the next version and makes it the
+     * open one. The open id is cleared first, so if saving fails, Save still
+     * creates a new version rather than overwriting the one it replaced.
+     */
+    const saveResumeVersion = async (currentJob: Job, content: ResumeData) => {
+        setCurrentResumeId(null);
+        setCurrentResumeName("");
+        const saveRes = await fetch("/api/resumes", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                jobId: currentJob.id,
+                content,
+                resumeName: `Resume V${savedResumes.length + 1}`,
+                masterProfileName: masterProfileName,
+                templateId: selectedTemplate
+            }),
+        });
+        if (!saveRes.ok) throw new Error("Failed to save generated resume");
+        const saveJson = await saveRes.json();
+        if (saveJson.data?.id) {
+            setCurrentResumeId(saveJson.data.id);
+            setCurrentResumeName(saveJson.data.name);
+            // Refresh list
+            const updatedListRes = await fetch(`/api/resumes?jobId=${currentJob.id}`);
+            const updatedList = await updatedListRes.json();
+            setSavedResumes(updatedList.data || []);
         }
     };
 
@@ -409,8 +458,12 @@ function ResumeStudioPageContent() {
             const formattedData = toResumeData(aiData, masterProfile, job.jobTitle);
             setResumeData(formattedData);
             setHasGenerated(true);
+            setRegenerating(false);
             setActiveDocument("resume");
             setMobilePanelView("preview");
+            // Saved as the next version, as the Application Pack does, so it is
+            // what opens next time instead of the version it replaced.
+            await saveResumeVersion(job, formattedData);
         } catch (error) {
             console.error(error);
         } finally {
@@ -453,39 +506,13 @@ function ResumeStudioPageContent() {
 
             setResumeData(formattedData);
             setHasGenerated(true);
+            setRegenerating(false);
             setMobilePanelView("preview");
 
-            // 4. Save
-            const saveRes = await fetch("/api/resumes", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    jobId: currentJob.id,
-                    content: formattedData,
-                    resumeName: `Resume V${savedResumes.length + 1}`,
-                    masterProfileName: masterProfileName,
-                    templateId: selectedTemplate
-                }),
-            });
-
-            // 5. Save Cover Letter to Job Application
-            if (result.coverLetter) {
-                await fetch(`/api/jobs/${currentJob.id}`, {
-                    method: "PATCH",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ coverLetter: result.coverLetter }),
-                });
-            }
-
-            if (!saveRes.ok) throw new Error("Failed to save generated resume");const saveJson = await saveRes.json();
-            if (saveJson.data?.id) {
-                setCurrentResumeId(saveJson.data.id);
-                setCurrentResumeName(saveJson.data.name);
-                // Refresh list
-                const updatedListRes = await fetch(`/api/resumes?jobId=${currentJob.id}`);
-                const updatedList = await updatedListRes.json();
-                setSavedResumes(updatedList.data || []);
-            }
+            // 4. Save the letter and email to the job, and the resume as a new version
+            if (result.coverLetter) await letterSaver.save(result.coverLetter);
+            if (result.draftEmail) await emailSaver.save(result.draftEmail);
+            await saveResumeVersion(currentJob, formattedData);
 
         } catch (error) {
             console.error("Error generating resume:", error);
@@ -1064,11 +1091,8 @@ function ResumeStudioPageContent() {
                                     meta={`${new Date(resume.createdAt).toLocaleString()}${resume.extensionData?.masterProfileName ? ` • Tailored using: ${resume.extensionData.masterProfileName}` : ""}`}
                                     active={currentResumeId === resume.id && activeDocument === "resume"}
                                     onClick={() => {
-                                        setResumeData(resume.content);
-                                        setHasGenerated(true);
-                                        setCurrentResumeId(resume.id);
-                                        setCurrentResumeName(resume.name);
-                                        applySavedTemplate(resume.templateId);
+                                        openSavedResume(resume);
+                                        setRegenerating(false);
                                         setActiveDocument("resume");
                                         setMobilePanelView("preview");
                                     }}
@@ -1086,9 +1110,10 @@ function ResumeStudioPageContent() {
                                 <SavedRow
                                     icon={Mail}
                                     title="Cover letter"
-                                    meta={`${coverLetter.trim().split(/\s+/).length} words${letterSaveState === "saving" ? " • saving…" : ""}`}
+                                    meta={`${wordCount(coverLetter)} words${letterSaver.state === "saving" ? " • saving…" : ""}`}
                                     active={activeDocument === "cover-letter"}
                                     onClick={() => {
+                                        setRegenerating(false);
                                         setActiveDocument("cover-letter");
                                         setMobilePanelView("preview");
                                     }}
@@ -1100,15 +1125,16 @@ function ResumeStudioPageContent() {
                             title="Draft email"
                             icon={Send}
                             count={draftEmail ? 1 : 0}
-                            empty="No draft email yet. Generate an Application Pack to create one."
+                            empty="No draft email for this job yet."
                         >
                             {draftEmail && (
                                 <SavedRow
                                     icon={Send}
                                     title="Draft email"
-                                    meta={`${draftEmail.trim().split(/\s+/).length} words • kept for this session`}
+                                    meta={`${wordCount(draftEmail)} words${emailSaver.state === "saving" ? " • saving…" : ""}`}
                                     active={activeDocument === "email"}
                                     onClick={() => {
+                                        setRegenerating(false);
                                         setActiveDocument("email");
                                         setMobilePanelView("preview");
                                     }}
@@ -1232,7 +1258,7 @@ function ResumeStudioPageContent() {
                     onClick={() => setMobilePanelView("editor")}
                     className={`flex-1 py-2.5 text-xs font-bold uppercase tracking-wider transition-all ${mobilePanelView === "editor" ? "text-[var(--primary)] border-b-2 border-[var(--primary)]" : "text-[var(--text-secondary)]"}`}
                 >
-                    {hasGenerated ? "Editor" : "Setup"}
+                    {showSetup ? "Setup" : "Editor"}
                 </button>
                 <button
                     onClick={() => setMobilePanelView("preview")}
@@ -1246,7 +1272,7 @@ function ResumeStudioPageContent() {
 
                 {/* === LEFT PANEL (EDITOR / REVIEW) === */}
                 <div className={`${mobilePanelView === "editor" ? "flex" : "hidden"} md:flex flex-col border-r border-[var(--border-color)] bg-[var(--sidebar-bg)] shrink-0 z-10 shadow-2xl w-full md:w-[45%] xl:w-[45%] md:max-w-[45%] transition-all duration-300 ease-in-out overflow-hidden`}>
-                    {!hasGenerated ? (
+                    {showSetup ? (
                         <>
                             {/* PRE-GENERATION VIEW */}
                             <div className="p-5 border-b border-[var(--border-color)] bg-[var(--background)]">
@@ -1444,7 +1470,10 @@ function ResumeStudioPageContent() {
                                             </div>
                                         </div>
                                         <button
-                                            onClick={() => setHasGenerated(false)}
+                                            onClick={() => {
+                                                setRegenerating(true);
+                                                setMobilePanelView("preview");
+                                            }}
                                             className="shrink-0 flex items-center gap-1.5 h-8 px-3 rounded-lg border border-[var(--border-color)] bg-[var(--background)] text-[11px] font-semibold text-[var(--foreground)] hover:bg-black/5 dark:hover:bg-white/5 transition"
                                         >
                                             <RefreshCw className="w-3.5 h-3.5" /> Regenerate
@@ -1542,25 +1571,46 @@ function ResumeStudioPageContent() {
                 {/* === RIGHT PANEL (PDF PREVIEW / IS GENERATING VIEW) === */}
                 <div className={`${mobilePanelView === "preview" ? "flex" : "hidden"} md:flex flex-1 min-w-0 bg-black/5 dark:bg-[#525659] relative flex-col h-full border-l border-[var(--border-color)] overflow-hidden`}>
                     {(hasGenerated || coverLetter || draftEmail) && !isGenerating && (
-                        <div className="flex items-center justify-center gap-4 py-3 bg-[var(--background)] border-b border-[var(--border-color)] shadow-sm z-10">
-                            <button 
-                                onClick={() => setActiveDocument('resume')} 
-                                className={`px-4 py-1.5 rounded-full text-sm font-bold transition-all ${activeDocument === 'resume' ? 'bg-[var(--primary)] text-[var(--background)] shadow-md' : 'text-[var(--text-secondary)] hover:text-[var(--foreground)] hover:bg-black/5 dark:hover:bg-white/5'}`}
-                            >
-                                📄 Resume
-                            </button>
-                            <button 
-                                onClick={() => setActiveDocument('cover-letter')} 
-                                className={`px-4 py-1.5 rounded-full text-sm font-bold transition-all ${activeDocument === 'cover-letter' ? 'bg-[var(--primary)] text-[var(--background)] shadow-md' : 'text-[var(--text-secondary)] hover:text-[var(--foreground)] hover:bg-black/5 dark:hover:bg-white/5'}`}
-                            >
-                                ✉️ Cover Letter
-                            </button>
-                            <button 
-                                onClick={() => setActiveDocument('email')} 
-                                className={`px-4 py-1.5 rounded-full text-sm font-bold transition-all ${activeDocument === 'email' ? 'bg-[var(--primary)] text-[var(--background)] shadow-md' : 'text-[var(--text-secondary)] hover:text-[var(--foreground)] hover:bg-black/5 dark:hover:bg-white/5'}`}
-                            >
-                                📨 Draft Email
-                            </button>
+                        <div className="@container shrink-0 bg-[var(--background)] border-b border-[var(--border-color)] shadow-sm z-10">
+                            <div className="flex items-center gap-2 px-3 py-3">
+                                {/* Matches the action on the right, so the tabs stay centred. */}
+                                <div className="flex-1 min-w-0" aria-hidden="true" />
+                                <div className="min-w-0 overflow-x-auto">
+                                    <div className="flex items-center gap-1.5 @xl:gap-3">
+                                        {([
+                                            { id: "resume", icon: "📄", label: "Resume" },
+                                            { id: "cover-letter", icon: "✉️", label: "Cover Letter" },
+                                            { id: "email", icon: "📨", label: "Draft Email" },
+                                        ] as const).map((doc) => (
+                                            <button
+                                                key={doc.id}
+                                                onClick={() => {
+                                                    setActiveDocument(doc.id);
+                                                    setRegenerating(false);
+                                                }}
+                                                className={`shrink-0 whitespace-nowrap px-3 @xl:px-4 py-1.5 rounded-full text-xs @xl:text-sm font-bold transition-all ${activeDocument === doc.id ? 'bg-[var(--primary)] text-[var(--background)] shadow-md' : 'text-[var(--text-secondary)] hover:text-[var(--foreground)] hover:bg-black/5 dark:hover:bg-white/5'}`}
+                                            >
+                                                <span className="hidden @xl:inline" aria-hidden="true">{doc.icon} </span>
+                                                {doc.label}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                                <div className="flex-1 flex justify-end">
+                                    {/* A saved document is shown as it is; making it again is a choice. */}
+                                    {!showGenerateWindow && (
+                                        <button
+                                            onClick={() => setRegenerating(true)}
+                                            aria-label={activeDocumentHasContent ? "Regenerate" : "Generate"}
+                                            title={activeDocumentHasContent ? "Regenerate" : "Generate"}
+                                            className="shrink-0 flex items-center gap-1.5 h-8 px-2.5 @md:px-3 rounded-lg border border-[var(--border-color)] bg-[var(--background)] text-xs font-semibold text-[var(--foreground)] hover:border-[var(--primary)]/50 hover:text-[var(--primary)] transition"
+                                        >
+                                            <RefreshCw className="w-3.5 h-3.5" />
+                                            <span className="hidden @md:inline">{activeDocumentHasContent ? "Regenerate" : "Generate"}</span>
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
                         </div>
                     )}
                     {isGenerating ? (
@@ -1582,9 +1632,17 @@ function ResumeStudioPageContent() {
                                 <span>AI is analyzing the job description and matching your profile</span>
                             </div>
                         </div>
-                    ) : !hasGenerated && !activeDocumentHasContent ? (
+                    ) : showGenerateWindow ? (
                         <div className="flex-1 overflow-y-auto bg-[var(--background)]">
                             <div className="max-w-3xl mx-auto px-6 py-10 flex flex-col items-center text-center">
+                                {regenerating && (
+                                    <button
+                                        onClick={() => setRegenerating(false)}
+                                        className="self-start -mt-4 mb-4 flex items-center gap-1.5 h-8 px-3 rounded-lg border border-[var(--border-color)] text-xs font-semibold text-[var(--foreground)] hover:bg-black/5 dark:hover:bg-white/5 transition"
+                                    >
+                                        <ArrowLeft className="w-3.5 h-3.5" /> Back to your documents
+                                    </button>
+                                )}
                                 {/* Drawn rather than shipped as an asset, so it recolours with the
                                     theme: a resume sheet flanked by a document and a sparkle tile. */}
                                 <div className="relative w-[320px] h-[248px] mb-7 shrink-0" aria-hidden="true">
@@ -1634,40 +1692,86 @@ function ResumeStudioPageContent() {
                                 </div>
 
                                 <h2 className="text-2xl font-bold text-[var(--foreground)] tracking-tight">
-                                    Your Job Details are Ready
+                                    {regenerating ? "Regenerate your documents?" : "Your Job Details are Ready"}
                                 </h2>
                                 <p className="text-sm text-[var(--text-secondary)] mt-2 max-w-md leading-relaxed">
-                                    Use the details from this job post and your Master Profile to generate a tailored,
-                                    ATS-optimised resume.
+                                    {regenerating
+                                        ? "You already have documents for this job. Create a fresh one only if you want a new take on it."
+                                        : "Use the details from this job post and your Master Profile to generate a tailored, ATS-optimised resume."}
                                 </p>
 
-                                {/* What happens next */}
-                                <div className="w-full mt-8 rounded-xl border border-[var(--border-color)] bg-[var(--sidebar-bg)]/60 p-5 text-left">
-                                    <p className="text-xs font-bold text-[var(--foreground)] mb-4">What will happen next?</p>
-                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                                        {[
-                                            { icon: Search, title: "AI Analysis", body: "We analyse the job description and match it with your profile." },
-                                            { icon: FileText, title: "Generate Resume", body: "Get a tailored, ATS-optimised resume." },
-                                            { icon: SlidersHorizontal, title: "Review & Refine", body: "Edit, fine-tune and download your resume." },
-                                        ].map((step, i) => (
-                                            <div key={step.title} className="relative">
-                                                <div className="flex items-center gap-2 mb-2">
-                                                    <span className="w-8 h-8 rounded-lg bg-[var(--primary)]/10 text-[var(--primary)] flex items-center justify-center shrink-0">
-                                                        <step.icon className="w-4 h-4" />
+                                {regenerating ? (
+                                    /* What is already saved, so it is clear what a new one replaces */
+                                    <div className="w-full mt-8 rounded-xl border border-[var(--border-color)] bg-[var(--sidebar-bg)]/60 p-5 text-left">
+                                        <p className="text-xs font-bold text-[var(--foreground)] mb-4">Already saved for this job</p>
+                                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                            {[
+                                                {
+                                                    icon: FileText,
+                                                    title: "Resume",
+                                                    ready: savedResumes.length > 0 || Boolean(resumeData),
+                                                    body: savedResumes.length > 0
+                                                        ? `${savedResumes.length} saved version${savedResumes.length === 1 ? "" : "s"}`
+                                                        : resumeData ? "Open, not saved yet" : "Not created yet",
+                                                },
+                                                {
+                                                    icon: Mail,
+                                                    title: "Cover Letter",
+                                                    ready: Boolean(coverLetter),
+                                                    body: coverLetter ? `${wordCount(coverLetter)} words` : "Not created yet",
+                                                },
+                                                {
+                                                    icon: Send,
+                                                    title: "Draft Email",
+                                                    ready: Boolean(draftEmail),
+                                                    body: draftEmail ? `${wordCount(draftEmail)} words` : "Not created yet",
+                                                },
+                                            ].map((doc) => (
+                                                <div key={doc.title} className="flex items-start gap-2.5">
+                                                    <span className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${doc.ready ? "bg-emerald-500/10 text-emerald-500" : "bg-[var(--primary)]/10 text-[var(--primary)]"}`}>
+                                                        {doc.ready ? <Check className="w-4 h-4" /> : <doc.icon className="w-4 h-4" />}
                                                     </span>
-                                                    <span className="w-6 h-6 rounded-full bg-[var(--background)] border border-[var(--border-color)] text-[11px] font-bold text-[var(--text-secondary)] flex items-center justify-center">
-                                                        {i + 1}
-                                                    </span>
-                                                    {i < 2 && (
-                                                        <ChevronRight className="hidden sm:block w-4 h-4 text-[var(--text-secondary)] absolute -right-2.5 top-2" />
-                                                    )}
+                                                    <div className="min-w-0">
+                                                        <p className="text-xs font-bold text-[var(--foreground)]">{doc.title}</p>
+                                                        <p className="text-[11px] text-[var(--text-secondary)] mt-0.5 leading-relaxed">{doc.body}</p>
+                                                    </div>
                                                 </div>
-                                                <p className="text-xs font-bold text-[var(--foreground)]">{step.title}</p>
-                                                <p className="text-[11px] text-[var(--text-secondary)] mt-1 leading-relaxed">{step.body}</p>
-                                            </div>
-                                        ))}
+                                            ))}
+                                        </div>
+                                        <p className="text-[11px] text-[var(--text-secondary)] mt-4 pt-4 border-t border-[var(--border-color)] leading-relaxed">
+                                            A new resume is saved as another version, so earlier ones stay in Saved. A new
+                                            cover letter or email replaces the one you have.
+                                        </p>
                                     </div>
-                                </div>
+                                ) : (
+                                    /* What happens next */
+                                    <div className="w-full mt-8 rounded-xl border border-[var(--border-color)] bg-[var(--sidebar-bg)]/60 p-5 text-left">
+                                        <p className="text-xs font-bold text-[var(--foreground)] mb-4">What will happen next?</p>
+                                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                            {[
+                                                { icon: Search, title: "AI Analysis", body: "We analyse the job description and match it with your profile." },
+                                                { icon: FileText, title: "Generate Resume", body: "Get a tailored, ATS-optimised resume." },
+                                                { icon: SlidersHorizontal, title: "Review & Refine", body: "Edit, fine-tune and download your resume." },
+                                            ].map((step, i) => (
+                                                <div key={step.title} className="relative">
+                                                    <div className="flex items-center gap-2 mb-2">
+                                                        <span className="w-8 h-8 rounded-lg bg-[var(--primary)]/10 text-[var(--primary)] flex items-center justify-center shrink-0">
+                                                            <step.icon className="w-4 h-4" />
+                                                        </span>
+                                                        <span className="w-6 h-6 rounded-full bg-[var(--background)] border border-[var(--border-color)] text-[11px] font-bold text-[var(--text-secondary)] flex items-center justify-center">
+                                                            {i + 1}
+                                                        </span>
+                                                        {i < 2 && (
+                                                            <ChevronRight className="hidden sm:block w-4 h-4 text-[var(--text-secondary)] absolute -right-2.5 top-2" />
+                                                        )}
+                                                    </div>
+                                                    <p className="text-xs font-bold text-[var(--foreground)]">{step.title}</p>
+                                                    <p className="text-[11px] text-[var(--text-secondary)] mt-1 leading-relaxed">{step.body}</p>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
 
                                 {/* Generation actions — three outlined documents on the left,
                                     the combined pack on the right, split by a divider. */}
@@ -1745,7 +1849,8 @@ function ResumeStudioPageContent() {
                             </div>
                         </div>
                     ) : activeDocument === "resume" ? (
-                        resumeData ? (
+                        // A missing resume gets the generate window above.
+                        resumeData && (
                             /* Using Interactive Preview with Canva-like editing */
                             <div className="flex-1 relative min-h-0">
                                 <InteractivePreviewPanel
@@ -1762,12 +1867,6 @@ function ResumeStudioPageContent() {
                                         PRO
                                     </div>
                                 )}
-                            </div>
-                        ) : (
-                            <div className="flex-1 flex flex-col items-center justify-center p-10 text-center text-[var(--foreground)] bg-[var(--background)]">
-                                <FileText className="w-16 h-16 text-[var(--border-color)] mb-4" />
-                                <h3 className="text-xl font-bold mb-2">No Resume Generated</h3>
-                                <p className="text-sm text-[var(--text-secondary)] max-w-md">You haven't generated a tailored resume for this job yet. Click "Generate Resume" or "Generate Application Pack" in the left panel to create one.</p>
                             </div>
                         )
                     ) : activeDocument === "cover-letter" ? (
@@ -1786,15 +1885,7 @@ function ResumeStudioPageContent() {
                                     onChange={(e) => setCoverLetter(e.target.value)}
                                     placeholder="Your Cover Letter will appear here..."
                                 />
-                                {letterSaveState !== "idle" && (
-                                    <span className="absolute top-4 left-4 flex items-center gap-1.5 text-[11px] font-semibold text-[var(--text-secondary)]">
-                                        {letterSaveState === "saving" ? (
-                                            <><Loader2 className="w-3 h-3 animate-spin" /> Saving…</>
-                                        ) : (
-                                            <><Check className="w-3 h-3 text-emerald-500" /> Saved</>
-                                        )}
-                                    </span>
-                                )}
+                                <SaveIndicator state={letterSaver.state} />
                             </div>
                         </div>
                     ) : (
@@ -1813,6 +1904,7 @@ function ResumeStudioPageContent() {
                                     onChange={(e) => setDraftEmail(e.target.value)}
                                     placeholder="Your Draft Email will appear here..."
                                 />
+                                <SaveIndicator state={emailSaver.state} />
                             </div>
                         </div>
                     )}
@@ -1865,6 +1957,70 @@ export default function ResumeStudioPage() {
 }
 
 // Helpers
+
+type SaveState = "idle" | "saving" | "saved";
+
+/**
+ * Keeps one text column on the job — the cover letter or the draft email —
+ * saved as it changes. Edits are debounced so typing doesn't PATCH on every
+ * keystroke; `save` writes straight away, for text that was just generated.
+ * `persistedRef` holds what the server has, so unchanged text is never sent.
+ */
+function useJobTextSaver(
+    jobId: string,
+    field: "coverLetter" | "draftEmail",
+    value: string | null,
+    persistedRef: React.RefObject<string | null>,
+) {
+    const [state, setState] = useState<SaveState>("idle");
+
+    const save = useCallback(async (text: string) => {
+        if (text === persistedRef.current) {
+            setState((s) => (s === "saving" ? "saved" : s));
+            return;
+        }
+        setState("saving");
+        try {
+            const res = await fetch(`/api/jobs/${jobId}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ [field]: text }),
+            });
+            if (!res.ok) throw new Error("save failed");
+            persistedRef.current = text;
+            setState("saved");
+        } catch {
+            setState("idle");
+        }
+    }, [jobId, field, persistedRef]);
+
+    useEffect(() => {
+        if (value === null) return;
+        if (value !== persistedRef.current) setState("saving");
+        const timer = setTimeout(() => void save(value), 900);
+        return () => clearTimeout(timer);
+    }, [value, save, persistedRef]);
+
+    return { state, save };
+}
+
+/** "Saving…" / "Saved" over the cover letter and email editors. */
+function SaveIndicator({ state }: { state: SaveState }) {
+    if (state === "idle") return null;
+    return (
+        <span className="absolute top-4 left-4 flex items-center gap-1.5 text-[11px] font-semibold text-[var(--text-secondary)]">
+            {state === "saving" ? (
+                <><Loader2 className="w-3 h-3 animate-spin" /> Saving…</>
+            ) : (
+                <><Check className="w-3 h-3 text-emerald-500" /> Saved</>
+            )}
+        </span>
+    );
+}
+
+function wordCount(text: string) {
+    return text.trim().split(/\s+/).length;
+}
 
 /** One labelled group in the Saved tab, with its own empty state. */
 function SavedGroup({

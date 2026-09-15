@@ -113,14 +113,24 @@ export default function NaukriSideBySide({ current, optimized, copiedText, onCop
                             copyValue={optimized.employment[i]?.description} limit={NAUKRI_LIMITS.jobProfile}
                             unchanged={job.description === (optimized.employment[i]?.description || "")} />
                     ))}
-                    {current.projects.map((project, i) => (
-                        <Row {...shared} key={`project-${i}`} icon={<FolderKanban className={small} />}
-                            title={`Project \u00B7 ${project.title}`}
-                            before={<Paragraph value={project.description} empty="No project details" />}
-                            after={<Paragraph value={optimized.projects[i]?.description} empty="No project details" />}
-                            copyValue={optimized.projects[i]?.description} limit={NAUKRI_LIMITS.projectDetails}
-                            unchanged={project.description === (optimized.projects[i]?.description || "")} />
-                    ))}
+                    {optimized.projects.map((project, i) => {
+                        const was = current.projects[i];
+                        return (
+                            <Row {...shared} key={`project-${i}`} icon={<FolderKanban className={small} />}
+                                title={`${was ? "Project" : "New project"} \u00B7 ${project.title}`}
+                                before={<Paragraph value={was?.description} empty={was ? "No project details" : "Not on Naukri yet"} />}
+                                after={
+                                    <div className="space-y-1.5">
+                                        {!was && join(project.client, project.duration) && (
+                                            <p className="text-xs text-[var(--text-secondary)]">{join(project.client, project.duration)}</p>
+                                        )}
+                                        <Paragraph value={project.description} empty="No project details" />
+                                    </div>
+                                }
+                                copyValue={project.description} limit={NAUKRI_LIMITS.projectDetails}
+                                unchanged={!!was && was.description === project.description} />
+                        );
+                    })}
                     <Row {...shared} icon={<FileText className={small} />} title="Profile summary"
                         before={<Paragraph value={current.profileSummary} empty="No profile summary" />}
                         after={<Paragraph value={optimized.profileSummary} empty="No profile summary" />}

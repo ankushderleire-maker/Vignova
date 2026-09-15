@@ -179,7 +179,7 @@ export default function AdminExtensionPage() {
                     {/* Extension Version */}
                     <div>
                         <label className="text-xs font-bold uppercase tracking-wider text-gray-400 block mb-1.5">
-                            Current Version <span className="text-blue-400 normal-case">(required)</span>
+                            Latest Version <span className="text-blue-400 normal-case">(required)</span>
                         </label>
                         <input
                             type="text"
@@ -189,9 +189,9 @@ export default function AdminExtensionPage() {
                             className="w-full px-3 py-2.5 bg-zinc-900 border border-white/10 rounded-lg text-sm text-white font-mono placeholder:text-gray-600 focus:outline-none focus:border-blue-500/50"
                         />
                         <p className="text-[11px] text-gray-500 mt-1.5">
-                            Bump this whenever you publish a new extension version. Users with an older
-                            version will see an "Update your extension" notification on the LinkedIn
-                            Optimizer page.
+                            Bump this whenever you publish a new extension version. Anyone on an older
+                            version sees an &ldquo;update available&rdquo; notice in the extension within
+                            about 20 minutes, and can keep using it until they update.
                         </p>
                     </div>
 
@@ -268,8 +268,8 @@ export default function AdminExtensionPage() {
                             className="w-full px-3 py-2.5 bg-zinc-900 border border-white/10 rounded-lg text-sm text-white placeholder:text-gray-600 focus:outline-none focus:border-blue-500/50"
                         />
                         <p className="text-[11px] text-gray-500 mt-1.5">
-                            Shown on the block screen. Say what broke, so the prompt reads as a
-                            fix rather than a nag.
+                            Shown with the update notice, and on the block screen for versions below the
+                            minimum. Say what changed or broke, so the prompt reads as a fix rather than a nag.
                         </p>
                     </div>
                 </div>
@@ -307,7 +307,7 @@ export default function AdminExtensionPage() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
                         {[
                             { label: "Extension ID",      value: settings.extensionId      || "(not set — ID check disabled)" },
-                            { label: "Current Version",   value: settings.extensionVersion },
+                            { label: "Latest Version",    value: settings.extensionVersion },
                             { label: "Display Name",      value: settings.extensionName    || "(not set)" },
                             { label: "Install URL",       value: settings.installUrl       || "(defaults to /dashboard/extension)" },
                         ].map(({ label, value }) => (

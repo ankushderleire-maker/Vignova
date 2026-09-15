@@ -48,11 +48,22 @@
         window.scrollTo(0, startY);
     }
 
+    /**
+     * Clicks a link for the page's own handler only. Naukri's links point at
+     * "javascript:" placeholders, and following one from an extension script
+     * breaks the extension's Content Security Policy, which Chrome lists as an
+     * extension error. Cancelling the default leaves the page's handling as is.
+     */
+    function clickForHandler(link) {
+        link.addEventListener("click", (event) => event.preventDefault(), { once: true });
+        link.click();
+    }
+
     /** Long summaries and job profiles are cut at "Read More" until it is clicked. */
     async function expandReadMore() {
         const links = all(document, "#lazyProfileSummary a.morelink, #lazyEmployment a.morelink, #lazyProject a.morelink")
             .filter((link) => /read more/i.test(textOf(link)));
-        links.forEach((link) => link.click());
+        links.forEach(clickForHandler);
         if (links.length) await sleep(500);
     }
 

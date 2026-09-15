@@ -235,11 +235,121 @@
         row.append(icon(symbol), node('span', 'row-label', label), content, button);
         return row;
     }
+    /**
+     * The profile menu. A native <select> list is drawn by the operating system
+     * and cannot be styled, so each picker opens this menu instead. The hidden
+     * select stays the source of truth: loadProfile() fills it, and choosing a
+     * row fires its change event, which switches the profile as before.
+     */
+    function setupProfileMenus() {
+        document.querySelectorAll('.profile-switcher').forEach(root => {
+            const trigger = root.querySelector('.profile-picker');
+            const menu = root.querySelector('.profile-menu');
+            const select = root.querySelector('select');
+            let focused = -1;
+            const rows = () => [...menu.querySelectorAll('.profile-option')];
+            const focusRow = i => {
+                const items = rows();
+                if (!items.length)
+                    return;
+                focused = (i + items.length) % items.length;
+                items.forEach((row, n) => row.classList.toggle('is-focused', n === focused));
+                items[focused].focus();
+            };
+            const close = returnFocus => {
+                if (menu.hidden)
+                    return;
+                menu.hidden = true;
+                trigger.setAttribute('aria-expanded', 'false');
+                if (returnFocus)
+                    trigger.focus();
+            };
+            const choose = id => {
+                close(true);
+                if (id && id !== select.value) {
+                    select.value = id;
+                    select.dispatchEvent(new Event('change'));
+                }
+            };
+            const render = () => {
+                const options = [...select.options].filter(o => o.value);
+                menu.replaceChildren(node('p', 'profile-menu-title', 'Switch profile'), ...options.map(o => {
+                    const active = o.value === select.value;
+                    const row = node('button', 'profile-option');
+                    row.type = 'button';
+                    row.setAttribute('role', 'option');
+                    row.setAttribute('aria-selected', String(active));
+                    const copy = node('span', 'option-copy');
+                    copy.append(node('strong', '', o.dataset.person || o.textContent), node('small', '', active ? (o.dataset.profile || '') + ' · Active' : o.dataset.profile || ''));
+                    row.append(node('span', 'option-avatar', initials(o.dataset.person || o.textContent)), copy);
+                    if (active) {
+                        const check = icon('check');
+                        check.classList.add('option-check');
+                        row.append(check);
+                    }
+                    row.onclick = () => choose(o.value);
+                    return row;
+                }));
+                const manage = node('button', 'profile-menu-manage');
+                manage.type = 'button';
+                manage.append(icon('plus'), node('span', '', 'Manage profiles'));
+                manage.onclick = () => {
+                    close(false);
+                    openApp('/dashboard/profile');
+                };
+                menu.append(manage);
+            };
+            trigger.onclick = () => {
+                if (!menu.hidden)
+                    return close(true);
+                if (select.disabled || ![...select.options].some(o => o.value))
+                    return;
+                document.querySelectorAll('.profile-switcher').forEach(other => {
+                    if (other !== root) {
+                        other.querySelector('.profile-menu').hidden = true;
+                        other.querySelector('.profile-picker').setAttribute('aria-expanded', 'false');
+                    }
+                });
+                render();
+                menu.hidden = false;
+                trigger.setAttribute('aria-expanded', 'true');
+                focusRow(Math.max(0, rows().findIndex(row => row.getAttribute('aria-selected') === 'true')));
+            };
+            trigger.onkeydown = e => {
+                if (menu.hidden && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
+                    e.preventDefault();
+                    trigger.click();
+                }
+            };
+            menu.onkeydown = e => {
+                if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    focusRow(focused + (e.key === 'ArrowDown' ? 1 : -1));
+                } else if (e.key === 'Escape') {
+                    e.preventDefault();
+                    close(true);
+                } else if (e.key === 'Tab') {
+                    close(false);
+                }
+            };
+            document.addEventListener('mousedown', e => {
+                if (!root.contains(e.target))
+                    close(false);
+            });
+        });
+    }
+    /** "2.5 years", "1 year", or "" when there is no value. */
+    function experienceText(years) {
+        if (years === null || years === undefined || String(years).trim() === '')
+            return '';
+        const n = Number(years);
+        return Number.isFinite(n) ? n + (n === 1 ? ' year' : ' years') : String(years);
+    }
     function renderProfile() {
         const p = state.profile || {};
         $('personalSectionBody').replaceChildren(...personalRows().map(copyRow));
         $('copyAllBtn').disabled = !state.profile;
-        $('workSectionBody').replaceChildren(...[['briefcase', 'Current Title', p.current_title], ['chart', 'Experience', p.years_experience != null && p.years_experience !== '' ? p.years_experience + ' years' : ''], ['globe', 'Work Authorization', [p.work_authorized, p.visa_status, p.needs_sponsorship ? 'Sponsorship: ' + p.needs_sponsorship : ''].filter(Boolean).join(' · ')]].map(copyRow));
+        $('workSectionBody').replaceChildren(...[['briefcase', 'Current Title', p.current_title], ['chart', 'Experience', experienceText(p.years_experience)], ['globe', 'Work Authorization', [p.work_authorized, p.visa_status, p.needs_sponsorship ? 'Sponsorship: ' + p.needs_sponsorship : ''].filter(Boolean).join(' · ')]].map(copyRow));
         const items = skills(p.skills);
         $('skillsSectionCaption').textContent = 'Technical & professional skills (' + items.length + ')';
         $('skillsSectionBody').replaceChildren();
@@ -287,17 +397,29 @@
         state.profiles = results[0].profiles;
         state.profile = results[1].profile;
         const active = state.profiles.find(p => p.is_default) || state.profiles[0];
+        // People know a profile by whose it is, not as "Primary Profile". The
+        // profile's own name is added only where two profiles share a person.
+        const person = p => p.person_name || (p.id === active?.id ? personalRows()[0][2] : '') || p.name;
+        const repeated = new Set(state.profiles.map(person).filter((name, i, all) => all.indexOf(name) !== i));
+        const label = p => repeated.has(person(p)) ? person(p) + ' · ' + p.name : person(p);
         ['activeProfileSelect', 'profileSelect'].forEach(id => {
             $(id).replaceChildren(...state.profiles.map(p => {
-                const option = node('option', '', p.name);
+                const option = node('option', '', label(p));
                 option.value = p.id;
+                option.dataset.person = person(p);
+                option.dataset.profile = p.name;
                 option.selected = p.id === active?.id;
                 return option;
             }));
             $(id).disabled = !state.profiles.length;
         });
-        document.querySelectorAll('.profile-initials').forEach(el => el.textContent = initials(personalRows()[0][2]));
-        $('profileSubtitle').textContent = [state.profile.current_title, state.profile.years_experience ? state.profile.years_experience + ' years experience' : ''].filter(Boolean).join(' · ') || 'Your active profile';
+        const activeName = (active && person(active)) || personalRows()[0][2];
+        const years = experienceText(state.profile.years_experience);
+        const summary = [state.profile.current_title, years ? years + ' experience' : ''].filter(Boolean).join(' · ');
+        document.querySelectorAll('.profile-initials').forEach(el => el.textContent = initials(activeName));
+        document.querySelectorAll('.profile-person').forEach(el => el.textContent = activeName || 'Your profile');
+        document.querySelectorAll('.profile-meta').forEach(el => el.textContent = summary || (active ? active.name : ''));
+        $('profileSubtitle').textContent = summary || 'Your active profile';
         renderProfile();
         void loadDocuments();
     }
@@ -473,7 +595,7 @@
                 $(kind + 'Keywords').append(node('p', 'helper', kind === 'matched' ? 'No matching skills found.' : 'No missing keywords found.'));
         }
     }
-    const actionNames = { resume: 'Tailor Resume', letter: 'Cover Letter', save: 'Save Job', extract: 'Extract Job Details', analyze: 'Check Keyword Match', email: 'Application Email', hr: 'Message HR' };
+    const actionNames = { resume: 'Tailor Resume', letter: 'Cover Letter', save: 'Save Job', extract: 'Extract Job Details', analyze: 'Check Keyword Match', email: 'Application Email', hr: 'Draft HR Message' };
     async function editJob(action, blank = false) {
         state.pasteAction = action;
         if (['resume', 'letter', 'email', 'hr'].includes(action) && !await paid(actionNames[action]))
@@ -661,6 +783,28 @@
             $('webSessionAvatar').textContent = initials(user.name || user.email);
         }
     }
+    /**
+     * A newer build is out but this one still works, so say so without getting
+     * in the way. Dismissing the notice hides it until the next release.
+     */
+    async function showUpdateNotice(update) {
+        const banner = $('updateBanner');
+        if (!update?.updateAvailable || update.blocked || !update.latest) {
+            banner.hidden = true;
+            return;
+        }
+        const { vignova_update_dismissed: dismissed } = await chrome.storage.local.get('vignova_update_dismissed');
+        if (dismissed === update.latest)
+            return;
+        $('updateBannerTitle').textContent = 'Vignova ' + update.latest + ' is available';
+        $('updateBannerNote').textContent = update.note || 'Update to get the latest fixes and features.';
+        $('updateBannerBtn').onclick = () => chrome.tabs.create({ url: safeUrl(update.installUrl) || 'https://chromewebstore.google.com/search/vignova' });
+        $('updateBannerClose').onclick = () => {
+            banner.hidden = true;
+            void chrome.storage.local.set({ vignova_update_dismissed: update.latest });
+        };
+        banner.hidden = false;
+    }
     async function bootstrap() {
         try {
             const update = await msg('GET_UPDATE_STATE');
@@ -688,6 +832,7 @@
                 throw new Error('This account cannot access the extension. Please contact Vignova support.');
             renderPlan(r);
             show('dashboardView');
+            void showUpdateNotice(update);
             const results = await Promise.allSettled([loadProfile(), loadOverview()]);
             if (results[0].status === 'rejected') {
                 renderProfile();
@@ -695,6 +840,7 @@
                     $(id).replaceChildren(node('option', '', 'Add a profile in Vignova'));
                     $(id).disabled = true;
                 });
+                document.querySelectorAll('.profile-person').forEach(el => el.textContent = 'Add a profile in Vignova');
                 fail(results[0].reason);
             }
             if (results[1].status === 'rejected') {
@@ -794,18 +940,14 @@
     });
     for (const id of ['activeProfileSelect', 'profileSelect'])
         $(id).onchange = e => void switchProfile(e.target.value);
+    setupProfileMenus();
     $('copyAllBtn').onclick = () => copy(personalRows().filter(r => r[2]).map(r => r[1] + ': ' + r[2]).join('\n'));
     $('editProfileLink').onclick = () => openApp('/dashboard/profile');
     for (const id of ['jobTrackerLink', 'recentViewAllBtn', 'analyticsTrackerBtn'])
         $(id).onclick = () => openApp('/dashboard/jobs');
     $('analyticsBtn').onclick = analytics;
     $('retryJobsBtn').onclick = () => busy('Loading your jobs…', async () => { try { await loadOverview(); } catch(e) { $('retryJobsBtn').hidden = false; throw e; } });
-    $('showAllToolsBtn').onclick = () => {
-        const expanded = $('moreTools').hidden;
-        $('moreTools').hidden = !expanded;
-        $('showAllToolsBtn').setAttribute('aria-expanded', String(expanded));
-        $('showAllToolsBtn').replaceChildren(document.createTextNode(expanded ? 'Show fewer tools' : 'Show all tools'), icon('arrow'));
-    };
+    // Draft HR Message and Draft Email are always on show now; there is no toggle.
     $('supportedSitesList').textContent = 'LinkedIn, Indeed, Workday, Greenhouse, Lever, Ashby and other standard application forms. Custom forms may require manual input.';
     for (const [id, action] of Object.entries({ tailorResumeBtn: 'resume', coverLetterBtn: 'letter', extractJobBtn: 'extract', saveJobBtn: 'save', hrMessageBtn: 'hr', applyEmailBtn: 'email', updateResumeBtn: 'resume' }))
         $(id).onclick = () => void editJob(action);
